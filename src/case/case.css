@@ -1,0 +1,502 @@
+:root {
+  --bg: #07060c;
+  --ink: rgba(244, 236, 220, 0.88);
+  --ink-dim: rgba(244, 236, 220, 0.44);
+  --line: rgba(244, 236, 220, 0.14);
+  --edge: clamp(1.25rem, 4vw, 4rem);
+
+  /* The layout primitive: a narrow label gutter, then the content column.
+     Everything on the page hangs off this one grid. */
+  --gutter: clamp(6rem, 18vw, 15rem);
+  --gap: clamp(1.5rem, 4vw, 4rem);
+  --measure: 62ch;
+}
+
+* {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+a {
+  color: inherit;
+}
+
+/* Site chrome ------------------------------------------------------------ */
+
+.case-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem var(--edge);
+  background: rgba(7, 6, 12, 0.78);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.75rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.case-nav a {
+  text-decoration: none;
+  color: var(--ink-dim);
+  transition: color 200ms ease;
+}
+
+.case-nav a:hover,
+.case-nav a:focus-visible {
+  color: var(--ink);
+}
+
+.case-nav .home {
+  color: var(--ink);
+}
+
+/* Hero ------------------------------------------------------------------- */
+
+.case-hero {
+  padding: clamp(4rem, 16vh, 11rem) var(--edge) clamp(2.5rem, 8vh, 5rem);
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  gap: 0 var(--gap);
+  border-bottom: 1px solid var(--line);
+}
+
+.case-index {
+  grid-column: 1;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  padding-top: 0.6rem;
+}
+
+.case-title {
+  grid-column: 2;
+  font-size: clamp(1.5rem, 3.4vw, 2.5rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.case-headline {
+  grid-column: 2;
+  margin-top: 0.75rem;
+  max-width: 22ch;
+  font-size: clamp(2rem, 6.4vw, 5rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.case-meta {
+  grid-column: 2;
+  margin-top: clamp(2rem, 6vh, 4rem);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 1.25rem 2rem;
+  font-size: 0.8125rem;
+}
+
+.case-meta dt {
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+  margin-bottom: 0.2rem;
+}
+
+.case-meta dd {
+  margin: 0;
+}
+
+/* The label/content row -------------------------------------------------- */
+
+.row {
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  gap: 0 var(--gap);
+  padding: clamp(3rem, 10vh, 7rem) var(--edge);
+  border-bottom: 1px solid var(--line);
+}
+
+.row-label {
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  /* Sticks alongside long content, so you always know which section you're in. */
+  position: sticky;
+  top: 4.5rem;
+  align-self: start;
+}
+
+.prose {
+  max-width: var(--measure);
+  display: grid;
+  gap: 1.25rem;
+  color: rgba(244, 236, 220, 0.72);
+  text-wrap: pretty;
+}
+
+.prose p:first-child {
+  font-size: clamp(1.0625rem, 1.6vw, 1.3125rem);
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* What I did ------------------------------------------------------------- */
+
+.did-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.6rem 2rem;
+  max-width: 52rem;
+}
+
+.did-list li {
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.9375rem;
+  color: rgba(244, 236, 220, 0.74);
+}
+
+/* Outcomes --------------------------------------------------------------- */
+
+.outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: clamp(2rem, 5vh, 3.5rem) var(--gap);
+}
+
+.outcome-figure {
+  display: flex;
+  align-items: flex-start;
+  line-height: 0.86;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.outcome-value {
+  font-size: clamp(3.25rem, 8vw, 6rem);
+  font-weight: 800;
+}
+
+/* Prefix and unit ride at the cap-height of the numeral, like the reference's
+   $100M — raised and much smaller, not baseline-aligned. */
+.outcome-prefix,
+.outcome-unit {
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
+  font-weight: 800;
+  padding-top: 0.14em;
+}
+
+.outcome-caption {
+  margin-top: 1rem;
+  max-width: 26ch;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+/* Pull quote ------------------------------------------------------------- */
+
+.pull-quote {
+  margin: 0;
+  padding: clamp(3rem, 10vh, 7rem) var(--edge);
+  border-bottom: 1px solid var(--line);
+}
+
+.pull-quote blockquote {
+  margin: 0 0 1.5rem;
+  max-width: 26ch;
+  margin-inline: auto;
+  font-size: clamp(1.375rem, 3.4vw, 2.5rem);
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.pull-quote figcaption {
+  display: grid;
+  gap: 0.15rem;
+  text-align: center;
+  font-size: 0.8125rem;
+}
+
+.quote-role {
+  color: var(--ink-dim);
+}
+
+/* Takeaways -------------------------------------------------------------- */
+
+.takeaway-index {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: 46rem;
+}
+
+.takeaway-index li {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  align-items: baseline;
+  gap: 1rem;
+  padding: clamp(0.9rem, 2vh, 1.4rem) 0;
+  border-top: 1px solid var(--line);
+}
+
+.takeaway-num,
+.chapter-num {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+
+.takeaway-name {
+  font-size: clamp(1.125rem, 2.4vw, 1.75rem);
+  line-height: 1.15;
+}
+
+.chapter {
+  padding: clamp(3.5rem, 12vh, 8rem) var(--edge);
+  border-bottom: 1px solid var(--line);
+}
+
+.chapter-head {
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  gap: 0 var(--gap);
+  margin-bottom: clamp(2rem, 6vh, 4rem);
+}
+
+.chapter-num {
+  grid-column: 1;
+  padding-top: 0.7rem;
+}
+
+.chapter-title {
+  grid-column: 2;
+  font-size: clamp(1.75rem, 5vw, 3.5rem);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  max-width: 18ch;
+  text-wrap: balance;
+}
+
+.chapter-section {
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  gap: 0 var(--gap);
+}
+
+.chapter-section + .chapter-section {
+  margin-top: clamp(2rem, 6vh, 3.5rem);
+}
+
+.chapter-sub {
+  grid-column: 1;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink-dim);
+  padding-top: 0.3rem;
+}
+
+.chapter-section .prose {
+  grid-column: 2;
+}
+
+.chapter-section .prose p:first-child {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(244, 236, 220, 0.72);
+}
+
+.inline-quote {
+  grid-column: 2;
+  margin: 1.5rem 0 0;
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--line);
+  max-width: var(--measure);
+}
+
+.inline-quote blockquote {
+  margin: 0 0 0.5rem;
+  font-size: 1.0625rem;
+  line-height: 1.45;
+}
+
+.inline-quote figcaption {
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+}
+
+/* More work -------------------------------------------------------------- */
+
+.more-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.more-item + .more-item {
+  border-top: 1px solid var(--line);
+}
+
+.more-item a {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  align-items: baseline;
+  gap: 1rem;
+  padding: clamp(0.9rem, 2.2vh, 1.5rem) 0;
+  text-decoration: none;
+}
+
+.more-num,
+.more-meta {
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+  transition: color 200ms ease;
+}
+
+.more-num {
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.more-title {
+  font-size: clamp(1.125rem, 2.6vw, 1.875rem);
+  display: inline-block;
+  transition: transform 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.more-item a:hover .more-title,
+.more-item a:focus-visible .more-title {
+  transform: translateX(clamp(0.35rem, 1vw, 0.85rem));
+}
+
+.more-item a:hover .more-num,
+.more-item a:hover .more-meta,
+.more-item a:focus-visible .more-num,
+.more-item a:focus-visible .more-meta {
+  color: var(--ink);
+}
+
+/* Footer ----------------------------------------------------------------- */
+
+.case-foot {
+  padding: clamp(3rem, 9vh, 6rem) var(--edge);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.case-foot a {
+  text-decoration: none;
+}
+
+.case-foot a:hover {
+  color: var(--ink);
+}
+
+.not-found {
+  padding: 8rem var(--edge);
+  text-align: center;
+  color: var(--ink-dim);
+}
+
+/* Scroll reveal ---------------------------------------------------------- */
+
+/* Scoped to .js so the page is readable even if the module never runs. Hiding
+   content by default and relying on script to bring it back is how a broken
+   bundle turns into a blank page. */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 600ms ease, transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.js .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal {
+    transition: none;
+  }
+}
+
+/* Narrow screens: the gutter becomes a stacked label rather than a column. */
+@media (max-width: 720px) {
+  :root {
+    --gutter: 1fr;
+  }
+
+  .case-hero,
+  .row,
+  .chapter-head,
+  .chapter-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .case-index,
+  .case-title,
+  .case-headline,
+  .case-meta,
+  .chapter-num,
+  .chapter-title,
+  .chapter-section .prose,
+  .inline-quote {
+    grid-column: 1;
+  }
+
+  .row-label,
+  .chapter-sub {
+    position: static;
+    margin-bottom: 1.25rem;
+  }
+
+  .takeaway-index li,
+  .more-item a {
+    grid-template-columns: 2.5rem 1fr;
+  }
+
+  .more-meta {
+    grid-column: 2;
+  }
+}

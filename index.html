@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Gabriel Ganzarolli</title>
+    <meta name="description" content="Product Designer based in São Paulo." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div class="preloader" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+
+    <div class="overlay">
+      <h1 class="name">Gabriel Ganzarolli</h1>
+
+      <p class="bio" data-fade-on-scroll>
+        Product Designer based in São&nbsp;Paulo, currently working for the largest bank in
+        Latin&nbsp;America. Special interest in design engineering and philosophy.
+      </p>
+
+      <p class="hint" data-fade-on-scroll>Hover the name</p>
+
+      <button class="sound-toggle" type="button" aria-pressed="true">Sound on</button>
+    </div>
+
+    <main>
+      <!-- Scroll room for the particle text to morph into WORK before the case list
+           arrive. The hero itself is the fixed canvas behind everything. -->
+      <div class="hero-space" aria-hidden="true"></div>
+
+      <section class="work" id="work" data-solid aria-label="Selected work">
+        <h2 class="work-title reveal">Selected work</h2>
+
+        <!-- PLACEHOLDER CASES. Replace the titles, disciplines and years, and
+             point each href at the real case. No imagery by design. -->
+        <ol class="cases">
+          <li class="case reveal">
+            <a href="./work/project-01.html">
+              <span class="case-index">01</span>
+              <span class="case-title">Project title</span>
+              <span class="case-meta">Product design</span>
+              <span class="case-year">2026</span>
+            </a>
+          </li>
+          <li class="case reveal">
+            <a href="./work/project-02.html">
+              <span class="case-index">02</span>
+              <span class="case-title">Project title</span>
+              <span class="case-meta">Design engineering</span>
+              <span class="case-year">2025</span>
+            </a>
+          </li>
+          <li class="case reveal">
+            <a href="./work/project-03.html">
+              <span class="case-index">03</span>
+              <span class="case-title">Project title</span>
+              <span class="case-meta">Design system</span>
+              <span class="case-year">2025</span>
+            </a>
+          </li>
+          <li class="case reveal">
+            <a href="./work/project-04.html">
+              <span class="case-index">04</span>
+              <span class="case-title">Project title</span>
+              <span class="case-meta">Prototype</span>
+              <span class="case-year">2024</span>
+            </a>
+          </li>
+          <li class="case reveal">
+            <a href="./work/project-05.html">
+              <span class="case-index">05</span>
+              <span class="case-title">Project title</span>
+              <span class="case-meta">Research</span>
+              <span class="case-year">2024</span>
+            </a>
+          </li>
+          <li class="case reveal">
+            <a href="./work/project-06.html">
+              <span class="case-index">06</span>
+              <span class="case-title">Project title</span>
+              <span class="case-meta">Interface</span>
+              <span class="case-year">2023</span>
+            </a>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Transparent gap: the canvas shows through here, and the particles
+           morph from WORK into ABOUT ME as it scrolls in. -->
+      <div class="about-space" aria-hidden="true"></div>
+
+      <section class="about" data-solid aria-label="About">
+        <h2 class="about-title reveal">About me</h2>
+
+        <div class="about-body">
+          <p class="lede reveal">
+            I'm a Product Designer based in São&nbsp;Paulo, currently working for the largest bank
+            in Latin&nbsp;America.
+          </p>
+
+          <p class="reveal">
+            I have a special interest in design engineering — the seam where interface decisions
+            stop being drawings and start being behaviour — and in philosophy.
+          </p>
+
+          <p class="reveal">
+            <!-- Replace with your real address before publishing. -->
+            <a class="about-link" href="mailto:hello@example.com">Get in touch</a>
+          </p>
+        </div>
+      </section>
+
+      <footer class="foot" data-solid>
+        <p>Gabriel Ganzarolli — São Paulo</p>
+      </footer>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

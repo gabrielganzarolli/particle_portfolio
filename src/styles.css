@@ -1,0 +1,372 @@
+:root {
+  --bg: #07060c;
+  --ink: rgba(244, 236, 220, 0.86);
+  --ink-dim: rgba(244, 236, 220, 0.42);
+  --line: rgba(244, 236, 220, 0.14);
+  --edge: clamp(1.25rem, 3.2vw, 2.75rem);
+}
+
+* {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The particle field is a fixed backdrop; the document scrolls over it. */
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  /* pan-y, not none — `none` would swallow vertical scrolling on touch. */
+  touch-action: pan-y;
+}
+
+/* Hero chrome, pinned over the canvas and never eating pointer events. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  padding: var(--edge);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  gap: 1rem;
+}
+
+.name {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.bio {
+  grid-column: 1;
+  grid-row: 3;
+  align-self: end;
+  max-width: 30ch;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+.hint {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+}
+
+/* The one interactive thing in the overlay, so it opts back into events. It is
+   deliberately not faded on scroll — silencing a page has to stay reachable. */
+.sound-toggle {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: end;
+  justify-self: end;
+  pointer-events: auto;
+  appearance: none;
+  /* Backed and pilled, not a bare underline: it floats over the scrolling
+     content and lands right on the case list's year column, where an unstyled
+     label reads as part of the list rather than as a control. */
+  background: rgba(7, 6, 12, 0.72);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 200ms ease, border-color 200ms ease, background-color 200ms ease;
+}
+
+.sound-toggle:hover,
+.sound-toggle:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink);
+  background: rgba(7, 6, 12, 0.9);
+}
+
+/* Scrolling content ------------------------------------------------------ */
+
+main {
+  position: relative;
+  z-index: 1;
+  /* Transparent, but its box still covers the fixed canvas and would otherwise
+     be the hit target across the whole hero. Real content re-enables below. */
+  pointer-events: none;
+}
+
+.work,
+.about,
+.foot {
+  pointer-events: auto;
+}
+
+.hero-space {
+  height: 170vh;
+}
+
+.about-space {
+  /* The morph has to finish before the About section starts covering the
+     canvas, so this has to grow with PACE in scrollWork.js — at PACE 1.5 the
+     WORK -> ABOUT ME morph ends around gapTop -0.10, and the section must not
+     reach the viewport bottom before then. */
+  height: 115vh;
+}
+
+/* Content sections fade in at the top so the particle field dissolves behind
+   them instead of being cut off by a hard edge. */
+.about {
+  padding: clamp(1.75rem, 5vh, 3.25rem) var(--edge) clamp(4rem, 12vh, 8rem);
+  background: linear-gradient(
+    to bottom,
+    rgba(7, 6, 12, 0) 0%,
+    rgba(7, 6, 12, 0.82) 11%,
+    var(--bg) 24%,
+    var(--bg) 100%
+  );
+}
+
+/* Work also fades back out at the bottom, because the gap that follows it has
+   to reopen onto the canvas for the ABOUT ME phrase. About is the last section
+   before the footer, so it stays solid all the way down. */
+.work {
+  padding: clamp(3rem, 9vh, 7rem) var(--edge) clamp(2.5rem, 7vh, 5rem);
+  background: linear-gradient(
+    to bottom,
+    rgba(7, 6, 12, 0) 0%,
+    rgba(7, 6, 12, 0.82) 11%,
+    var(--bg) 24%,
+    var(--bg) 78%,
+    rgba(7, 6, 12, 0.82) 91%,
+    rgba(7, 6, 12, 0) 100%
+  );
+}
+
+.about-title,
+.work-title {
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+/* Text-only case list — no thumbnails. The titles carry the section, so they
+   are the largest thing in it after the particle headline. */
+.cases {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* JS writes transform/opacity per element for the scroll-staggered reveal;
+   `will-change` keeps each one on its own compositor layer. */
+.reveal {
+  will-change: transform, opacity;
+}
+
+.case + .case {
+  border-top: 1px solid var(--line);
+}
+
+.case a {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: clamp(1rem, 3vw, 3rem);
+  padding: clamp(1.1rem, 2.6vh, 1.9rem) 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.case-index {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  transition: color 220ms ease;
+}
+
+.case-title {
+  font-size: clamp(1.25rem, 3.4vw, 2.25rem);
+  line-height: 1.1;
+  color: var(--ink);
+  /* Shifts right on hover. The transition lives on this inner span so it never
+     fights the row's own scroll-reveal transform, which JS writes on .case. */
+  display: inline-block;
+  transition: transform 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.case-meta,
+.case-year {
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+  transition: color 220ms ease;
+}
+
+.case-year {
+  font-variant-numeric: tabular-nums;
+}
+
+.case a:hover .case-title,
+.case a:focus-visible .case-title {
+  transform: translateX(clamp(0.4rem, 1.2vw, 1rem));
+}
+
+.case a:hover .case-index,
+.case a:focus-visible .case-index,
+.case a:hover .case-meta,
+.case a:focus-visible .case-meta,
+.case a:hover .case-year,
+.case a:focus-visible .case-year {
+  color: var(--ink);
+}
+
+/* Four columns crush together on a narrow screen; drop the discipline onto its
+   own line under the title instead. */
+@media (max-width: 640px) {
+  .case a {
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem 1rem;
+  }
+
+  .case-meta {
+    grid-column: 2 / -1;
+  }
+}
+
+.about-body {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 46ch;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+.about-body .lede {
+  font-size: clamp(1.125rem, 2.2vw, 1.5rem);
+  line-height: 1.4;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+
+.about-link {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 2px;
+  transition: border-color 250ms ease;
+}
+
+.about-link:hover,
+.about-link:focus-visible {
+  border-bottom-color: var(--ink);
+}
+
+.foot {
+  padding: 0 var(--edge) clamp(2rem, 6vh, 4rem);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  background: var(--bg);
+}
+
+/* Preloader — the reference's own loading state is a scatter of particles, so
+   this mirrors it rather than showing a spinner. */
+.preloader {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  background: var(--bg);
+  z-index: 10;
+  opacity: 1;
+  transition: opacity 700ms ease;
+}
+
+.preloader.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preloader span {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: drift 2.4s ease-in-out infinite;
+}
+
+.preloader span:nth-child(1)  { transform: translate(-38px, -22px); animation-delay: -0.05s; }
+.preloader span:nth-child(2)  { transform: translate(  9px, -41px); animation-delay: -0.31s; }
+.preloader span:nth-child(3)  { transform: translate( 34px, -12px); animation-delay: -0.62s; }
+.preloader span:nth-child(4)  { transform: translate(-19px,  27px); animation-delay: -0.94s; }
+.preloader span:nth-child(5)  { transform: translate( 26px,  33px); animation-delay: -1.22s; }
+.preloader span:nth-child(6)  { transform: translate(-44px,   6px); animation-delay: -1.51s; }
+.preloader span:nth-child(7)  { transform: translate(  2px,  12px); animation-delay: -1.83s; }
+.preloader span:nth-child(8)  { transform: translate( 45px, -34px); animation-delay: -2.11s; }
+.preloader span:nth-child(9)  { transform: translate(-28px, -46px); animation-delay: -0.18s; }
+.preloader span:nth-child(10) { transform: translate( 15px,  47px); animation-delay: -0.44s; }
+.preloader span:nth-child(11) { transform: translate(-52px,  36px); animation-delay: -0.76s; }
+.preloader span:nth-child(12) { transform: translate( 52px,  14px); animation-delay: -1.07s; }
+.preloader span:nth-child(13) { transform: translate( -8px,  -8px); animation-delay: -1.38s; }
+.preloader span:nth-child(14) { transform: translate( 21px, -25px); animation-delay: -1.69s; }
+.preloader span:nth-child(15) { transform: translate(-35px,  50px); animation-delay: -1.97s; }
+
+@keyframes drift {
+  0%, 100% { opacity: 0.15; }
+  50%      { opacity: 0.9; }
+}
+
+.fatal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-dim);
+  background: var(--bg);
+  z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader span {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .case-title {
+    transition: none;
+  }
+}
