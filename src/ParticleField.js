@@ -16,22 +16,25 @@ const VELOCITY_SHADER = `${simplex}\n${curl}\n${simVelocity}`;
 const POINTS_VERT = `${simplex}\n${pointsVert}`;
 
 // The damping term works out to c = -60*ln(damping) per second, so critical
-// damping sits at spring = (c/2)^2 — about 14.7 at 0.88. Sitting just above it
-// gives a crisp arrival with a trace of overshoot, and settles in ~0.5s.
+// damping sits at spring = (c/2)^2 — about 8.0 at 0.91. Sitting just above it
+// gives a soft arrival with the faintest overshoot, settling over ~0.8s. The
+// earlier 16/0.88 pair was well above critical and snapped into place.
 const DEFAULTS = {
-  spring: 16.0,
-  damping: 0.88,
-  turbulence: 0.28,
-  noiseScale: 0.42,
-  flow: 0.09,
-  maxSpeed: 14.0,
+  spring: 9.0,
+  damping: 0.91,
+  // Bigger, slower eddies. Amplitude came down because the weaker spring lets
+  // the same force push further — displacement is force/spring, so holding
+  // turbulence at 0.28 would have loosened the letterforms.
+  turbulence: 0.24,
+  noiseScale: 0.28,
+  flow: 0.055,
+  maxSpeed: 10.0,
   // Equilibrium displacement under the cursor is repel/spring world units, so
-  // 13/16 pushes the field about a third of a text-height aside — a clear wake that
-  // still leaves the letters readable. At 62 it punched a hole and piled the
-  // displaced particles into a blown-out crescent.
-  repel: 13.0,
-  wake: 0.08,
-  radius: 1.35,
+  // 8/9 keeps roughly the previous reach while the wider radius spreads it over
+  // more of the field — a soft swell rather than a sharp dent.
+  repel: 8.0,
+  wake: 0.06,
+  radius: 1.6,
   // ~2 device pixels per particle. Larger than that and 262k additive sprites
   // overdraw each other into a solid white slab with no letterforms left.
   pointSize: 0.008,

@@ -67,47 +67,6 @@ body {
   text-wrap: pretty;
 }
 
-.hint {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  color: var(--ink-dim);
-}
-
-/* The one interactive thing in the overlay, so it opts back into events. It is
-   deliberately not faded on scroll — silencing a page has to stay reachable. */
-.sound-toggle {
-  grid-column: 2;
-  grid-row: 3;
-  align-self: end;
-  justify-self: end;
-  pointer-events: auto;
-  appearance: none;
-  /* Backed and pilled, not a bare underline: it floats over the scrolling
-     content and lands right on the case list's year column, where an unstyled
-     label reads as part of the list rather than as a control. */
-  background: rgba(7, 6, 12, 0.72);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.45rem 0.9rem;
-  font: inherit;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  color: var(--ink-dim);
-  cursor: pointer;
-  transition: color 200ms ease, border-color 200ms ease, background-color 200ms ease;
-}
-
-.sound-toggle:hover,
-.sound-toggle:focus-visible {
-  color: var(--ink);
-  border-color: var(--ink);
-  background: rgba(7, 6, 12, 0.9);
-}
-
 /* Scrolling content ------------------------------------------------------ */
 
 main {
@@ -125,21 +84,21 @@ main {
 }
 
 .hero-space {
-  height: 170vh;
+  height: 245vh;
 }
 
 .about-space {
   /* The morph has to finish before the About section starts covering the
-     canvas, so this has to grow with PACE in scrollWork.js — at PACE 1.5 the
-     WORK -> ABOUT ME morph ends around gapTop -0.10, and the section must not
-     reach the viewport bottom before then. */
-  height: 115vh;
+     canvas, so this has to grow with PACE in scrollWork.js. Minimum height is
+     (1 - (0.44 - 0.36 * PACE)) — at PACE 2.0 the morph ends around gapTop
+     -0.28, so the gap needs at least 128vh. 132vh leaves a small margin. */
+  height: 140vh;
 }
 
 /* Content sections fade in at the top so the particle field dissolves behind
    them instead of being cut off by a hard edge. */
 .about {
-  padding: clamp(1.75rem, 5vh, 3.25rem) var(--edge) clamp(4rem, 12vh, 8rem);
+  padding: clamp(3rem, 9vh, 6rem) var(--edge) clamp(5rem, 16vh, 11rem);
   background: linear-gradient(
     to bottom,
     rgba(7, 6, 12, 0) 0%,
@@ -153,7 +112,7 @@ main {
    to reopen onto the canvas for the ABOUT ME phrase. About is the last section
    before the footer, so it stays solid all the way down. */
 .work {
-  padding: clamp(3rem, 9vh, 7rem) var(--edge) clamp(2.5rem, 7vh, 5rem);
+  padding: clamp(4rem, 13vh, 9rem) var(--edge) clamp(4rem, 13vh, 9rem);
   background: linear-gradient(
     to bottom,
     rgba(7, 6, 12, 0) 0%,
@@ -185,10 +144,40 @@ main {
   margin: 0;
 }
 
-/* JS writes transform/opacity per element for the scroll-staggered reveal;
-   `will-change` keeps each one on its own compositor layer. */
-.reveal {
+/* Scroll-staggered reveal. JS only toggles .is-in; the motion lives here, so it
+   runs on its own clock instead of tracking the scroll wheel's discrete steps.
+   Opacity is given a longer, later ramp than the movement — text that finishes
+   sliding slightly before it finishes fading reads softer than the two landing
+   together. Scoped to .js so a failed bundle leaves the content visible. */
+.js .reveal {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition:
+    opacity 1500ms cubic-bezier(0.33, 0, 0.2, 1) 60ms,
+    transform 1250ms cubic-bezier(0.16, 0.62, 0.18, 1);
   will-change: transform, opacity;
+}
+
+.js .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal {
+    transition: none;
+  }
+}
+
+/* Sits below the last row, sharing its rule so it reads as the end of the
+   list rather than as a separate block. */
+.cases-note {
+  margin-top: 0;
+  padding: clamp(2.25rem, 5.5vh, 3.75rem) 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
 }
 
 .case + .case {
@@ -200,7 +189,7 @@ main {
   grid-template-columns: auto 1fr auto auto;
   align-items: baseline;
   gap: clamp(1rem, 3vw, 3rem);
-  padding: clamp(1.1rem, 2.6vh, 1.9rem) 0;
+  padding: clamp(2.25rem, 5.5vh, 3.75rem) 0;
   text-decoration: none;
   color: inherit;
 }

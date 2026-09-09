@@ -1,12 +1,3 @@
-export function createOverlay({ reducedMotion, coarsePointer }) {
-  const hint = document.querySelector('.hint');
-  if (!hint) return;
-
-  if (reducedMotion) hint.textContent = 'Reduced motion — animation held still';
-  else if (coarsePointer) hint.textContent = 'Tap the name';
-  else hint.textContent = 'Hover the name';
-}
-
 export function hidePreloader() {
   const el = document.querySelector('.preloader');
   if (!el) return;

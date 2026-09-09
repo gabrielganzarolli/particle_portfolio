@@ -1,17 +1,17 @@
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
 // One dial for how fast everything scroll-linked feels. Every duration below is
 // a fraction of viewport height, so raising this spreads each motion over more
 // scroll without changing where any of them start. 1 = the earlier tuning.
-const PACE = 1.5;
+const PACE = 2.0;
 
-// How far a revealed element travels, and how much of a viewport height that
-// reveal is spread over. Travel is a fixed distance, not a duration, so it is
-// deliberately outside PACE — scaling it would make things drift further, not
-// move more slowly.
-const REVEAL_TRAVEL_PX = 88;
-const REVEAL_VH = 0.22 * PACE;
+// Where an element flips to revealed, as a fraction of viewport height from the
+// top. Reveals used to be scrubbed — transform and opacity recomputed from
+// scroll offset every frame — which ties the motion to the scroll wheel's
+// discrete steps and reads as juddery however gently it's eased. They are now a
+// one-shot class toggle, with duration and travel handled by CSS transition, so
+// the motion is smooth regardless of how the page is being scrolled.
+const REVEAL_TRIGGER_VH = 0.92;
 
 // Scroll distance over which the particle text morphs into WORK. The phrase
 // should land before the case list starts covering it.
@@ -67,13 +67,11 @@ export function createScrollWork() {
       const aboutSpaceTop = aboutSpace ? aboutSpace.getBoundingClientRect().top : Infinity;
 
       // --- write pass ---
+      // A one-way class toggle. Each element still staggers itself by its own
+      // position on the page, so no per-element delays are needed, but the
+      // motion itself is now CSS's job.
       for (let i = 0; i < revealed.length; i++) {
-        // 0 when the element's top edge sits at the bottom of the viewport, 1
-        // once it has risen REVEAL_VH further. Each element therefore staggers
-        // itself by its own position — no hand-tuned per-element delays.
-        const p = easeOutCubic(clamp01((vh - tops[i]) / (vh * REVEAL_VH)));
-        revealed[i].style.transform = `translate3d(0, ${((1 - p) * REVEAL_TRAVEL_PX).toFixed(2)}px, 0)`;
-        revealed[i].style.opacity = p.toFixed(3);
+        if (tops[i] < vh * REVEAL_TRIGGER_VH) revealed[i].classList.add('is-in');
       }
 
       const chromeOpacity = 1 - clamp01(scrollY / (vh * CHROME_FADE_VH));

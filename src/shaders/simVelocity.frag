@@ -39,20 +39,22 @@ void main() {
 
   // Each particle starts its flight at a slightly different moment. Without
   // this stagger the whole field slides across as one rigid sheet instead of
-  // breaking into a swarm.
-  float stagger = hash12(uv * 511.0) * 0.45;
-  float m = smoothstep(stagger, stagger + 0.55, uMorph);
+  // breaking into a swarm. The spread and the window sum to 1.0 so the last
+  // particles still land exactly when uMorph reaches 1 — a wider spread reads
+  // as the field flowing rather than translating.
+  float stagger = hash12(uv * 511.0) * 0.55;
+  float m = smoothstep(stagger, stagger + 0.45, uMorph);
 
   vec3 goal = mix(texture2D(uTargetA, uv).xyz, texture2D(uTargetB, uv).xyz, m);
 
   // Peaks at the midpoint of a transition and is zero while a phrase is held.
   float energy = sin(PI * clamp(uMorph, 0.0, 1.0));
 
-  // Slacken the spring mid-flight so particles overshoot and arc in.
-  vec3 force = (goal - pos) * (uSpring * mix(1.0, 0.3, energy));
+  // Slacken the spring mid-flight so particles arc rather than track straight.
+  vec3 force = (goal - pos) * (uSpring * mix(1.0, 0.45, energy));
 
   vec3 swirl = curlNoise(pos * uNoiseScale + vec3(0.0, 0.0, uTime * uFlow));
-  force += swirl * (uTurbulence * (1.0 + 7.0 * energy));
+  force += swirl * (uTurbulence * (1.0 + 4.0 * energy));
 
   // Cursor: a radial shove plus a push along the pointer's travel direction,
   // so it leaves a directional wake rather than a symmetric hole.

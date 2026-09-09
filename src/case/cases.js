@@ -1,12 +1,7 @@
 /**
  * ============================================================================
- * PLACEHOLDER CONTENT — every string below is scaffolding, not real work.
- *
- * The numbers, outcomes and quotes are deliberately generic: no client names,
- * no dollar figures, no attributable claims. Replace them before this goes
- * anywhere public. The shape follows work.co's case studies — label in the left
- * gutter, content in the right column — so you can swap copy without touching
- * the layout.
+ * Case content. One object per case; the page templates read from here, so a
+ * case can be edited without touching layout code.
  *
  * Structure of a case:
  *   slug        URL segment; must match the filename in /work
@@ -23,71 +18,294 @@
  */
 
 export const CASES = [
+
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  // Transcribed from case02selecaodepremios.md. Two notes carried over from the
+  // brief's own annotations:
+  //
+  //   [[ confirmar ]]  `duration` is the campaign length, not necessarily how
+  //                    long you were on it. Confirm before publishing.
+  //
+  //   [[ sigilo ]]     If outcomes are added back, note that the absolute
+  //                    figures in the brief (customer counts, mission and spin
+  //                    totals, the cross-campaign comparison) expose base size
+  //                    and were meant for the NDA version only.
   {
-    slug: 'project-01',
+    slug: 'selecao-de-premios',
     index: '01',
-    title: 'Project title',
-    headline: 'Rebuilding a core flow around how people actually decide',
+    title: 'Seleção de Prêmios',
+    headline: 'A prize mechanic that had to feel like a bank, not a bet',
+    // One-paragraph orientation under the headline. Taken from your own hero
+    // mockup, which is where this field came from.
+    summary:
+      'A World Cup campaign built to grow Itaú’s relationship programme, Minhas Vantagens: a weekly prize spin, missions tied to real banking journeys, and draws whose odds come from your programme level.',
+    tag: 'Gamification',
+    client: 'Itaú Unibanco',
     year: '2026',
     discipline: 'Product design',
-    role: 'Lead product designer',
-    duration: '9 months',
+    role: 'Senior product designer',
+    duration: '12-week campaign',
+
+    // Order is fixed by the brief. Entries whose file is not yet in
+    // src/images/selecao-de-premios/ are skipped at render time.
+    images: [
+      {
+        src: '01-main.png',
+        alt: 'Seleção de Prêmios campaign key visual — the promotion lockup and “São experiências e prêmios fenomenais”, with Ronaldo and the five stars',
+        placement: 'after-cover',
+        width: 'full',
+      },
+      {
+        src: '02-campaign-home.png',
+        alt: 'Campaign home with the available spin, the countdown to the final draw, and the programme explainer',
+        caption: 'Campaign home: the spin you have, the draw you are counting down to, and what the programme is.',
+        placement: 'after-overview',
+        width: 'full',
+      },
+      {
+        src: '03-spin-and-draws.png',
+        alt: 'The prize spin, and the screen tracking which draws a customer is entered into',
+        caption: 'The spin, and the lucky numbers already earned — chances held, not staked.',
+        placement: 'after-takeaway-01',
+        width: 'full',
+      },
+      {
+        src: '04-how-it-works.png',
+        alt: 'How the mechanic works, explained in the flow itself, and the headline draws',
+        caption: 'The rules, written where the decision happens rather than in a regulation nobody opens.',
+        placement: 'after-takeaway-02',
+        width: 'full',
+      },
+      {
+        src: '05-progression.png',
+        alt: 'Programme level and progress, and the recommended next activity',
+        caption: 'Programme level and the next step — the slower progression under the weekly loop.',
+        placement: 'after-takeaway-03',
+        width: 'full',
+      },
+    ],
+
     whatWeDid: [
-      'Discovery and user research',
-      'Service blueprint',
-      'Interaction design',
-      'Design system foundations',
+      'Game mechanic design with product, engineering and the sweepstake partner',
+      'Gamification research into what makes people return to a game',
+      'Interaction design for the weekly spin, missions and prize journeys',
+      'Content design with legal, turning compliance into plain language',
+      'Coordination across legal, marketing, engineering and brand assets',
+      'Review with superintendents and directors through to launch',
+    ],
+
+    // MM = millions, matching the convention used in the source brief.
+    outcomes: [
+      { value: '4.3', unit: 'MM', caption: 'Customers enrolled in the campaign' },
+      { value: '1', unit: 'MM', caption: 'Of those net-new to Minhas Vantagens' },
+      { value: '11', unit: 'MM', caption: 'Prize spins executed' },
+      { value: '4.6', unit: 'MM', caption: 'Missions completed' },
+      { value: '86', unit: '%', caption: 'Campaign opt-in conversion rate' },
+      {
+        value: '580',
+        caption:
+          'Support cases across the whole campaign — spin accounting, sign-up and rules; low friction relative to volume',
+      },
+    ],
+
+    overview: [
+      'Itaú ran a promotional campaign across the 2026 World Cup, built inside Minhas Vantagens, the bank’s relationship programme, and fronted by Ronaldo. Customers earned lucky numbers and spins by completing weekly missions — registering a Pix key, connecting Open Finance, setting up automatic payments, starting to invest — which entered them into instant prizes and a set of headline draws, up to a million reais in gold bars, a trip, and dinner with Ronaldo. More than twenty products across the bank were wired into the mission system.',
+      'The hard part was not the interface. A spinning wheel with a gold jackpot behind it is, visually, the language of gambling, and this had to read as the opposite: a bank rewarding people who were already its customers. Three decisions carried that. Nothing was ever staked — customers did not bet, they earned chances, so there was no way to lose anything. Every customer received a lucky number each week simply for being a client, with more arriving the more they used the bank, which made the mechanic a reward rather than a lottery ticket. And the visual language was deliberately restrained, close to the bank’s own voice rather than to the loud register the category invites.',
+      'I worked closely with legal for the whole campaign, and the compliance work ended up being content design rather than legal notices. The rules had to be present at the moment they mattered, in words a customer could act on, with no fine print and no asterisks — while keeping the playful tone the mechanic needed to work at all. Alongside that ran research into game design: what makes a weekly loop worth coming back to, how instant reward and slower progression sit together, and why a player returns on week six. It launched to the whole customer base at once, which made the first hour its own design constraint.',
+    ],
+
+    whatMadeItWork: [
+      'Reused the existing LE3 solution for partner campaigns rather than building new',
+      'Near-real-time mission data over Kafka, which made new product types possible inside the programme',
+      'The Platform Evolution Program ran ahead of launch to close resilience, security and scalability gaps',
+      'Devin used for structural delivery and bug fixes',
+      'Targeted multichannel campaigns and non-QR advertising both drove opt-in growth — conversion held across acquisition paths',
+    ],
+
+    takeaways: [
+      {
+        index: '01',
+        title: 'Rewarding, never wagering',
+        sections: [
+          {
+            title: 'Nothing is ever staked',
+            body: [
+              'The mechanic was built so a customer could not lose anything: chances were earned by doing something, never bought or bet. That single rule did more for trust than any amount of visual reassurance, and it made every screen easier to write — there was never a loss to explain away.',
+            ],
+          },
+          {
+            title: 'Restraint reads as credible',
+            body: [
+              'The category pulls hard toward flashing, loud, jackpot-styled design. Staying close to the bank’s own visual language cost some immediate excitement and bought the thing it actually needed, which was for a customer to believe the prize was real.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '02',
+        title: 'Compliance is content design',
+        sections: [
+          {
+            title: 'No asterisks',
+            body: [
+              'Rather than push the rules into a regulation document nobody opens, we put what mattered where the decision happened, in the customer’s words — when a spin unlocks, how long a mission takes to credit, when a result is published. Legal reviewed language rather than approving disclaimers, which meant the constraint shaped the writing instead of arriving after it.',
+            ],
+          },
+          {
+            title: 'Clear enough to be quiet',
+            body: [
+              'Across a campaign of this scale, support tickets stayed in the hundreds, and the recurring ones were about counting spins and registration rather than confusion about how to win. For a promotional mechanic that is the result worth reporting — it means the rules landed the first time.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '03',
+        title: 'Borrowed from games, not from casinos',
+        sections: [
+          {
+            title: 'Designing the return, not the visit',
+            body: [
+              'The team studied what genuinely brings people back to a game: a weekly rhythm, a reward that arrives immediately, and a slower progression underneath it. Level in the programme meant more lucky numbers, so a long-standing customer saw the relationship he already had reflected in his odds.',
+            ],
+          },
+          {
+            title: 'The first hour is a design problem',
+            body: [
+              'Launching to the entire base meant an enormous spike in the first minutes rather than a curve. Planning that with engineering and marketing ahead of time — what loads first, what can wait, what a customer sees if something is slow — was as much part of the design as the screens themselves.',
+              'The platform held. Reach on campaign communications ran to 19.7MM, and enrolment came in at roughly ten times the previous internal benchmark campaign.',
+            ],
+            // Compact figures rather than the big numerals used for Outcomes:
+            // these are evidence for the point above, not headline results.
+            stats: [
+              { value: '18×', label: 'Screen views, within 50 minutes' },
+              { value: '4.8×', label: 'Total requests, within 50 minutes' },
+              { value: '5×', label: 'Requests per second, within 50 minutes' },
+              { value: '3–3.8×', label: 'Peak burst in a 3-minute window (21:40)' },
+              { value: '13×', label: 'Opt-ins in under an hour, at the 4h mark' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+
+
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  // Same template and palette as selecao-de-premios. Notes from the brief:
+  //
+  //   [[ revisar ]]   The solution paragraph mentions "time-to-quote under 60
+  //                   seconds". The brief itself flags this as likely left over
+  //                   from another case — there is no quote step in this flow.
+  //                   Kept verbatim rather than silently rewritten; confirm and
+  //                   correct, or delete the clause.
+  //
+  //   [[ verificar ]] The quote is attributed to a named individual at a named
+  //                   employer. Confirm they said it and are happy to be quoted
+  //                   publicly before this ships.
+  {
+    slug: 'retiree-hub',
+    index: '02',
+    title: 'Retiree Hub',
+    headline: 'A unified space for financial benefits',
+    tag: 'Banking',
+    client: 'Itaú Unibanco',
+    year: '2025',
+    discipline: 'Product design',
+    role: 'Product designer',
+
+    images: [
+      {
+        src: '01-hero.png',
+        alt: 'The INSS benefits hub inside the Itaú app',
+        placement: 'after-cover',
+        width: 'full',
+      },
+      {
+        src: '06-why-bother.png',
+        alt: 'The benefits of linking, and the single field that starts the request',
+        caption:
+          'The case for linking a benefit, and then the single field that starts the request.',
+        placement: 'after-takeaway-01',
+        width: 'full',
+      },
+      {
+        src: '02-step-by-step.png',
+        alt: 'Benefit detail screen and the step-by-step for finding the INSS benefit number',
+        caption:
+          'Benefit details, and the step-by-step for finding the number in the government app — one tap from the field that asks for it.',
+        placement: 'after-takeaway-03',
+        width: 'full',
+      },
+      {
+        src: '03-multi-select.png',
+        alt: 'Multi-select benefit picker and the request status timeline',
+        caption:
+          'Selecting more than one benefit at once. Each card carries the last payment and the beneficiary’s name — the two details people actually use to tell their benefits apart.',
+        placement: 'after-takeaway-02',
+        width: 'full',
+      },
+    ],
+
+    whatWeDid: [
+      'Discovery and research with retired customers',
+      'Information architecture for the benefits hub',
+      'Interaction design for linking, unlinking and status',
+      'Content design for the request and its waiting states',
       'Prototyping and usability testing',
       'Handoff and build support',
     ],
+
     outcomes: [
-      { value: '2', unit: '×', caption: 'Completion rate on the primary task after redesign' },
-      { prefix: '−', value: '40', unit: '%', caption: 'Median time to finish the core flow' },
-      { value: '12', unit: '', caption: 'Screens collapsed into a single guided sequence' },
+      { value: '87', unit: '%', caption: 'Positive customer rating' },
+      { value: '5', unit: 'M+', caption: 'Clients impacted' },
+      { prefix: '+', value: '21', unit: '%', caption: 'In financial product sales to this audience' },
+      { prefix: '−', value: '67', unit: '%', caption: 'In customer service complaints' },
     ],
+
     overview: [
-      'The existing flow had grown by accretion — each new requirement added a step, and nobody had gone back to ask whether the sequence still matched how people actually made the decision. Completion was falling and support volume was rising in step with it.',
-      'We started by watching people use it rather than by redrawing it. The research made the failure obvious: the flow asked for commitment before it gave people enough to commit to. Reordering it around the moment of decision, rather than around the internal data model, did more than any amount of visual work would have.',
-      'The rebuild shipped incrementally behind a flag, which let us measure each step against the old flow rather than betting the whole thing on one release.',
+      'A dedicated space within the Itaú app where retirees can link and manage their financial benefits in one place. Instead of tracking retirement pay, pensions, and government allowances across separate channels, customers get a single, clear view of everything they receive.',
+      'Retired customers often juggle multiple income sources: social security retirement (INSS), survivor pensions, temporary leave allowances, and other benefits. Each one lives in a different place, with different payment dates and rules. Keeping track of what arrives, when, and how much becomes a constant source of uncertainty for an audience that values stability and predictability above all.',
+      'We consolidated the product into a single cohesive experience — simplifying navigation, establishing a clear visual hierarchy, and reducing the time-to-quote to under 60 seconds. The new system scaled across all touchpoints while remaining flexible enough for future growth. Itaú makes it easy to add, consult and update benefits.',
     ],
+
     quote: {
-      text: 'The reordering seems obvious in hindsight. It was not obvious before someone sat with our customers and watched them get stuck in the same place eleven times in a row.',
-      name: 'Placeholder name',
-      role: 'Placeholder role, Placeholder company',
+      text: 'Gabriel came to kickoff with a clickable version of the thing we had been arguing about for two weeks. The argument was over in ten minutes.',
+      name: 'Marina Cordeiro',
+      role: 'Product Manager, Itaú Unibanco',
     },
+
     takeaways: [
       {
         index: '01',
-        title: 'Finding the real failure',
+        title: 'A number nobody has memorised',
         sections: [
           {
-            title: 'Research before redraw',
             body: [
-              'The brief asked for a visual refresh. The sessions showed the problem was structural — people abandoned at a consistent point, and it was not the point anyone internally expected. Reframing the brief was the highest-leverage thing that happened on the project.',
-            ],
-          },
-          {
-            title: 'Mapping the decision, not the screens',
-            body: [
-              'We rebuilt the service blueprint around what a person needs to know at each moment, then checked the existing flow against it. The mismatch was the roadmap.',
+              'The whole flow hinges on a ten-digit benefit number printed on a card most people have not looked at in years. Rather than treat that as the customer’s problem, we wrote a step-by-step for finding it inside the government app, put it one tap from the field, and let people leave and come back without losing what they had typed.',
             ],
           },
         ],
       },
       {
         index: '02',
-        title: 'Rebuilding in the open',
+        title: 'Nobody has exactly one benefit',
         sections: [
           {
-            title: 'Shipping behind a flag',
             body: [
-              'Each stage went out to a slice of traffic and was measured against the flow it replaced. That turned a redesign into a sequence of small, reversible bets.',
+              'The first version assumed a single benefit per person. Support tickets said otherwise — pensions and retirements stack, often across family members. So the picker became multi-select, each card carrying the last payment amount and the beneficiary name, because that is how people actually tell two benefits apart.',
             ],
           },
+        ],
+      },
+      {
+        index: '03',
+        title: 'Saying “wait” without losing anyone',
+        sections: [
           {
-            title: 'Foundations that outlast the project',
             body: [
-              'The components built for this flow became the first real entries in a shared library, which meant the next team started from something rather than from nothing.',
+              'The INSS can take up to four months to answer. A spinner would have been a lie. The status timeline names every stage, dates the ones that have happened, and gives an honest outer bound for the one that has not — so the answer to “did it work?” is on the screen instead of in a phone queue.',
             ],
           },
         ],
@@ -95,241 +313,150 @@ export const CASES = [
     ],
   },
 
-  {
-    slug: 'project-02',
-    index: '02',
-    title: 'Project title',
-    headline: 'Making an internal tool fast enough to be trusted',
-    year: '2025',
-    discipline: 'Design engineering',
-    role: 'Design engineer',
-    duration: '5 months',
-    whatWeDid: [
-      'Performance audit',
-      'Interaction prototyping',
-      'Front-end architecture',
-      'Component library',
-      'Instrumentation',
-    ],
-    outcomes: [
-      { prefix: '−', value: '80', unit: '%', caption: 'Time to first meaningful interaction' },
-      { value: '60', unit: 'fps', caption: 'Sustained on the previously unusable data view' },
-      { value: '3', unit: '×', caption: 'Daily active use in the quarter after launch' },
-    ],
-    overview: [
-      'The tool worked, in the sense that every feature it claimed to have was present. It was also slow enough that the team it was built for had quietly gone back to spreadsheets.',
-      'Treating performance as a design problem rather than an engineering cleanup task changed what we built. The interactions people used constantly got a budget; the ones they used monthly did not.',
-    ],
-    quote: {
-      text: 'Nobody files a ticket saying the tool is too slow to think in. They just stop opening it.',
-      name: 'Placeholder name',
-      role: 'Placeholder role, Placeholder company',
-    },
-    takeaways: [
-      {
-        index: '01',
-        title: 'Budgets before features',
-        sections: [
-          {
-            title: 'Measuring the real path',
-            body: [
-              'Instrumenting the actual sequence people run every morning — not a synthetic benchmark — showed the cost was concentrated in one view that nobody had thought to profile.',
-            ],
-          },
-        ],
-      },
-      {
-        index: '02',
-        title: 'Designing to the budget',
-        sections: [
-          {
-            title: 'Prototyping in the real runtime',
-            body: [
-              'Every interaction was prototyped in the production stack rather than in a design tool, so a proposal that could not hit frame budget was caught while it was still cheap to change.',
-            ],
-          },
-        ],
-      },
-    ],
-  },
 
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  // Uses the standard template, like the other real cases. The brief asked for
+  // "the long layout of Retiree Hub", but that layout was retired when Retiree
+  // Hub was moved onto this one — see the note there.
+  //
+  //   [[ confirmar ]]  `year` — screens show Feb 2024 but the project ran over
+  //                    a year. `role` — confirm the title you want to use.
+  //
+  //   [[ confirmar ]]  The −35% came from "quase 40, trinta e poucos".
+  //                    Confirm the real figure or soften to "over 30%".
+  //
+  //   [[ revisar ]]    04-refinancing is deliberately not included: the brief
+  //                    flags that screen as showing four fields with the same
+  //                    label and value, so probably a component-variant sheet
+  //                    rather than the final screen. The file is not imported.
   {
-    slug: 'project-03',
+    slug: 'atm-accessibility',
     index: '03',
-    title: 'Project title',
-    headline: 'One design language across teams that had stopped talking',
-    year: '2025',
-    discipline: 'Design system',
-    role: 'Systems lead',
-    duration: 'Ongoing',
+    title: 'ATM accessibility',
+    headline: 'Rebuilding the ATM and its design system around accessibility',
+    tag: 'Design system',
+    client: 'Itaú Unibanco',
+    year: '2024',
+    discipline: 'Product design, design systems',
+    role: 'Senior product designer',
+    duration: 'Over a year',
+
+    // Before/after slider, shown in the hero position.
+    compare: {
+      before: '01a-home-before.png',
+      after: '01b-home-after.png',
+      labelBefore: 'Before',
+      labelAfter: 'After',
+      alt: 'The ATM home screen before and after the redesign',
+      caption:
+        'Twelve competing options became eight, each with an icon and a target sized for an unsteady hand.',
+    },
+
+    images: [
+      {
+        src: '02-payment-input.png',
+        alt: 'The payment amount screen, with an on-screen keypad and the invoice amount shown for reference',
+        caption: 'The amount being paid sits directly under the field, so checking it costs nothing.',
+        placement: 'after-takeaway-01',
+        width: 'full',
+      },
+      {
+        src: '07-limit-split.png',
+        alt: 'Splitting a credit limit between two cards',
+        caption: 'One screen, one decision, with both sides of the transfer visible at once.',
+        placement: 'after-takeaway-02',
+        width: 'full',
+      },
+      {
+        src: '06-spec-spacing.png',
+        alt: 'Spacing annotated on the payment confirmation screen using the design system tokens',
+        caption:
+          'Spacing annotated in shared tokens, so the terminal and the app measure the same way.',
+        placement: 'after-takeaway-03',
+        width: 'full',
+      },
+      {
+        src: '03-date-picker.png',
+        alt: 'Choosing a due date in the renegotiation flow',
+        caption:
+          'Unavailable dates stay visible in grey, and the chosen date is repeated in words next to the range that allows it.',
+        placement: 'after-overview',
+        width: 'full',
+      },
+    ],
+
     whatWeDid: [
-      'Interface audit',
-      'Token architecture',
-      'Component library',
-      'Documentation',
-      'Adoption and governance',
-      'Contribution model',
+      'Field research in branches and lab sessions with disabled and older customers',
+      'Full redesign of the terminal’s screens and journeys',
+      'A design system built from scratch for the ATM',
+      'Voice journeys designed alongside every screen',
+      'Accessibility specification for the build',
+      'Handoff and support through development',
     ],
+
     outcomes: [
-      { value: '400', unit: '+', caption: 'Components and variants in the shared library' },
-      { prefix: '−', value: '65', unit: '%', caption: 'Duplicate components across product teams' },
-      { value: '9', unit: '', caption: 'Teams shipping from the same foundations' },
+      { prefix: '+', value: '50', unit: '%', caption: 'Increase in NPS for the ATM experience' },
+      { prefix: '−', value: '35', unit: '%', caption: 'Median time to complete a transaction' },
+      {
+        value: '2',
+        unit: '×',
+        caption: 'Every journey designed twice, once on screen and once in voice',
+      },
     ],
+
     overview: [
-      'Four teams had independently built four button components, three date pickers and two entirely separate ideas about what "danger" meant. None of this was anyone\'s fault; it was the predictable result of shipping quickly without a shared floor.',
-      'The audit came first and was deliberately unflattering — every variant in production, screenshotted side by side. It made the case better than a proposal could have.',
-      'Governance turned out to matter more than the components. A library nobody can contribute to becomes a bottleneck, and then becomes abandoned.',
+      'A full redesign of Itaú’s ATM network, together with a new design system built for it from the ground up. The guiding principle was not visual: the terminal had to work for people with low vision, people with limited mobility, people who cannot read, and older customers standing in a queue with a line behind them.',
+      'An ATM is used standing up, often outdoors, often in a hurry, by a customer base that includes people who cannot read a sentence on a screen, people who cannot see it at all, and people whose hands do not land precisely where they aim. The existing terminal had grown into a wall of options of equal visual weight, with the important detail set in the smallest type on the screen. The technology running the machines could not support the screen reader software that already existed on phones and computers, so there was no accessible path at all for a blind customer.',
+      'We rebuilt the terminal around what field research showed people actually do at an ATM: they do not read, they orient by shape, colour, position and touch. Fewer options per screen, larger targets, higher contrast, icons carrying meaning alongside words, and the same three exits repeated in the same place on every screen. Underneath it sits a design system built from scratch for the terminal, inheriting the tokens and visual language of the bank’s app so the two products speak the same language. Because no existing screen reader would run on the machines, the bank built its own audio layer, and we designed every journey a second time as a spoken sequence.',
     ],
+
     takeaways: [
       {
         index: '01',
-        title: 'Making the problem visible',
+        title: 'People do not read at an ATM',
         sections: [
           {
-            title: 'The audit as argument',
             body: [
-              'Putting every production variant on one wall replaced a long debate about whether a system was needed with a short conversation about where to start.',
+              'Field visits to branches and lab sessions with older customers, blind customers, customers with motor disabilities and customers who cannot read all pointed the same way. Nobody reads a screen while standing at a machine with people waiting behind them. They scan for shape, colour and position, and they confirm with their hands.',
+              'That finding decided the rest: the secondary microcopy that used to carry the important detail was removed, the numbers that matter were made large enough to check at a glance, and every constraint was stated in words rather than implied by a disabled control.',
             ],
           },
         ],
       },
       {
         index: '02',
-        title: 'Building for contribution',
+        title: 'Complexity does not need more steps',
         sections: [
           {
-            title: 'A path in, not just a path out',
             body: [
-              'Teams could propose and land components through a documented route. Adoption followed, because using the library stopped being slower than working around it.',
+              'Splitting a credit limit between cards is the most complicated thing a customer can do at one of these machines, and it fits in a single screen. Source on the left, destination on the right, current and maximum limits side by side, and a confirm button that stays inactive until there is a real choice to confirm. Card art and brand marks do part of the work, because a customer who cannot read the card name still recognises it by sight.',
             ],
           },
         ],
       },
+      {
+        index: '03',
+        title: 'A system built to be built',
+        sections: [
+          {
+            body: [
+              'The design system was derived from the bank’s app system, reusing its tokens so the terminal would not become an island. What changed came from the physical context: type sizes and touch targets scaled for a screen viewed at arm’s length, contrast raised for glare, options per screen cut, and the same three anchors repeated at the bottom of every screen so a customer can leave from anywhere without hunting.',
+              'Developers received the system and an accessibility specification alongside it, which is the part that decides whether any of this survives contact with the build.',
+            ],
+          },
+        ],
+      },
+    ],
+
+    whatMadeItWork: [
+      'None of the assistive technology that works on a phone would run on the terminals, so the bank built proprietary audio software for its own ATMs',
+      'That left an open design question: what does a journey sound like. The customer never speaks — they listen and they touch the screen',
+      'Each flow was designed a second time as a spoken sequence, with its own wording, its own order, and its own decisions about what is said aloud in a public place',
+      'Developers received two specifications per journey, the screens and the voice, which is what made it possible to build consistently',
     ],
   },
 
-  {
-    slug: 'project-04',
-    index: '04',
-    title: 'Project title',
-    headline: 'Proving a concept before committing a roadmap to it',
-    year: '2024',
-    discipline: 'Prototype',
-    role: 'Product designer',
-    duration: '6 weeks',
-    whatWeDid: [
-      'Concept definition',
-      'Interactive prototyping',
-      'Technical feasibility spike',
-      'Concept testing',
-      'Recommendation',
-    ],
-    outcomes: [
-      { value: '6', unit: 'wks', caption: 'From open question to evidence-backed decision' },
-      { value: '4', unit: '', caption: 'Directions tested with real users' },
-      { value: '1', unit: '', caption: 'Direction taken forward — and three retired early' },
-    ],
-    overview: [
-      'The organisation was about to commit a year of roadmap to an idea that had never been in front of a customer. The cheapest useful thing to build was not the product — it was the evidence.',
-      'Three of the four directions failed in testing, which is the point. Retiring them in six weeks cost a fraction of retiring them after launch.',
-    ],
-    takeaways: [
-      {
-        index: '01',
-        title: 'Building the smallest real thing',
-        sections: [
-          {
-            title: 'Prototype fidelity as a choice',
-            body: [
-              'Each direction was built only to the fidelity its open question required. The riskiest assumption got a working prototype; the rest got clickable flows.',
-            ],
-          },
-        ],
-      },
-    ],
-  },
 
-  {
-    slug: 'project-05',
-    index: '05',
-    title: 'Project title',
-    headline: 'Understanding a behaviour nobody in the building had seen',
-    year: '2024',
-    discipline: 'Research',
-    role: 'Research lead',
-    duration: '4 months',
-    whatWeDid: [
-      'Study design',
-      'Contextual interviews',
-      'Diary study',
-      'Behavioural analysis',
-      'Synthesis and workshops',
-    ],
-    outcomes: [
-      { value: '38', unit: '', caption: 'Contextual sessions across three regions' },
-      { value: '2', unit: '', caption: 'Assumptions in the strategy that did not survive contact' },
-      { value: '5', unit: '', caption: 'Opportunity areas taken into the roadmap' },
-    ],
-    overview: [
-      'A significant segment of users behaved in a way the analytics could see but not explain. The numbers showed what was happening; only sitting with people showed why.',
-      'The synthesis deliberately ended in a workshop rather than a report. Findings that a team argues with in a room get acted on; findings that arrive as a PDF do not.',
-    ],
-    takeaways: [
-      {
-        index: '01',
-        title: 'Going where the behaviour is',
-        sections: [
-          {
-            title: 'Context over lab',
-            body: [
-              'Sessions ran where people actually used the product. Most of what mattered — the interruptions, the workarounds, the second device — is invisible in a usability lab.',
-            ],
-          },
-        ],
-      },
-    ],
-  },
-
-  {
-    slug: 'project-06',
-    index: '06',
-    title: 'Project title',
-    headline: 'An interface that gets out of the way of the work',
-    year: '2023',
-    discipline: 'Interface',
-    role: 'Product designer',
-    duration: '7 months',
-    whatWeDid: [
-      'Information architecture',
-      'Interaction design',
-      'Visual design',
-      'Accessibility review',
-      'Design QA',
-    ],
-    outcomes: [
-      { prefix: '−', value: '50', unit: '%', caption: 'Clicks to complete the most frequent task' },
-      { value: 'AA', unit: '', caption: 'Conformance level met across the redesigned surface' },
-      { value: '4', unit: '', caption: 'Navigation levels reduced to two' },
-    ],
-    overview: [
-      'The product was used all day by people who knew it well. That changes the brief: for expert users, discoverability matters far less than speed, density and predictability.',
-      'Much of the work was subtraction — removing chrome, decoration and confirmation steps that protected against mistakes these users were not making.',
-    ],
-    takeaways: [
-      {
-        index: '01',
-        title: 'Designing for the expert',
-        sections: [
-          {
-            title: 'Density is a feature',
-            body: [
-              'Generous spacing helps a first-time user and punishes a daily one. We tuned density to the person who opens the product every morning.',
-            ],
-          },
-        ],
-      },
-    ],
-  },
 ];
 
 export const bySlug = (slug) => CASES.find((c) => c.slug === slug);

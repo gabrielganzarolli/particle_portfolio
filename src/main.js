@@ -5,9 +5,8 @@ import { ParticleField } from './ParticleField.js';
 import { Pointer } from './pointer.js';
 import { readyFonts } from './textTargets.js';
 import { backgroundOf } from './palette.js';
-import { createOverlay, hidePreloader, showFatal } from './overlay.js';
+import { hidePreloader, showFatal } from './overlay.js';
 import { createScrollWork } from './scrollWork.js';
-import { FieldAudio } from './audio.js';
 
 const FOV = 50;
 const FIELD_WIDTH = 10;
@@ -46,12 +45,20 @@ function chooseSize() {
   return coarse || weak ? 256 : 512;
 }
 
-/** easeInOutCubic — slow departure, slow arrival, fast through the middle. */
+/**
+ * easeInOutSine. Gentler than the cubic it replaced: no hard acceleration out
+ * of rest and no abrupt deceleration into the end, which is most of what makes
+ * a scrubbed morph feel mechanical.
+ */
 function ease(t) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
 async function boot() {
+  // Gates the hidden-until-revealed styles. If this module fails to load, the
+  // .reveal elements never get opacity: 0 and the page still reads.
+  document.documentElement.classList.add('js');
+
   // The hero is the whole point of the page; restoring a reload to mid-scroll
   // drops you into the card grid with the intro already over.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -98,37 +105,7 @@ async function boot() {
     field.setPair(a, b);
   }
 
-  createOverlay({ reducedMotion, coarsePointer });
   const scrollWork = createScrollWork();
-
-  // Audio ---------------------------------------------------------------
-  const audio = new FieldAudio();
-  const soundBtn = document.querySelector('.sound-toggle');
-
-  function paintSoundBtn() {
-    if (!soundBtn) return;
-    soundBtn.textContent = audio.enabled ? 'Sound on' : 'Sound off';
-    soundBtn.setAttribute('aria-pressed', String(audio.enabled));
-  }
-  paintSoundBtn();
-
-  // Autoplay policy: the context can only start inside a real gesture. Scroll
-  // does not count, so this listens for the ones that do.
-  const unlock = () => audio.unlock();
-  for (const evt of ['pointerdown', 'keydown', 'touchend']) {
-    window.addEventListener(evt, unlock, { once: true, passive: true });
-  }
-
-  soundBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    audio.unlock();
-    audio.setEnabled(!audio.enabled);
-    paintSoundBtn();
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    audio.setPageVisible(document.visibilityState === 'visible');
-  });
 
   const pointer = new Pointer(canvas, camera);
   // Timer, not the deprecated Clock. Core's Timer has no max-delta setting, so
@@ -166,7 +143,6 @@ async function boot() {
   // Hover ---------------------------------------------------------------
   let hovering = false;
   let morphT = 0; // raw 0..1 ramp; ease() is applied on the way to the shader
-  let prevMorph = 0; // previous frame's morphT, for the audio energy signal
 
   const restBounds = field.boundsOf(REST);
 
@@ -241,14 +217,6 @@ async function boot() {
       field.setMorph(ease(morphT));
     }
 
-    // Sound is driven by the same two quantities that drive the particles, so
-    // it tracks the motion exactly rather than approximating it on a timer.
-    // Reading actual speeds back off the GPU would stall the pipeline.
-    const morphEnergy = dt > 0 ? Math.min(Math.abs(morphT - prevMorph) / dt / 1.5, 1) : 0;
-    prevMorph = morphT;
-    const pointerEnergy = Math.min(pointer.velocity.length() / 7, 1) * pointer.active;
-    audio.update(morphEnergy, pointerEnergy);
-
     field.update(dt, elapsed);
     renderer.render(field.scene, camera);
     hudUpdate();
@@ -302,7 +270,6 @@ async function boot() {
       camera,
       field,
       pointer,
-      audio,
       step,
       pump: (n = 60, dt = 1 / 60) => {
         for (let i = 0; i < n; i++) step(dt);

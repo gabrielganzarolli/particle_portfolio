@@ -1,4 +1,6 @@
 import { CASES } from './cases.js';
+import { imageUrl, reportMissing } from './images.js';
+import { buildCompare } from './compare.js';
 
 const el = (tag, className, text) => {
   const node = document.createElement(tag);
@@ -24,14 +26,20 @@ function row(label, content, { className = '' } = {}) {
   return section;
 }
 
-function renderHero(c) {
+function renderHero(c, image) {
   const hero = el('header', 'case-hero');
-  hero.appendChild(el('p', 'case-index', c.index));
+
+  const eyebrow = el('div', 'case-eyebrow');
+  eyebrow.appendChild(el('span', 'case-index', c.index));
+  if (c.tag) eyebrow.appendChild(el('span', 'case-tag', c.tag));
+  hero.appendChild(eyebrow);
+
   hero.appendChild(el('h1', 'case-title', c.title));
   hero.appendChild(el('p', 'case-headline', c.headline));
 
   const meta = el('dl', 'case-meta');
   const pairs = [
+    ['Client', c.client],
     ['Year', c.year],
     ['Discipline', c.discipline],
     ['Role', c.role],
@@ -39,10 +47,26 @@ function renderHero(c) {
   ];
   for (const [k, v] of pairs) {
     if (!v) continue;
-    meta.appendChild(el('dt', null, k));
-    meta.appendChild(el('dd', null, v));
+    // Each label/value pair is wrapped so it stays together as one grid cell.
+    // Loose dt/dd children flow independently and split across rows once the
+    // column narrows, which puts a value under someone else's label.
+    const cell = el('div', 'meta-pair');
+    cell.appendChild(el('dt', null, k));
+    cell.appendChild(el('dd', null, v));
+    meta.appendChild(cell);
   }
   hero.appendChild(meta);
+
+  // The cover sits beside the facts rather than as a band underneath, so the
+  // first screen carries both what the project was and what it looked like.
+  const media = image('after-cover');
+  if (media) {
+    media.classList.add('hero-media');
+    media.classList.remove('reveal'); // above the fold; nothing to reveal into
+    hero.appendChild(media);
+  } else {
+    hero.classList.add('is-textonly');
+  }
 
   return hero;
 }
@@ -54,6 +78,10 @@ function renderWhatWeDid(c) {
 }
 
 function renderOutcomes(c) {
+  // No figures, no section — an "Outcomes" label over empty space reads as a
+  // page that failed to load rather than as a deliberate omission.
+  if (!c.outcomes?.length) return null;
+
   const grid = el('div', 'outcomes');
 
   for (const o of c.outcomes ?? []) {
@@ -94,7 +122,7 @@ function renderQuote(c) {
   return fig;
 }
 
-function renderTakeaways(c) {
+function renderTakeaways(c, image) {
   const takeaways = c.takeaways ?? [];
   if (!takeaways.length) return [];
 
@@ -120,11 +148,27 @@ function renderTakeaways(c) {
 
     for (const s of t.sections ?? []) {
       const sub = el('div', 'chapter-section');
-      sub.appendChild(el('h3', 'chapter-sub reveal', s.title));
+      // Sections may omit the gutter sub-title; an empty h3 would still
+      // occupy the column and misalign the prose beside it.
+      if (s.title) sub.appendChild(el('h3', 'chapter-sub reveal', s.title));
 
       const prose = el('div', 'prose');
       for (const p of s.body ?? []) prose.appendChild(el('p', 'reveal', p));
       sub.appendChild(prose);
+
+      // Supporting figures. Deliberately smaller than the Outcomes numerals:
+      // these are evidence for the point just made, not headline results, and
+      // sizing them the same would flatten that distinction.
+      if (s.stats?.length) {
+        const list = el('dl', 'stat-list reveal');
+        for (const st of s.stats) {
+          const cell = el('div', 'stat');
+          cell.appendChild(el('dt', 'stat-value', st.value));
+          cell.appendChild(el('dd', 'stat-label', st.label));
+          list.appendChild(cell);
+        }
+        sub.appendChild(list);
+      }
 
       if (s.quote) {
         const q = el('figure', 'inline-quote reveal');
@@ -137,9 +181,51 @@ function renderTakeaways(c) {
     }
 
     nodes.push(chapter);
+
+    // Each chapter is followed by its own image, so the imagery is read as
+    // evidence for the point just made rather than as a gallery at the end.
+    const after = image(`after-takeaway-${t.index}`);
+    if (after) nodes.push(after);
   }
 
   return nodes;
+}
+
+/**
+ * One image at a given placement, or null if that file has not been added yet.
+ *
+ * Per the brief: no frame, no shadow, no device mockup, no typographic overlay.
+ * The screen compositions already sit on black and meet the page background
+ * seamlessly, so the figure adds nothing around them.
+ */
+function renderImage(c, placement) {
+  const spec = (c.images ?? []).find((i) => i.placement === placement);
+  if (!spec) return null;
+
+  const url = imageUrl(c.slug, spec.src);
+  if (!url) return null; // not supplied yet — section simply omits it
+
+  const fig = el('figure', 'case-figure reveal');
+  if (spec.width && spec.width !== 'full') fig.dataset.width = String(spec.width);
+
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = spec.alt ?? '';
+  // The cover is above the fold on every case page; everything below it is not.
+  img.loading = placement === 'after-cover' ? 'eager' : 'lazy';
+  img.decoding = 'async';
+  fig.appendChild(img);
+
+  if (spec.caption) fig.appendChild(el('figcaption', null, spec.caption));
+
+  return fig;
+}
+
+function renderMadeItWork(c) {
+  if (!c.whatMadeItWork?.length) return null;
+  const ul = el('ul', 'did-list');
+  for (const item of c.whatMadeItWork) ul.appendChild(el('li', 'reveal', item));
+  return row('What made it work', ul);
 }
 
 function renderMore(current) {
@@ -166,15 +252,29 @@ export function renderCase(c, mount) {
   const desc = document.querySelector('meta[name="description"]');
   if (desc) desc.setAttribute('content', c.headline);
 
-  mount.appendChild(renderHero(c));
+  reportMissing(c.slug, c.images ?? []);
+  const image = (placement) => renderImage(c, placement);
 
+  // The cover is consumed by the hero, so it is not repeated below.
+  mount.appendChild(renderHero(c, image));
+
+  // A before/after comparison takes the hero image's place when a case has one.
+  const compare = buildCompare(c.slug, c.compare);
+
+  // Page order is fixed by the brief; images sit between sections rather than
+  // inside them, so they run the full width of the container.
   const main = el('main', 'case-body');
   const parts = [
+    compare,
     renderWhatWeDid(c),
     renderOutcomes(c),
     renderOverview(c),
+    image('after-overview'),
     renderQuote(c),
-    ...renderTakeaways(c),
+    ...renderTakeaways(c, image),
+    // 'closing' is still a supported placement; no case currently uses one.
+    image('closing'),
+    renderMadeItWork(c),
     renderMore(c),
   ];
   for (const part of parts) if (part) main.appendChild(part);

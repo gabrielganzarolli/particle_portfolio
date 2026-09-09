@@ -10,6 +10,10 @@
   --gutter: clamp(6rem, 18vw, 15rem);
   --gap: clamp(1.5rem, 4vw, 4rem);
   --measure: 62ch;
+  /* Body figures are capped well inside the container: at full width the
+     screenshots dominate the page and read larger than the prose they
+     support. Captions share the cap so they align with the image edge. */
+  --figure-max: 60rem;
 }
 
 * {
@@ -76,36 +80,65 @@ a {
 
 /* Hero ------------------------------------------------------------------- */
 
+/* Gutter, text, image. The eyebrow keeps its gutter, the type keeps the
+   treatment it had, and the cover sits alongside rather than underneath. */
 .case-hero {
-  padding: clamp(4rem, 16vh, 11rem) var(--edge) clamp(2.5rem, 8vh, 5rem);
+  padding: clamp(3.5rem, 12vh, 8rem) var(--edge) clamp(3rem, 9vh, 6rem);
   display: grid;
-  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  /* The hero uses a narrower gutter than the body rows: it holds only the
+     index and the tag pill, so the full --gutter width is dead space that was
+     costing the image its size. */
+  grid-template-columns: clamp(7.5rem, 10vw, 9rem) minmax(0, 1fr) minmax(0, 1.25fr);
   gap: 0 var(--gap);
+  align-items: start;
   border-bottom: 1px solid var(--line);
 }
 
-.case-index {
+.case-eyebrow {
   grid-column: 1;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  padding-top: 0.6rem;
+}
+
+.case-index {
   font-size: 0.75rem;
   letter-spacing: 0.14em;
   font-variant-numeric: tabular-nums;
   color: var(--ink-dim);
-  padding-top: 0.6rem;
 }
 
+.case-tag {
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+}
+
+/* The project name is a label for the statement below it, not a peer of it.
+   At near-identical size and weight the two read as one block; this pulls the
+   name down to roughly 40% of the headline and dims it so the statement leads. */
 .case-title {
   grid-column: 2;
-  font-size: clamp(1.5rem, 3.4vw, 2.5rem);
+  font-size: clamp(0.9375rem, 1.35vw, 1.125rem);
   font-weight: 400;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
 }
 
 .case-headline {
   grid-column: 2;
-  margin-top: 0.75rem;
+  margin-top: 0.9rem;
   max-width: 22ch;
-  font-size: clamp(2rem, 6.4vw, 5rem);
+  /* Sentence case, sized for the narrower column beside the image but now with
+     clear separation from the project name above it. */
+  font-size: clamp(1.75rem, 3.5vw, 3.1rem);
   font-weight: 400;
   line-height: 1.02;
   letter-spacing: -0.025em;
@@ -116,7 +149,7 @@ a {
   grid-column: 2;
   margin-top: clamp(2rem, 6vh, 4rem);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
   gap: 1.25rem 2rem;
   font-size: 0.8125rem;
 }
@@ -129,6 +162,49 @@ a {
 
 .case-meta dd {
   margin: 0;
+}
+
+/* The cover, beside the text. It opts out of the full-bleed padding the body
+   figures use — here it is a column, not a band. */
+.case-hero .hero-media {
+  grid-column: 3;
+  /* Must start at row 1 and span the rows column 2 uses (title, headline,
+     meta). Grid's sparse auto-placement never backtracks, so without this the
+     image lands in the last row and floats down beside the meta. `1 / -1` does
+     not work here: with no grid-template-rows the explicit grid has no rows for
+     -1 to resolve against, so it collapses to row 1 and stretches it. */
+  grid-row: 1 / span 3;
+  /* Top-aligned with the project title; the nudge matches its cap-height. */
+  align-self: start;
+  margin: 0.55rem 0 0;
+  padding: 0;
+}
+
+.case-hero .hero-media img {
+  width: 100%;
+  height: auto;
+  border-radius: clamp(6px, 0.7vw, 10px);
+}
+
+/* No cover supplied: fall back to the two-column layout this hero had before. */
+.case-hero.is-textonly {
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+}
+
+.case-hero.is-textonly .case-headline {
+  font-size: clamp(2rem, 6.4vw, 5rem);
+}
+
+/* Stack before the columns get too tight for the headline. */
+@media (max-width: 1000px) {
+  .case-hero {
+    grid-template-columns: clamp(7.5rem, 10vw, 9rem) minmax(0, 1fr);
+  }
+
+  .case-hero .hero-media {
+    grid-column: 2;
+    margin-top: clamp(1.75rem, 4vh, 2.75rem);
+  }
 }
 
 /* The label/content row -------------------------------------------------- */
@@ -222,6 +298,227 @@ a {
   line-height: 1.5;
   color: var(--ink-dim);
   text-wrap: pretty;
+}
+
+/* Supporting figures ------------------------------------------------------ */
+
+.stat-list {
+  grid-column: 2;
+  margin: clamp(1.5rem, 4vh, 2.25rem) 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 1.5rem 2rem;
+  max-width: var(--measure);
+  border-top: 1px solid var(--line);
+  padding-top: clamp(1.25rem, 3vh, 1.75rem);
+}
+
+.stat-value {
+  font-size: clamp(1.375rem, 2.4vw, 1.875rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.stat-label {
+  margin: 0.45rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+/* Imagery ---------------------------------------------------------------- */
+
+/* Deliberately unadorned: no frame, no shadow, no radius, no device mockup.
+   The screen compositions are already assembled on black, so anything drawn
+   around them would break the seam with the page background. Campaign pieces
+   are light-on-photo and carry their own edge. */
+.case-figure {
+  margin: 0;
+  padding: clamp(2.5rem, 7vh, 5rem) var(--edge);
+}
+
+.case-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: var(--figure-max);
+  margin-inline: auto;
+}
+
+/* The closing piece is vertical (9:16) — centred at its natural size rather
+   than stretched across the container. */
+.case-figure[data-width] {
+  display: grid;
+  justify-items: center;
+}
+
+.case-figure[data-width] img {
+  max-width: 480px;
+}
+
+.case-figure figcaption {
+  max-width: var(--figure-max);
+  margin: 0.9rem auto 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+/* Before / after comparison ---------------------------------------------- */
+
+.compare {
+  margin: 0;
+  padding: clamp(2.5rem, 7vh, 5rem) var(--edge);
+}
+
+.compare-frame {
+  max-width: var(--figure-max);
+  margin-inline: auto;
+  --pos: 50%;
+  position: relative;
+  overflow: hidden;
+  /* The pointer handlers read clientX against this box, so it must not be
+     scrolled or panned by the same gesture that drags the divider. */
+  touch-action: pan-y;
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.compare-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The "after" image is clipped to the divider and revealed from the right, so
+   the layout matches the labels: before on the left, after on the right. It is
+   absolutely positioned over the "before" one, which is what gives the frame
+   its height — the two files must therefore share an aspect ratio. */
+.compare-after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  clip-path: inset(0 0 0 var(--pos));
+}
+
+.compare-tag {
+  position: absolute;
+  top: clamp(0.6rem, 2vw, 1rem);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: rgba(7, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  pointer-events: none;
+}
+
+.compare-tag.is-before {
+  left: clamp(0.6rem, 2vw, 1rem);
+}
+
+.compare-tag.is-after {
+  right: clamp(0.6rem, 2vw, 1rem);
+}
+
+.compare-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos);
+  width: 44px; /* comfortable target; the visible line is drawn by ::before */
+  transform: translateX(-50%);
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: ew-resize;
+}
+
+.compare-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--ink);
+}
+
+.compare-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+.compare-handle:focus-visible {
+  outline: none;
+}
+
+.compare-handle:focus-visible::after {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--ink);
+}
+
+.compare figcaption {
+  margin: 0.9rem auto 0;
+  max-width: var(--figure-max);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  text-wrap: pretty;
+}
+
+/* Below this width dragging hides half the screen behind a thumb, so the
+   comparison becomes two labelled images instead. */
+@media (max-width: 720px) {
+  .compare-frame {
+    cursor: default;
+  }
+
+  .compare-after {
+    position: static;
+    clip-path: none;
+    margin-top: 0.75rem;
+  }
+
+  .compare-handle {
+    display: none;
+  }
+
+  .compare-tag {
+    position: static;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    background: none;
+    backdrop-filter: none;
+    padding: 0;
+    color: var(--ink-dim);
+  }
+
+  /* Source order is before-image, after-wrapper, before-tag, after-tag; put the
+     labels above the images they name. */
+  .compare-frame {
+    display: grid;
+  }
+
+  .compare-tag.is-before { order: 1; }
+  .compare-frame > .compare-img { order: 2; }
+  .compare-tag.is-after { order: 3; }
+  .compare-after { order: 4; }
 }
 
 /* Pull quote ------------------------------------------------------------- */
@@ -445,8 +742,13 @@ a {
    bundle turns into a blank page. */
 .js .reveal {
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 600ms ease, transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translate3d(0, 26px, 0);
+  /* Matches the home page: opacity runs longer and starts a beat later than the
+     movement, so the two don't land on the same frame. */
+  transition:
+    opacity 1500ms cubic-bezier(0.33, 0, 0.2, 1) 60ms,
+    transform 1250ms cubic-bezier(0.16, 0.62, 0.18, 1);
+  will-change: transform, opacity;
 }
 
 .js .reveal.is-in {
