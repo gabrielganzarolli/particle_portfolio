@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "description": "GPGPU particle field that spells and morphs between phrases.",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "npm run cases && vite",
+    "build": "npm run cases && vite build",
+    "preview": "vite preview",
+    "cases": "node scripts/build-cases.mjs"
   },
   "type": "module",
   "dependencies": {

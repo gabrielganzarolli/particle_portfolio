@@ -1,88 +1,30 @@
-import { imageUrl } from './images.js';
-
 /**
- * Before/after comparison with a draggable divider.
+ * Drag and keyboard behaviour for the before/after comparison.
  *
- * Both images are stacked; the "after" one is revealed by a clip that follows
- * the divider. The two files must share an aspect ratio — the container's
- * height comes from the "before" image, and a mismatched "after" would be
- * letterboxed or cropped against it.
+ * The markup is already in the HTML (see renderHtml.js) — this only attaches
+ * behaviour. With scripts disabled the control still renders at its resting
+ * 50%, both images are visible and both carry alt text, so nothing is lost
+ * except the dragging.
  *
- * On the accessibility of this control, which matters more than usual given
- * what the case is about:
- *   - the handle is a real focusable element with role="slider" and live
+ * On accessibility, which matters more than usual given what the case is about:
+ *   - the handle is a real focusable button with role="slider" and live
  *     aria-valuenow, so it is announced and operable without a mouse
- *   - arrow keys move it, Home/End jump to either end
- *   - both images carry alt text; the comparison is not the only way to see
- *     them, since below 720px the slider is replaced by both images stacked
- *     with visible labels (handled in CSS)
+ *   - arrow keys move it, Shift multiplies the step, Home/End jump to an end
+ *   - below 720px the slider is replaced by both images stacked with visible
+ *     labels, because dragging on a phone hides half the screen behind a thumb
  */
 
 const clamp = (v) => (v < 0 ? 0 : v > 100 ? 100 : v);
 
-export function buildCompare(slug, spec) {
-  if (!spec) return null;
+export function attachCompare(root = document) {
+  const frame = root.querySelector('.compare-frame');
+  if (!frame) return;
 
-  const beforeUrl = imageUrl(slug, spec.before);
-  const afterUrl = imageUrl(slug, spec.after);
-  if (!beforeUrl || !afterUrl) return null;
+  const handle = frame.querySelector('.compare-handle');
+  const labelBefore = frame.querySelector('.compare-tag.is-before')?.textContent ?? 'Before';
+  const labelAfter = frame.querySelector('.compare-tag.is-after')?.textContent ?? 'After';
+  if (!handle) return;
 
-  const labelBefore = spec.labelBefore ?? 'Before';
-  const labelAfter = spec.labelAfter ?? 'After';
-
-  const fig = document.createElement('figure');
-  fig.className = 'compare reveal';
-
-  const frame = document.createElement('div');
-  frame.className = 'compare-frame';
-
-  // "Before" sits underneath and defines the box's height.
-  const imgBefore = document.createElement('img');
-  imgBefore.className = 'compare-img';
-  imgBefore.src = beforeUrl;
-  imgBefore.alt = `${spec.alt ?? ''} — ${labelBefore.toLowerCase()}`.trim();
-  imgBefore.decoding = 'async';
-  frame.appendChild(imgBefore);
-
-  // "After" is clipped to the divider position.
-  const afterWrap = document.createElement('div');
-  afterWrap.className = 'compare-after';
-  const imgAfter = document.createElement('img');
-  imgAfter.className = 'compare-img';
-  imgAfter.src = afterUrl;
-  imgAfter.alt = `${spec.alt ?? ''} — ${labelAfter.toLowerCase()}`.trim();
-  imgAfter.decoding = 'async';
-  afterWrap.appendChild(imgAfter);
-  frame.appendChild(afterWrap);
-
-  const tagBefore = document.createElement('span');
-  tagBefore.className = 'compare-tag is-before';
-  tagBefore.textContent = labelBefore;
-  frame.appendChild(tagBefore);
-
-  const tagAfter = document.createElement('span');
-  tagAfter.className = 'compare-tag is-after';
-  tagAfter.textContent = labelAfter;
-  frame.appendChild(tagAfter);
-
-  const handle = document.createElement('button');
-  handle.type = 'button';
-  handle.className = 'compare-handle';
-  handle.setAttribute('role', 'slider');
-  handle.setAttribute('aria-label', `Compare ${labelBefore.toLowerCase()} and ${labelAfter.toLowerCase()}`);
-  handle.setAttribute('aria-valuemin', '0');
-  handle.setAttribute('aria-valuemax', '100');
-  handle.setAttribute('aria-orientation', 'horizontal');
-  frame.appendChild(handle);
-
-  fig.appendChild(frame);
-  if (spec.caption) {
-    const cap = document.createElement('figcaption');
-    cap.textContent = spec.caption;
-    fig.appendChild(cap);
-  }
-
-  // --- behaviour ---------------------------------------------------------
   let pct = 50;
 
   function apply() {
@@ -98,7 +40,6 @@ export function buildCompare(slug, spec) {
       `${n}% ${labelBefore.toLowerCase()}, ${100 - n}% ${labelAfter.toLowerCase()}`
     );
   }
-  apply();
 
   function setFromClientX(clientX) {
     const r = frame.getBoundingClientRect();
@@ -149,6 +90,4 @@ export function buildCompare(slug, spec) {
     pct = clamp(next);
     apply();
   });
-
-  return fig;
 }
