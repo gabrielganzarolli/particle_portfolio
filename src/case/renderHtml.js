@@ -53,6 +53,32 @@ function image(c, placement, resolve, { hero = false } = {}) {
   );
 }
 
+/**
+ * A looping walkthrough. `controls` is present deliberately: autoplaying
+ * looping motion has to be stoppable, and with controls it is stoppable
+ * without any script. Muted and playsinline are what make autoplay allowed at
+ * all; the poster is the first frame, so something is on screen before the
+ * file arrives.
+ */
+function video(c, placement, resolve) {
+  const v = c.video;
+  if (!v || (v.placement ?? 'after-overview') !== placement) return '';
+
+  const src = resolve(c.slug, v.src);
+  if (!src) return '';
+  const poster = v.poster ? resolve(c.slug, v.poster) : null;
+
+  return (
+    `<figure class="case-figure case-video reveal">` +
+    `<video src="${esc(src)}"${poster ? ` poster="${esc(poster)}"` : ''} ` +
+    `autoplay muted loop playsinline controls preload="metadata"` +
+    (v.alt ? ` aria-label="${esc(v.alt)}"` : '') +
+    `></video>` +
+    (v.caption ? `<figcaption>${esc(v.caption)}</figcaption>` : '') +
+    `</figure>`
+  );
+}
+
 function hero(c, resolve) {
   const media = image(c, 'after-cover', resolve, { hero: true });
 
@@ -280,6 +306,7 @@ export function renderCaseHtml(c, resolve) {
     outcomes(c),
     row('Overview', prose(c.overview)),
     image(c, 'after-overview', resolve),
+    video(c, 'after-overview', resolve),
     takeaways(c, resolve),
     notes(c, resolve),
     // 'closing' is still a supported placement; no case currently uses one.

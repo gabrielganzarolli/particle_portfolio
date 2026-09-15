@@ -13,18 +13,61 @@ import { attachCompare } from './compare.js';
 // content rather than a blank screen.
 document.documentElement.classList.add('js');
 
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 attachCompare();
+
+// A looping video is motion the visitor did not ask for. Under reduced-motion
+// it stays on its poster until played deliberately; otherwise it plays only
+// while on screen, which keeps it off the battery for the rest of the page.
+// Without script it simply autoplays, and `controls` still makes it stoppable.
+for (const v of document.querySelectorAll('.case-video video')) {
+  if (reducedMotion) {
+    v.autoplay = false;
+    v.pause();
+    v.currentTime = 0;
+    continue;
+  }
+  if (!('IntersectionObserver' in window)) continue;
+
+  // Once the visitor uses the controls, stop second-guessing them. The flag is
+  // needed because scrolling away pauses the video too, and that must not be
+  // mistaken for the visitor pausing it.
+  let manual = false;
+  let programmatic = false;
+  const drive = (fn) => {
+    programmatic = true;
+    fn();
+    // Cleared after the event has been dispatched, not synchronously.
+    setTimeout(() => (programmatic = false), 0);
+  };
+  for (const evt of ['pause', 'play']) {
+    v.addEventListener(evt, () => {
+      if (!programmatic) manual = true;
+    });
+  }
+
+  new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (manual) return;
+        if (e.isIntersecting) drive(() => v.play().catch(() => {}));
+        else drive(() => v.pause());
+      }
+    },
+    { threshold: 0.2 }
+  ).observe(v);
+}
 
 // Reveal on scroll. The home page drives this from its rAF loop because it
 // already runs one for the particle field; a content page has no loop to
 // piggyback on, so IntersectionObserver is both cheaper and smoother here —
 // the browser does the intersection work off the main thread and CSS handles
 // the transition.
-const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const targets = Array.from(document.querySelectorAll('.reveal'));
 const showAll = () => targets.forEach((t) => t.classList.add('is-in'));
 
-if (reduced || !('IntersectionObserver' in window)) {
+if (reducedMotion || !('IntersectionObserver' in window)) {
   showAll();
 } else {
   let fired = false;

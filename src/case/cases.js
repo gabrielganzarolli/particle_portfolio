@@ -474,29 +474,16 @@ export const CASES = [
     discipline: 'Product design',
     role: 'Senior product designer',
 
-    images: [
-      {
-        src: '01-client-overview.png',
-        alt: 'The client overview, showing segment, level, current steps, steps to the next level and the products that earn them',
-        placement: 'after-overview',
-        width: 'full',
-      },
-      {
-        src: '03-filter.png',
-        alt: 'The history filter, with event types and a date range',
-        caption:
-          'Filtering by lost steps, rule change and segment change, the events a client actually asks about.',
-        placement: 'after-notes-1',
-        width: 'full',
-      },
-      {
-        src: '04-filtered.png',
-        alt: 'The filtered step history',
-        caption: 'Each entry dated, priced, and tied to the level it applied to.',
-        placement: 'after-notes-2',
-        width: 'full',
-      },
-    ],
+    // A looping walkthrough rather than stills. The three frames this replaced
+    // were all pulled from this same recording.
+    video: {
+      src: 'console.mp4',
+      poster: '01-client-overview.png',
+      alt: 'A walkthrough of the console: the client overview, the step history, and the history filtered by event type and date',
+      caption:
+        'The console end to end: the client overview, then the step history filtered to the events a client actually asks about.',
+      placement: 'after-overview',
+    },
 
     overview: [
       'An internal console that shows a branch manager where a client stands in Minhas Vantagens, the bank’s relationship programme. Before it existed, managers had no view of the programme at all: when a client asked why a benefit had gone, the manager had to ask the client to explain their own account.',
