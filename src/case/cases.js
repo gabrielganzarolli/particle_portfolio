@@ -451,6 +451,81 @@ export const CASES = [
   },
 
 
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  // Short form: no outcomes, no quote, no "What I did". The template already
+  // skips sections with no data, so "short" needed no new layout — only the
+  // `notes` and `getInTouch` blocks, which render as ordinary labelled rows.
+  //
+  //   [[ confirmar ]]  `role`. `year` is 2024, which the date picker in the
+  //                    product confirms (screen shows 10/02/2024).
+  //
+  //   Index is 04, not the 05 in the brief: that numbering assumed the
+  //   placeholder cases that have since been removed.
+  {
+    slug: 'minhas-vantagens-console',
+    index: '04',
+    title: 'Minhas Vantagens console',
+    headline: 'The manager who had to ask the client',
+    description:
+      'An internal console giving Itaú branch managers the same view of the relationship programme their clients see, plus the reasons a level was lost.',
+    tag: 'Banking',
+    client: 'Itaú Unibanco',
+    year: '2024',
+    discipline: 'Product design',
+    role: 'Senior product designer',
+
+    images: [
+      {
+        src: '01-client-overview.png',
+        alt: 'The client overview, showing segment, level, current steps, steps to the next level and the products that earn them',
+        placement: 'after-overview',
+        width: 'full',
+      },
+      {
+        src: '03-filter.png',
+        alt: 'The history filter, with event types and a date range',
+        caption:
+          'Filtering by lost steps, rule change and segment change, the events a client actually asks about.',
+        placement: 'after-notes-1',
+        width: 'full',
+      },
+      {
+        src: '04-filtered.png',
+        alt: 'The filtered step history',
+        caption: 'Each entry dated, priced, and tied to the level it applied to.',
+        placement: 'after-notes-2',
+        width: 'full',
+      },
+    ],
+
+    overview: [
+      'An internal console that shows a branch manager where a client stands in Minhas Vantagens, the bank’s relationship programme. Before it existed, managers had no view of the programme at all: when a client asked why a benefit had gone, the manager had to ask the client to explain their own account.',
+    ],
+
+    // Label left, a few sentences right. Lighter than a takeaway chapter,
+    // which is what keeps this case short.
+    notes: [
+      {
+        title: 'The question was pointed the wrong way',
+        body: 'A client walks into a branch and asks what happened to their level. The manager is the one person in the room who should be able to answer, and the only information available was whatever the client could recall. Giving the manager the same picture the client sees, plus the reasons behind it, was the whole project.',
+      },
+      {
+        title: 'Loss is the part people ask about',
+        body: 'Programme dashboards tend to show progress and stop there. This one leads with the risk: steps lost, and a warning when the client is close to a downgrade. The history can be filtered to lost steps, rule changes and segment changes, because those are the events a client comes in angry about and the ones a manager could never explain.',
+      },
+      {
+        title: 'An abstract programme priced in steps',
+        body: 'Each product carries what it is worth, and the accumulation products show a figure against a threshold rather than a vague sense of progress. That turns a loyalty programme into a concrete conversation at a desk: here is where you are, here is what closes the gap.',
+      },
+    ],
+
+    getInTouch: {
+      text: 'Want the longer version of this one? That is a better conversation than a page.',
+      button: 'Ask me about it',
+      href: 'mailto:gabrielganza@gmail.com',
+    },
+  },
+
 ];
 
 export const bySlug = (slug) => CASES.find((c) => c.slug === slug);

@@ -222,6 +222,38 @@ function takeaways(c, resolve) {
   return out;
 }
 
+/**
+ * Short-form notes: a label in the gutter and a few sentences beside it.
+ * Deliberately lighter than a takeaway chapter — that weight is what makes a
+ * long case long. Each note can be followed by its own image.
+ */
+function notes(c, resolve) {
+  const list = c.notes ?? [];
+  if (!list.length) return '';
+
+  return list
+    .map((n, i) => {
+      const body = `<div class="prose"><p class="reveal">${esc(n.body)}</p></div>`;
+      return row(n.title, body, 'row-note') + image(c, `after-notes-${i + 1}`, resolve);
+    })
+    .join('');
+}
+
+function getInTouch(c) {
+  const g = c.getInTouch;
+  if (!g) return '';
+
+  const button = g.button
+    ? `<a class="contact-button reveal" href="${esc(g.href ?? '#')}">${esc(g.button)}</a>`
+    : '';
+
+  return row(
+    'Get in touch',
+    `<div class="contact"><p class="contact-text reveal">${esc(g.text)}</p>${button}</div>`,
+    'row-contact'
+  );
+}
+
 function more(current) {
   const items = CASES.filter((c) => c.slug !== current.slug)
     .map(
@@ -249,9 +281,11 @@ export function renderCaseHtml(c, resolve) {
     row('Overview', prose(c.overview)),
     image(c, 'after-overview', resolve),
     takeaways(c, resolve),
+    notes(c, resolve),
     // 'closing' is still a supported placement; no case currently uses one.
     image(c, 'closing', resolve),
     listRow('What made it work', c.whatMadeItWork),
+    getInTouch(c),
     more(c),
   ].join('');
 

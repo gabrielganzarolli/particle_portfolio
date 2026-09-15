@@ -300,6 +300,48 @@ a {
   text-wrap: pretty;
 }
 
+/* Short-form notes --------------------------------------------------------- */
+
+/* The gutter label is a sentence here, not a section name, so it drops the
+   uppercase and letterspacing that would make a full sentence hard to read. */
+.row-note .row-label {
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+/* Get in touch ------------------------------------------------------------- */
+
+.contact-text {
+  max-width: 46ch;
+  font-size: clamp(1.0625rem, 1.6vw, 1.3125rem);
+  line-height: 1.5;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.contact-button {
+  display: inline-block;
+  margin-top: clamp(1.25rem, 3vh, 1.75rem);
+  padding: 0.8rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.contact-button:hover,
+.contact-button:focus-visible {
+  border-color: var(--ink);
+  background: rgba(244, 236, 220, 0.06);
+}
+
 /* Supporting figures ------------------------------------------------------ */
 
 .stat-list {
