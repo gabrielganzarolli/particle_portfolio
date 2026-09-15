@@ -35,10 +35,6 @@ export const CASES = [
     index: '01',
     title: 'Seleção de Prêmios',
     headline: 'A prize mechanic that had to feel like a bank, not a bet',
-    // One-paragraph orientation under the headline. Taken from your own hero
-    // mockup, which is where this field came from.
-    summary:
-      'A World Cup campaign built to grow Itaú’s relationship programme, Minhas Vantagens: a weekly prize spin, missions tied to real banking journeys, and draws whose odds come from your programme level.',
     tag: 'Gamification',
     client: 'Itaú Unibanco',
     year: '2026',
@@ -195,15 +191,6 @@ export const CASES = [
   // ── REAL CASE ────────────────────────────────────────────────────────────
   // Same template and palette as selecao-de-premios. Notes from the brief:
   //
-  //   [[ revisar ]]   The solution paragraph mentions "time-to-quote under 60
-  //                   seconds". The brief itself flags this as likely left over
-  //                   from another case — there is no quote step in this flow.
-  //                   Kept verbatim rather than silently rewritten; confirm and
-  //                   correct, or delete the clause.
-  //
-  //   [[ verificar ]] The quote is attributed to a named individual at a named
-  //                   employer. Confirm they said it and are happy to be quoted
-  //                   publicly before this ships.
   {
     slug: 'retiree-hub',
     index: '02',
@@ -267,14 +254,8 @@ export const CASES = [
     overview: [
       'A dedicated space within the Itaú app where retirees can link and manage their financial benefits in one place. Instead of tracking retirement pay, pensions, and government allowances across separate channels, customers get a single, clear view of everything they receive.',
       'Retired customers often juggle multiple income sources: social security retirement (INSS), survivor pensions, temporary leave allowances, and other benefits. Each one lives in a different place, with different payment dates and rules. Keeping track of what arrives, when, and how much becomes a constant source of uncertainty for an audience that values stability and predictability above all.',
-      'We consolidated the product into a single cohesive experience — simplifying navigation, establishing a clear visual hierarchy, and reducing the time-to-quote to under 60 seconds. The new system scaled across all touchpoints while remaining flexible enough for future growth. Itaú makes it easy to add, consult and update benefits.',
+      'We consolidated the product into a single cohesive experience — simplifying navigation and establishing a clear visual hierarchy. The new system scaled across all touchpoints while remaining flexible enough for future growth. Itaú makes it easy to add, consult and update benefits.',
     ],
-
-    quote: {
-      text: 'Gabriel came to kickoff with a clickable version of the thing we had been arguing about for two weeks. The argument was over in ten minutes.',
-      name: 'Marina Cordeiro',
-      role: 'Product Manager, Itaú Unibanco',
-    },
 
     takeaways: [
       {
@@ -322,8 +303,9 @@ export const CASES = [
   //   [[ confirmar ]]  `year` — screens show Feb 2024 but the project ran over
   //                    a year. `role` — confirm the title you want to use.
   //
-  //   [[ confirmar ]]  The −35% came from "quase 40, trinta e poucos".
-  //                    Confirm the real figure or soften to "over 30%".
+  //   [[ confirmar ]]  Time saved is stated as 30% because the source was
+  //                    "quase 40, trinta e poucos" — thirty-something is
+  //                    certain, 35 was not. Raise it once confirmed.
   //
   //   [[ revisar ]]    04-refinancing is deliberately not included: the brief
   //                    flags that screen as showing four fields with the same
@@ -396,7 +378,7 @@ export const CASES = [
 
     outcomes: [
       { prefix: '+', value: '50', unit: '%', caption: 'Increase in NPS for the ATM experience' },
-      { prefix: '−', value: '35', unit: '%', caption: 'Median time to complete a transaction' },
+      { prefix: '−', value: '30', unit: '%', caption: 'Median time to complete a transaction' },
       {
         value: '2',
         unit: '×',

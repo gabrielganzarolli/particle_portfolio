@@ -137,9 +137,6 @@ async function boot() {
   resize();
   window.addEventListener('resize', resize);
 
-  // Set by the DEV block below; a no-op in production.
-  let hudUpdate = () => {};
-
   // Hover ---------------------------------------------------------------
   let hovering = false;
   let morphT = 0; // raw 0..1 ramp; ease() is applied on the way to the shader
@@ -219,7 +216,6 @@ async function boot() {
 
     field.update(dt, elapsed);
     renderer.render(field.scene, camera);
-    hudUpdate();
   }
 
   renderer.setAnimationLoop((time) => {
@@ -233,27 +229,6 @@ async function boot() {
   hidePreloader();
 
   if (import.meta.env.DEV) {
-    // Dev-only scroll readout. Scroll to the moment you want something to
-    // happen and read `gapTop` off the corner — that number is exactly what
-    // ABOUT_MORPH_START_VH in scrollWork.js takes. Stripped from the
-    // production build along with the rest of this block.
-    const hud = document.createElement('div');
-    hud.style.cssText =
-      'position:fixed;left:8px;bottom:8px;z-index:99;font:11px ui-monospace,monospace;' +
-      'color:#9fe8b4;background:rgba(0,0,0,.72);padding:5px 8px;border-radius:4px;' +
-      'pointer-events:none;white-space:pre;letter-spacing:.04em';
-    document.body.appendChild(hud);
-
-    const gapEl = document.querySelector('.about-space');
-    let tick = 0;
-    hudUpdate = () => {
-      if (++tick % 6) return;
-      const vh = window.innerHeight;
-      const gapTop = gapEl ? gapEl.getBoundingClientRect().top / vh : NaN;
-      hud.textContent =
-        `gapTop ${gapTop.toFixed(3)}   morphT ${morphT.toFixed(2)}   ${PHRASES[field.currentIndex]}`;
-    };
-
     const snapshot = () => ({
       frames,
       hovering,
