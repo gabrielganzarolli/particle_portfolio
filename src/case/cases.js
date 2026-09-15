@@ -32,6 +32,10 @@ export const CASES = [
   //                    and were meant for the NDA version only.
   {
     slug: 'selecao-de-premios',
+    // Social/search description. 120-160 chars, drawn from this page's own
+    // content rather than boilerplate.
+    description:
+      'A World Cup prize mechanic inside Itaú\'s relationship programme: weekly spins and missions built to reward customers, never to feel like a bet.',
     index: '01',
     title: 'Seleção de Prêmios',
     headline: 'A prize mechanic that had to feel like a bank, not a bet',
@@ -193,6 +197,10 @@ export const CASES = [
   //
   {
     slug: 'retiree-hub',
+    // Social/search description. 120-160 chars, drawn from this page's own
+    // content rather than boilerplate.
+    description:
+      'A space inside the Itaú app where retirees link and manage INSS benefits, pensions and allowances in one place instead of across separate channels.',
     index: '02',
     title: 'Retiree Hub',
     headline: 'A unified space for financial benefits',
@@ -313,6 +321,10 @@ export const CASES = [
   //                    rather than the final screen. The file is not imported.
   {
     slug: 'atm-accessibility',
+    // Social/search description. 120-160 chars, drawn from this page's own
+    // content rather than boilerplate.
+    description:
+      'A full redesign of Itaú\'s ATM network and the design system built for it, for customers who cannot read a screen, see it, or aim precisely.',
     index: '03',
     title: 'ATM accessibility',
     headline: 'Rebuilding the ATM and its design system around accessibility',
