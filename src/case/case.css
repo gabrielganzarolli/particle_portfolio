@@ -390,14 +390,10 @@ a {
   margin-inline: auto;
 }
 
-/* Video sits in the same frame as the stills, so a case can mix the two
-   without the page changing rhythm. */
-.case-video video {
+/* <picture> is an inline wrapper; without this it would not fill the figure
+   and the image inside it would ignore the width cap. */
+.case-figure picture {
   display: block;
-  width: 100%;
-  height: auto;
-  max-width: var(--figure-max);
-  margin-inline: auto;
 }
 
 /* The closing piece is vertical (9:16) — centred at its natural size rather

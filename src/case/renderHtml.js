@@ -54,27 +54,36 @@ function image(c, placement, resolve, { hero = false } = {}) {
 }
 
 /**
- * A looping walkthrough. `controls` is present deliberately: autoplaying
- * looping motion has to be stoppable, and with controls it is stoppable
- * without any script. Muted and playsinline are what make autoplay allowed at
- * all; the poster is the first frame, so something is on screen before the
- * file arrives.
+ * A looping walkthrough as an animated GIF.
+ *
+ * A GIF cannot be paused, so the only way to respect someone who has asked
+ * their system for less motion is to serve a still instead. `<picture>` does
+ * that natively, with no script: the media query is evaluated by the browser
+ * before anything is fetched, so a reduced-motion visitor never downloads the
+ * animation at all.
  */
-function video(c, placement, resolve) {
-  const v = c.video;
-  if (!v || (v.placement ?? 'after-overview') !== placement) return '';
+function gif(c, placement, resolve) {
+  const g = c.gif;
+  if (!g || (g.placement ?? 'after-overview') !== placement) return '';
 
-  const src = resolve(c.slug, v.src);
+  const src = resolve(c.slug, g.src);
   if (!src) return '';
-  const poster = v.poster ? resolve(c.slug, v.poster) : null;
+  const still = g.still ? resolve(c.slug, g.still) : null;
+
+  // Explicit dimensions so the figure holds its space before the file lands.
+  const dims = g.width && g.height ? ` width="${esc(g.width)}" height="${esc(g.height)}"` : '';
+  const img =
+    `<img src="${esc(src)}" alt="${esc(g.alt ?? '')}"${dims} loading="lazy" decoding="async">`;
 
   return (
-    `<figure class="case-figure case-video reveal">` +
-    `<video src="${esc(src)}"${poster ? ` poster="${esc(poster)}"` : ''} ` +
-    `autoplay muted loop playsinline controls preload="metadata"` +
-    (v.alt ? ` aria-label="${esc(v.alt)}"` : '') +
-    `></video>` +
-    (v.caption ? `<figcaption>${esc(v.caption)}</figcaption>` : '') +
+    `<figure class="case-figure reveal">` +
+    (still
+      ? `<picture>` +
+        `<source srcset="${esc(still)}" media="(prefers-reduced-motion: reduce)">` +
+        img +
+        `</picture>`
+      : img) +
+    (g.caption ? `<figcaption>${esc(g.caption)}</figcaption>` : '') +
     `</figure>`
   );
 }
@@ -306,7 +315,7 @@ export function renderCaseHtml(c, resolve) {
     outcomes(c),
     row('Overview', prose(c.overview)),
     image(c, 'after-overview', resolve),
-    video(c, 'after-overview', resolve),
+    gif(c, 'after-overview', resolve),
     takeaways(c, resolve),
     notes(c, resolve),
     // 'closing' is still a supported placement; no case currently uses one.

@@ -476,9 +476,12 @@ export const CASES = [
 
     // A looping walkthrough rather than stills. The three frames this replaced
     // were all pulled from this same recording.
-    video: {
-      src: 'console.mp4',
-      poster: '01-client-overview.png',
+    gif: {
+      src: 'console.gif',
+      // Shown instead of the animation under prefers-reduced-motion.
+      still: '01-client-overview.png',
+      width: 999,
+      height: 737,
       alt: 'A walkthrough of the console: the client overview, the step history, and the history filtered by event type and date',
       caption:
         'The console end to end: the client overview, then the step history filtered to the events a client actually asks about.',
