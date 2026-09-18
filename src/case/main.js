@@ -1,5 +1,6 @@
 import './case.css';
 import { attachCompare } from './compare.js';
+import { attachVideos } from './video.js';
 
 /**
  * Interactive behaviour only. The case text and images are already in the HTML
@@ -16,6 +17,7 @@ document.documentElement.classList.add('js');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 attachCompare();
+attachVideos();
 
 // Reveal on scroll. The home page drives this from its rAF loop because it
 // already runs one for the particle field; a content page has no loop to

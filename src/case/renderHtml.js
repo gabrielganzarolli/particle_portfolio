@@ -88,8 +88,122 @@ function gif(c, placement, resolve) {
   );
 }
 
+/**
+ * The <video> element for a looping walkthrough, without the surrounding figure.
+ *
+ * Two things here are deliberate and easy to undo by accident:
+ *
+ * `controls` ships in the HTML. The brief asks for a pause control that is
+ * always available, and a custom button cannot be that on its own — it needs
+ * script. So the native controls are the no-JS answer, and video.js swaps them
+ * for the quieter custom button once it has loaded. Whichever way the page
+ * ends up, the video can be stopped.
+ *
+ * `preload="none"` because a case page can carry several of these; fetching
+ * them all on load would cost tens of megabytes for clips most visitors never
+ * scroll to. The poster is what holds the space and shows the first frame, so
+ * nothing looks unloaded while waiting.
+ */
+function videoEl({ src, poster, alt, width, height }) {
+  // The box has to be right before anything loads, and `preload="none"` means
+  // nothing loads until the clip is scrolled to. The width/height attributes
+  // alone are not enough: the stylesheet gives these a definite width and lets
+  // the height follow, and a width attribute does not drive that — so the ratio
+  // is stated as `aspect-ratio` too. Without it the element sits at the default
+  // 300x150 (or collapses to nothing inside a shrink-to-fit wrapper) and the
+  // page jumps when the poster finally decodes.
+  const dims = width && height ? ` width="${esc(width)}" height="${esc(height)}"` : '';
+  const ratio = width && height ? ` style="aspect-ratio:${esc(width)}/${esc(height)}"` : '';
+
+  return (
+    `<video class="case-video" src="${esc(src)}"` +
+    (poster ? ` poster="${esc(poster)}"` : '') +
+    dims +
+    ratio +
+    ` autoplay loop muted playsinline controls preload="none" ` +
+    `aria-label="${esc(alt ?? '')}"></video>`
+  );
+}
+
+/**
+ * Every looping walkthrough at a given placement, in data order. A chapter can
+ * carry more than one — the decline and the approval are two halves of the same
+ * fork and belong together under the takeaway that explains them.
+ */
+function video(c, placement, resolve) {
+  const hero = placement === 'after-cover';
+  const cls = hero ? 'case-figure video-figure hero-media' : 'case-figure video-figure reveal';
+
+  return (c.videos ?? [])
+    .filter((v) => v.placement === placement)
+    .map((spec) => {
+      const src = resolve(c.slug, spec.src);
+      if (!src) return ''; // not supplied yet — the page simply omits it
+      const poster = spec.poster ? resolve(c.slug, spec.poster) : null;
+      const width = spec.width && spec.width !== 'full' ? ` data-width="${esc(spec.width)}"` : '';
+
+      return (
+        `<figure class="${cls}"${width}>` +
+        videoEl({ src, poster, alt: spec.alt, width: spec.w, height: spec.h }) +
+        (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
+        `</figure>`
+      );
+    })
+    .join('');
+}
+
+/**
+ * Two versions of the same screen, side by side with a label above each.
+ *
+ * Not the draggable divider used for the before/after stills: dragging a split
+ * between two clips that are both moving gives you two half-legible videos and
+ * no comparison. Two whole frames, each labelled, is the readable form.
+ */
+function compareVideo(c, placement, resolve) {
+  const spec = (c.compareVideos ?? []).find((v) => v.placement === placement);
+  if (!spec) return '';
+
+  const a = resolve(c.slug, spec.a);
+  const b = resolve(c.slug, spec.b);
+  if (!a || !b) return '';
+
+  const side = (src, posterSrc, label, alt, w, h) =>
+    `<div class="cv-side">` +
+    `<p class="cv-label">${esc(label)}</p>` +
+    videoEl({
+      src,
+      poster: posterSrc ? resolve(c.slug, posterSrc) : null,
+      alt,
+      width: w,
+      height: h,
+    }) +
+    `</div>`;
+
+  const alt = spec.alt ?? '';
+  const la = spec.aLabel ?? 'A';
+  const lb = spec.bLabel ?? 'B';
+
+  return (
+    `<figure class="case-figure compare-video reveal">` +
+    `<div class="cv-pair">` +
+    side(a, spec.aPoster, la, `${alt} — ${la.toLowerCase()}`.trim(), spec.aW, spec.aH) +
+    side(b, spec.bPoster, lb, `${alt} — ${lb.toLowerCase()}`.trim(), spec.bW, spec.bH) +
+    `</div>` +
+    (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
+    `</figure>`
+  );
+}
+
+/** Whatever media sits at this placement — at most one kind is ever present. */
+const media = (c, placement, resolve) =>
+  image(c, placement, resolve) +
+  gif(c, placement, resolve) +
+  video(c, placement, resolve) +
+  compareVideo(c, placement, resolve);
+
 function hero(c, resolve) {
-  const media = image(c, 'after-cover', resolve, { hero: true });
+  // A case leads with a still or with a looping clip, never both.
+  const cover = image(c, 'after-cover', resolve, { hero: true }) || video(c, 'after-cover', resolve);
 
   const meta = [
     ['Client', c.client],
@@ -106,7 +220,7 @@ function hero(c, resolve) {
     .join('');
 
   return (
-    `<header class="case-hero${media ? '' : ' is-textonly'}">` +
+    `<header class="case-hero${cover ? '' : ' is-textonly'}">` +
     `<div class="case-eyebrow">` +
     `<span class="case-index">${esc(c.index)}</span>` +
     (c.tag ? `<span class="case-tag">${esc(c.tag)}</span>` : '') +
@@ -114,7 +228,7 @@ function hero(c, resolve) {
     `<h1 class="case-title">${esc(c.title)}</h1>` +
     `<p class="case-headline">${esc(c.headline)}</p>` +
     `<dl class="case-meta">${meta}</dl>` +
-    media +
+    cover +
     `</header>`
   );
 }
@@ -251,7 +365,7 @@ function takeaways(c, resolve) {
 
     // Each chapter is followed by its own image, so the imagery reads as
     // evidence for the point just made rather than as a gallery at the end.
-    out += image(c, `after-takeaway-${t.index}`, resolve);
+    out += media(c, `after-takeaway-${t.index}`, resolve);
   }
 
   return out;
@@ -269,7 +383,7 @@ function notes(c, resolve) {
   return list
     .map((n, i) => {
       const body = `<div class="prose"><p class="reveal">${esc(n.body)}</p></div>`;
-      return row(n.title, body, 'row-note') + image(c, `after-notes-${i + 1}`, resolve);
+      return row(n.title, body, 'row-note') + media(c, `after-notes-${i + 1}`, resolve);
     })
     .join('');
 }
@@ -351,12 +465,10 @@ export function renderCaseHtml(c, resolve) {
     listRow('What I did', c.whatWeDid),
     outcomes(c),
     row('Overview', prose(c.overview)),
-    image(c, 'after-overview', resolve),
-    gif(c, 'after-overview', resolve),
+    media(c, 'after-overview', resolve),
     takeaways(c, resolve),
     notes(c, resolve),
-    // 'closing' is still a supported placement; no case currently uses one.
-    image(c, 'closing', resolve),
+    media(c, 'closing', resolve),
     group(c, resolve),
     listRow('What made it work', c.whatMadeItWork),
     getInTouch(c),
