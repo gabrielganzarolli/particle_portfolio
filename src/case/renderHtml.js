@@ -312,9 +312,13 @@ function group(c, resolve) {
     })
     .join('');
 
+  // Two images of very different proportions do not split into columns well —
+  // equalising their heights would leave one of them tiny. Below three, stack.
+  const count = 1 + (g.rest?.length ?? 0);
+
   return (
     `<figure class="case-figure gallery-figure reveal">` +
-    `<div class="gallery">` +
+    `<div class="gallery" data-count="${count}">` +
     `<div class="gallery-lead">${shot(lead, g.leadAlt)}</div>` +
     (rest ? `<div class="gallery-stack">${rest}</div>` : '') +
     `</div>` +

@@ -363,6 +363,13 @@ a {
   align-items: start;
 }
 
+/* Two pieces stack in a single column: the ratio above is what makes three
+   pieces finish level, and with only two the shorter column would shrink the
+   lead image to a fraction of the other's height. */
+.gallery[data-count='2'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .gallery-stack {
   display: grid;
   gap: clamp(0.75rem, 1.6vw, 1.25rem);

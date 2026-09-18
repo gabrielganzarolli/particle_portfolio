@@ -357,10 +357,6 @@ export const CASES = [
       leadAlt: 'Button components across primary, secondary and disabled states, in two sizes',
       rest: [
         {
-          src: '09-anchors.png',
-          alt: 'The three anchors repeated on every screen — shortcuts, notifications and exit — with the primary and secondary action buttons',
-        },
-        {
           src: '05-spec-input-field.png',
           alt: 'Specification of how the input field grows with its content',
         },
