@@ -84,7 +84,10 @@ main {
 }
 
 .hero-space {
-  height: 245vh;
+  /* Runway for the name -> WORK morph, and no more. It used to be 245vh, which
+     meant two and a half screens of nothing before the first case — long
+     enough to build momentum and flick straight past the list. */
+  height: 190vh;
 }
 
 .about-space {
@@ -112,7 +115,7 @@ main {
    to reopen onto the canvas for the ABOUT ME phrase. About is the last section
    before the footer, so it stays solid all the way down. */
 .work {
-  padding: clamp(4rem, 13vh, 9rem) var(--edge) clamp(4rem, 13vh, 9rem);
+  padding: clamp(5rem, 15vh, 10rem) var(--edge) clamp(5rem, 15vh, 10rem);
   background: linear-gradient(
     to bottom,
     rgba(7, 6, 12, 0) 0%,
@@ -189,7 +192,7 @@ main {
   grid-template-columns: auto 1fr auto auto;
   align-items: baseline;
   gap: clamp(1rem, 3vw, 3rem);
-  padding: clamp(2.25rem, 5.5vh, 3.75rem) 0;
+  padding: clamp(3.25rem, 8vh, 5.5rem) 0;
   text-decoration: none;
   color: inherit;
 }
@@ -265,6 +268,34 @@ main {
   line-height: 1.4;
   color: var(--ink);
   margin-bottom: 0.5rem;
+}
+
+/* A compact facts strip under the prose: the things a reader wants at a glance
+   and would otherwise have to infer from four paragraphs. */
+.about-facts {
+  margin: 0.5rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1.25rem 2rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.about-facts dt {
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+  margin-bottom: 0.2rem;
+}
+
+.about-facts dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
 }
 
 .about-link {

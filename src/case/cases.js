@@ -320,13 +320,15 @@ export const CASES = [
   //                    label and value, so probably a component-variant sheet
   //                    rather than the final screen. The file is not imported.
   {
+    // Slug stays atm-accessibility: it is the published URL, and both the
+    // canonical and og:url are built from it.
     slug: 'atm-accessibility',
     // Social/search description. 120-160 chars, drawn from this page's own
     // content rather than boilerplate.
     description:
       'A full redesign of Itaú\'s ATM network and the design system built for it, for customers who cannot read a screen, see it, or aim precisely.',
     index: '03',
-    title: 'ATM accessibility',
+    title: 'ATM redesign',
     headline: 'Rebuilding the ATM and its design system around accessibility',
     tag: 'Design system',
     client: 'Itaú Unibanco',
@@ -344,6 +346,25 @@ export const CASES = [
       alt: 'The ATM home screen before and after the redesign',
       caption:
         'Twelve competing options became eight, each with an icon and a target sized for an unsteady hand.',
+    },
+
+    // Shown together as one block rather than as three separate bands: they
+    // are one artefact — the system — not three moments in a journey. No
+    // caption or label by request; the alt text carries the description for
+    // anyone who cannot see them.
+    group: {
+      lead: '08-components.png',
+      leadAlt: 'Button components across primary, secondary and disabled states, in two sizes',
+      rest: [
+        {
+          src: '09-anchors.png',
+          alt: 'The three anchors repeated on every screen — shortcuts, notifications and exit — with the primary and secondary action buttons',
+        },
+        {
+          src: '05-spec-input-field.png',
+          alt: 'Specification of how the input field grows with its content',
+        },
+      ],
     },
 
     images: [

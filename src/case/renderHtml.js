@@ -289,6 +289,39 @@ function getInTouch(c) {
   );
 }
 
+/**
+ * A set of images presented as one block. The tall piece leads and the wider
+ * ones stack beside it, so three different aspect ratios read as a single
+ * composition instead of three unrelated bands. No caption and no label — the
+ * images speak for themselves; alt text carries them for anyone who cannot.
+ */
+function group(c, resolve) {
+  const g = c.group;
+  if (!g) return '';
+
+  const lead = resolve(c.slug, g.lead);
+  if (!lead) return '';
+
+  const shot = (src, alt) =>
+    `<img src="${esc(src)}" alt="${esc(alt ?? '')}" loading="lazy" decoding="async">`;
+
+  const rest = (g.rest ?? [])
+    .map((r) => {
+      const u = resolve(c.slug, r.src);
+      return u ? shot(u, r.alt) : '';
+    })
+    .join('');
+
+  return (
+    `<figure class="case-figure gallery-figure reveal">` +
+    `<div class="gallery">` +
+    `<div class="gallery-lead">${shot(lead, g.leadAlt)}</div>` +
+    (rest ? `<div class="gallery-stack">${rest}</div>` : '') +
+    `</div>` +
+    `</figure>`
+  );
+}
+
 function more(current) {
   const items = CASES.filter((c) => c.slug !== current.slug)
     .map(
@@ -320,6 +353,7 @@ export function renderCaseHtml(c, resolve) {
     notes(c, resolve),
     // 'closing' is still a supported placement; no case currently uses one.
     image(c, 'closing', resolve),
+    group(c, resolve),
     listRow('What made it work', c.whatMadeItWork),
     getInTouch(c),
     more(c),
