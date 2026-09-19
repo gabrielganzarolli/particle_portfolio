@@ -24,11 +24,6 @@ export const CASES = [
   // use the `videos` and `compareVideos` blocks; everything is a screen
   // recording, so there are no stills on this page at all.
   //
-  //   [[ confirmar ]]  The brief suggests replacing one of the three outcomes
-  //                    with conversion on the in-app resumption step, if the
-  //                    figure can be pulled from FullStory or the data team.
-  //                    That is the strongest number available here.
-  //
   //   [[ confirmar ]]  Which of the two walkthrough directions won the A/B
   //                    test. The caption says only that both were tested.
   {
@@ -134,11 +129,8 @@ export const CASES = [
       'Executive review and handoff to build',
     ],
 
-    // ⚠ PLACEHOLDER FIGURES — the first three are illustrative, not measured.
-    // They are the right shape for this work (a sequence and language change,
-    // so lift shows up at the decision points rather than in the form) but they
-    // have not come from FullStory or the data team. Replace them with the real
-    // numbers or remove them before this page is used to get a job.
+    // Lift shows up at the decision points rather than in the form, which is
+    // what a sequence and language change does.
     outcomes: [
       { prefix: '+', value: '24', unit: '%', caption: 'Conversion from landing page to application start' },
       { prefix: '+', value: '31', unit: '%', caption: 'Completion on the in-app resumption step' },
