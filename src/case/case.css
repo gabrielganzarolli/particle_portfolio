@@ -466,21 +466,11 @@ a {
 
 /* Looping walkthroughs ---------------------------------------------------- */
 
-/* The wrapper carries the size and the video simply fills it. It has to be this
-   way round: the wrapper is also the positioning context for the pause button,
-   so if the video were the narrower of the two the button would float off in
-   the empty space beside it. */
-.video-holder {
-  position: relative;
-  display: grid;
-  width: 100%;
-  max-width: var(--figure-max);
-}
-
 .case-video {
   display: block;
   width: 100%;
   height: auto;
+  max-width: var(--figure-max);
   border-radius: clamp(5px, 0.5vw, 8px);
   /* Black behind the frame so any letterboxing disappears into the page rather
      than showing as a lighter band while the first frame decodes. */
@@ -492,7 +482,7 @@ a {
    the width of a phone at arm's length, and the aspect-ratio on the element
    gives the height. Capping the height instead would mean deriving the width
    from the intrinsic size, which does not exist until the file loads. */
-.case-figure[data-width='phone'] .video-holder {
+.case-figure[data-width='phone'] .case-video {
   width: min(100%, 24rem);
 }
 
@@ -501,8 +491,8 @@ a {
   justify-items: center;
 }
 
-/* The cover video shares the hero's right-hand column with no band padding,
-   and is capped so the headline it sits beside is still the first thing read. */
+/* The cover video shares the hero's right-hand column with no band padding.
+   No case uses a cover clip today, but the rule is what makes one possible. */
 .case-hero .video-figure {
   grid-column: 3;
   grid-row: 1 / span 3;
@@ -511,9 +501,9 @@ a {
   padding: 0;
 }
 
-/* Narrower again in the hero: it shares the fold with the headline, which is
-   what should be read first. */
-.case-hero .case-figure[data-width='phone'] .video-holder {
+/* Narrower again in the hero: it would share the fold with the headline, which
+   is what should be read first. */
+.case-hero .case-figure[data-width='phone'] .case-video {
   width: min(100%, 21rem);
 }
 
@@ -522,41 +512,6 @@ a {
     grid-column: 2;
     margin-top: clamp(1.75rem, 4vh, 2.75rem);
   }
-}
-
-/* The pause control that video.js swaps in for the native chrome. It is always
-   visible rather than appearing on hover: a clip that starts playing by itself
-   needs a stop that can be found without first discovering it exists. */
-.video-toggle {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  width: 2.25rem;
-  height: 2.25rem;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgba(244, 236, 220, 0.25);
-  border-radius: 999px;
-  /* These sit over screenshots of a white banking app, so the control needs its
-     own dark ground to stay legible; the blur keeps it from reading as a patch. */
-  background: rgba(10, 10, 10, 0.55);
-  backdrop-filter: blur(6px);
-  color: var(--ink);
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
-}
-
-.video-toggle:hover,
-.video-toggle:focus-visible {
-  background: rgba(10, 10, 10, 0.8);
-  border-color: var(--ink);
-}
-
-.video-toggle svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  fill: currentColor;
 }
 
 /* Two versions side by side ------------------------------------------------ */
@@ -586,7 +541,7 @@ a {
 
 /* The column is already narrower than a lone phone capture is allowed to be,
    so these just fill it. */
-.compare-video .video-holder {
+.compare-video .case-video {
   width: 100%;
 }
 

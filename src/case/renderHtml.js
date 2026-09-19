@@ -91,13 +91,12 @@ function gif(c, placement, resolve) {
 /**
  * The <video> element for a looping walkthrough, without the surrounding figure.
  *
- * Two things here are deliberate and easy to undo by accident:
- *
- * `controls` ships in the HTML. The brief asks for a pause control that is
- * always available, and a custom button cannot be that on its own — it needs
- * script. So the native controls are the no-JS answer, and video.js swaps them
- * for the quieter custom button once it has loaded. Whichever way the page
- * ends up, the video can be stopped.
+ * These carry no visible control, by request. That is a real cost and worth
+ * knowing about: an autoplaying loop with no pause is the accessibility barrier
+ * the brief originally called out, and it is why video.js still refuses to
+ * start anything when the visitor has asked for reduced motion, and stops a
+ * clip the moment it scrolls out of view. Restoring a control means adding
+ * `controls` here and bringing back the button in video.js.
  *
  * `preload="none"` because a case page can carry several of these; fetching
  * them all on load would cost tens of megabytes for clips most visitors never
@@ -120,7 +119,7 @@ function videoEl({ src, poster, alt, width, height }) {
     (poster ? ` poster="${esc(poster)}"` : '') +
     dims +
     ratio +
-    ` autoplay loop muted playsinline controls preload="none" ` +
+    ` autoplay loop muted playsinline preload="none" ` +
     `aria-label="${esc(alt ?? '')}"></video>`
   );
 }

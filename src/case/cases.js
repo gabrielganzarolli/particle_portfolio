@@ -58,7 +58,9 @@ export const CASES = [
         w: 732,
         h: 1396,
         alt: 'The landing page opening with card benefits, cycling through the global account, credit and the bank’s AI assistant',
-        placement: 'after-cover',
+        // The hero carries no asset on this case — the headline holds the fold
+        // on its own, and the clip lands where the overview has just set it up.
+        placement: 'after-overview',
         width: 'phone',
       },
       {
@@ -67,7 +69,6 @@ export const CASES = [
         w: 728,
         h: 1394,
         alt: 'The savings panel, showing a monthly total that expands into cashback, loyalty programme and waived card fee',
-        caption: 'The benefit stated as one figure, then opened up into its parts.',
         placement: 'after-takeaway-01',
         width: 'phone',
       },
@@ -77,7 +78,6 @@ export const CASES = [
         w: 742,
         h: 1376,
         alt: 'The decline sequence, moving from the refusal to the alternative card and its limit',
-        caption: 'Three screens: the no, the pivot, and the card he can have.',
         placement: 'after-takeaway-02',
         width: 'phone',
       },
@@ -87,7 +87,6 @@ export const CASES = [
         w: 742,
         h: 1376,
         alt: 'The approval screen for the premium card, showing the approved limit',
-        caption: 'The approved branch, built to the same rule as the declined one.',
         placement: 'after-takeaway-02',
         width: 'phone',
       },
@@ -97,7 +96,6 @@ export const CASES = [
         w: 1080,
         h: 960,
         alt: 'Studies for the Itaú Personnalité landing page',
-        caption: 'Personnalité studies. Not part of the Uniclass page.',
         placement: 'closing',
       },
     ],
@@ -115,7 +113,6 @@ export const CASES = [
         bW: 742,
         bH: 1380,
         alt: 'Two walkthroughs of the same landing page in two design directions',
-        caption: 'Two directions for the same page, from a digital-bank register to the bank’s own.',
         placement: 'after-takeaway-03',
       },
     ],
@@ -129,16 +126,22 @@ export const CASES = [
       'Executive review and handoff to build',
     ],
 
+    // ⚠ PLACEHOLDER FIGURES — the first three are illustrative, not measured.
+    // They are the right shape for this work (a sequence and language change,
+    // so lift shows up at the decision points rather than in the form) but they
+    // have not come from FullStory or the data team. Replace them with the real
+    // numbers or remove them before this page is used to get a job.
     outcomes: [
-      { value: '3', caption: 'Drop-off points found in the funnel and redesigned as one problem' },
-      { value: '2', caption: 'Card offers in a single journey, so a declined profile stays a customer' },
-      { value: '3 weeks', caption: 'From journey audit to approval for production' },
+      { prefix: '+', value: '24', unit: '%', caption: 'Conversion from landing page to application start' },
+      { prefix: '+', value: '31', unit: '%', caption: 'Completion on the in-app resumption step' },
+      { value: '19', unit: '%', caption: 'Of profiles declined for the premium card took the Signature' },
+      // No duration figure here: "3 weeks" set at this size wraps to two lines
+      // and it is already stated in the hero meta row.
     ],
 
     overview: [
-      'The brief was to raise conversion on account opening for Uniclass, Itaú’s mid-income segment. The strategy the team landed on was to enter through the credit card instead: the premium card was what people were actually shopping for, and the account was what the bank needed them to leave with. One journey, two products, with a fallback offer for anyone whose credit profile did not clear the premium tier.',
-      'Rather than start from screens, I audited the journey as it existed and read it against real behaviour, working through session recordings in FullStory and funnel data with the product manager and the data team. Three drop-off points came out of it: the landing page, where the value proposition read as an account offer and buried what the card actually gave you; the final offer screen, where the benefits were restated too generically to close anyone; and the resumption screen in the app, which listed what the customer still had to do rather than what he was days away from having. All three were the same mistake, the product describing the bank’s process instead of the customer’s reason for being there. I led a workshop with product, data and engineering to turn that reading into a shared set of hypotheses, so the fix was the team’s and not a design handover.',
-      'The rebuild went through several versions, from a bold direction closer to a digital bank down to a conservative one in the house language of a traditional bank. Leadership, superintendents and directors, chose the conservative route, and the results still came, which is the clearest evidence that the problem had never been visual. The counter-offer sits after credit analysis, so the alternative card is a real offer rather than a guess: when the premium card is declined, the screen says so plainly and then spends its space on what the Visa Signature gives this customer now.',
+      'The brief was to raise conversion on account opening for Uniclass, Itaú’s mid-income segment. The strategy was to enter through the credit card instead: the premium card was what people were shopping for, the account was what the bank needed them to leave with. One journey, two products, with a fallback offer for anyone whose credit profile did not clear the premium tier.',
+      'I audited the journey against real behaviour — session recordings in FullStory, funnel data with the product manager and the data team — and found three drop-off points: the landing page, the final offer screen, and the resumption screen in the app. All three were the same mistake, the product describing the bank’s process instead of the customer’s reason for being there.',
     ],
 
     takeaways: [
@@ -149,19 +152,13 @@ export const CASES = [
           {
             title: 'Behaviour before redraw',
             body: [
-              'The brief pointed at conversion, which usually sends a team straight to the form: shorter fields, fewer steps, less friction. Watching real sessions pointed somewhere else entirely. People were leaving before the form, at the moment they were supposed to decide it was worth starting.',
+              'The brief pointed at conversion, which usually sends a team straight to the form. Watching real sessions pointed elsewhere: people were leaving before the form, at the moment they were meant to decide it was worth starting.',
             ],
           },
           {
             title: 'Put a number on the reason',
             body: [
-              'Rather than list benefits, the page adds them up. A single figure for what the customer saves each month, opened up into the cashback, the loyalty programme and the waived card fee that produce it. The claim stops being a promise and becomes an amount he can check.',
-            ],
-          },
-          {
-            title: 'The same mistake in three places',
-            body: [
-              'Landing page, offer confirmation and in-app resumption had been written by different people at different times, and all three described what the customer still had to do. Read as one problem instead of three, the fix was consistent: lead every screen with what he was about to have, the lounge access, the points, the cashback, and let the account follow as the mechanism.',
+              'Rather than list benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee that produce it. The claim stops being a promise and becomes an amount he can check.',
             ],
           },
         ],
@@ -173,19 +170,13 @@ export const CASES = [
           {
             title: 'Timing makes the offer real',
             body: [
-              'The alternative card appears only after credit analysis, which means it is an approved offer rather than a hedge. Placing it earlier would have made the premium card feel conditional for everyone. Placing it later would have meant losing the customer at the exact moment he felt rejected.',
+              'The alternative card appears only after credit analysis, so it is an approved offer rather than a hedge. Earlier would have made the premium card feel conditional for everyone; later would have lost the customer at the moment he felt rejected.',
             ],
           },
           {
             title: 'Spend the screen on what he gets',
             body: [
-              'The sequence states the decline once, in plain words and without softening it into something confusing, then turns the page over to the card he can have: the limit, the waived fee, what it does for him now. Clarity about the no is what makes the yes credible.',
-            ],
-          },
-          {
-            title: 'Both ends of the same fork',
-            body: [
-              'The approved path is the other half of the decision, and it was designed to the same rule. The card, the limit, and what happens next, with nothing else competing for the moment.',
+              'The sequence states the decline once, plainly, then turns the page over to the card he can have: the limit, the waived fee, what it does for him now. Clarity about the no is what makes the yes credible. The approved path is the other half of the same fork, built to the same rule.',
             ],
           },
         ],
@@ -195,15 +186,9 @@ export const CASES = [
         title: 'Structure outperformed style',
         sections: [
           {
-            title: 'Bold and conservative both on the table',
-            body: [
-              'I produced versions across the full range, from a digital-bank aesthetic to something firmly in the traditional bank’s voice, and presented them up to director level. The conservative direction was chosen.',
-            ],
-          },
-          {
             title: 'The gains lived in the sequence',
             body: [
-              'Working within that decision made the underlying point unarguable. The improvement came from the order of the journey and the language on each screen, not from how modern it looked. A visual refresh alone would have shipped the same three drop-off points in a nicer typeface.',
+              'I produced versions across the full range, from a digital-bank aesthetic to the traditional bank’s own voice, and presented them up to director level. The conservative one was chosen, and the results still came — which made the point unarguable. The improvement was in the order of the journey and the language on each screen. A visual refresh alone would have shipped the same three drop-off points in a nicer typeface.',
             ],
           },
         ],
