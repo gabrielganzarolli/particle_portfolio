@@ -125,30 +125,50 @@ function videoEl({ src, poster, alt, width, height }) {
 }
 
 /**
- * Every looping walkthrough at a given placement, in data order. A chapter can
- * carry more than one — the decline and the approval are two halves of the same
- * fork and belong together under the takeaway that explains them.
+ * The looping walkthroughs at a given placement.
+ *
+ * More than one at the same placement is not a list of clips, it is one piece
+ * of evidence with two parts — the page the benefit is stated on and the panel
+ * that totals it, or the declined and approved ends of the same fork. So they
+ * share a single figure and sit side by side, rather than stacking into two
+ * screens of scrolling that read as unrelated.
  */
 function video(c, placement, resolve) {
+  const items = (c.videos ?? [])
+    .filter((v) => v.placement === placement)
+    .map((spec) => ({ spec, src: resolve(c.slug, spec.src) }))
+    .filter((i) => i.src); // not supplied yet — the page simply omits it
+
+  if (!items.length) return '';
+
   const hero = placement === 'after-cover';
   const cls = hero ? 'case-figure video-figure hero-media' : 'case-figure video-figure reveal';
 
-  return (c.videos ?? [])
-    .filter((v) => v.placement === placement)
-    .map((spec) => {
-      const src = resolve(c.slug, spec.src);
-      if (!src) return ''; // not supplied yet — the page simply omits it
-      const poster = spec.poster ? resolve(c.slug, spec.poster) : null;
-      const width = spec.width && spec.width !== 'full' ? ` data-width="${esc(spec.width)}"` : '';
+  const el = ({ spec, src }) =>
+    videoEl({
+      src,
+      poster: spec.poster ? resolve(c.slug, spec.poster) : null,
+      alt: spec.alt,
+      width: spec.w,
+      height: spec.h,
+    });
 
-      return (
-        `<figure class="${cls}"${width}>` +
-        videoEl({ src, poster, alt: spec.alt, width: spec.w, height: spec.h }) +
-        (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
-        `</figure>`
-      );
-    })
-    .join('');
+  const caption = (text) => (text ? `<figcaption>${esc(text)}</figcaption>` : '');
+
+  if (items.length === 1) {
+    const { spec } = items[0];
+    const width = spec.width && spec.width !== 'full' ? ` data-width="${esc(spec.width)}"` : '';
+    return `<figure class="${cls}"${width}>` + el(items[0]) + caption(spec.caption) + `</figure>`;
+  }
+
+  // No data-width on the pair: the columns already hold each clip well inside
+  // the width a lone phone capture is given.
+  return (
+    `<figure class="${cls}">` +
+    `<div class="video-row">${items.map(el).join('')}</div>` +
+    caption(items.map((i) => i.spec.caption).filter(Boolean).join(' ')) +
+    `</figure>`
+  );
 }
 
 /**

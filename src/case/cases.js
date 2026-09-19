@@ -29,10 +29,8 @@ export const CASES = [
   //                    figure can be pulled from FullStory or the data team.
   //                    That is the strongest number available here.
   //
-  //   [[ confirmar ]]  Which of the two walkthrough directions shipped, and what
-  //                    separates them — section order, what lands in the first
-  //                    fold, how much offer comes before benefit, tone. The
-  //                    caption below says only what can be seen.
+  //   [[ confirmar ]]  Which of the two walkthrough directions won the A/B
+  //                    test. The caption says only that both were tested.
   {
     slug: 'uniclass-card-first-acquisition',
     description:
@@ -58,9 +56,10 @@ export const CASES = [
         w: 732,
         h: 1396,
         alt: 'The landing page opening with card benefits, cycling through the global account, credit and the bank’s AI assistant',
-        // The hero carries no asset on this case — the headline holds the fold
-        // on its own, and the clip lands where the overview has just set it up.
-        placement: 'after-overview',
+        // Sits with the savings calculator under the first takeaway: one shows
+        // the page leading with what the card gives you, the other turns that
+        // into a number. Same argument, two screens.
+        placement: 'after-takeaway-01',
         width: 'phone',
       },
       {
@@ -96,6 +95,11 @@ export const CASES = [
         w: 1080,
         h: 960,
         alt: 'Studies for the Itaú Personnalité landing page',
+        // The one caption left on this page. It is doing work the image cannot:
+        // without it these read as part of the Uniclass page rather than as the
+        // project the Uniclass result won.
+        caption:
+          'From a separate landing page project, for Itaú Personnalité — briefed right after the Uniclass page proved itself.',
         placement: 'closing',
       },
     ],
@@ -113,7 +117,11 @@ export const CASES = [
         bW: 742,
         bH: 1380,
         alt: 'Two walkthroughs of the same landing page in two design directions',
-        placement: 'after-takeaway-03',
+        caption:
+          'Both versions went to A/B test, with deliberately small differences between them.',
+        // The page's opening asset: the whole journey, twice, before any of the
+        // chapters start pulling single screens out of it.
+        placement: 'after-overview',
       },
     ],
 
@@ -198,7 +206,7 @@ export const CASES = [
     notes: [
       {
         title: 'Adjacent work',
-        body: 'Studies for the Personnalité landing page, the bank’s high-income segment. A different product and a different audience, built while the Uniclass page was running, and included here because the two together show how far the same approach stretches across segments.',
+        body: 'Studies for the Personnalité landing page, the bank’s high-income segment. The Uniclass page working is what won the next brief, and the same approach carried over to a different product and a different audience.',
       },
     ],
 

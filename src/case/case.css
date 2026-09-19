@@ -491,6 +491,35 @@ a {
   justify-items: center;
 }
 
+/* Two clips at the same point in the page, shown as one piece. The width is
+   stated rather than left to shrink-to-fit, because the videos inside size
+   from a percentage and a percentage of an undefined width resolves to
+   nothing. */
+.video-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2.5vw, 2rem);
+  width: min(100%, var(--figure-max));
+  align-items: start;
+}
+
+.video-row .case-video {
+  width: 100%;
+}
+
+/* Side by side, each clip is a quarter of a phone screen wide and neither is
+   readable. Below this they stack. */
+@media (max-width: 720px) {
+  .video-row {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .video-row .case-video {
+    width: min(100%, 24rem);
+  }
+}
+
 /* The cover video shares the hero's right-hand column with no band padding.
    No case uses a cover clip today, but the rule is what makes one possible. */
 .case-hero .video-figure {
