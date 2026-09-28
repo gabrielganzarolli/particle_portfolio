@@ -150,15 +150,8 @@ export const CASES = [
         title: 'Selling the reason, not the process',
         sections: [
           {
-            title: 'Behaviour before redraw',
             body: [
-              'The brief pointed at conversion, which usually sends a team straight to the form. Watching real sessions pointed elsewhere: people were leaving before the form, at the moment they were meant to decide it was worth starting.',
-            ],
-          },
-          {
-            title: 'Put a number on the reason',
-            body: [
-              'Rather than list benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee that produce it. The claim stops being a promise and becomes an amount he can check.',
+              'The brief pointed at conversion, which usually means fixing the form. Real sessions showed people leaving earlier, before deciding it was worth starting at all. So instead of listing benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee behind it. The claim stops being a promise and becomes an amount they can check.',
             ],
           },
         ],
@@ -168,15 +161,8 @@ export const CASES = [
         title: 'A decline that keeps the customer',
         sections: [
           {
-            title: 'Timing makes the offer real',
             body: [
-              'The alternative card appears only after credit analysis, so it is an approved offer rather than a hedge. Earlier would have made the premium card feel conditional for everyone; later would have lost the customer at the moment he felt rejected.',
-            ],
-          },
-          {
-            title: 'Spend the screen on what he gets',
-            body: [
-              'The sequence states the decline once, plainly, then turns the page over to the card he can have: the limit, the waived fee, what it does for him now. Clarity about the no is what makes the yes credible. The approved path is the other half of the same fork, built to the same rule.',
+              'The alternative card appears only after credit analysis, so it reads as an approved offer rather than a hedge — earlier would have made the premium card feel conditional for everyone, later would have lost the customer at the moment of rejection. The sequence states the decline once, plainly, then spends the rest of the screen on what the customer can have: the limit, the waived fee, what it does for them now. Clarity about the no is what makes the yes credible.',
             ],
           },
         ],
@@ -186,9 +172,8 @@ export const CASES = [
         title: 'Structure outperformed style',
         sections: [
           {
-            title: 'The gains lived in the sequence',
             body: [
-              'I produced versions across the full range, from a digital-bank aesthetic to the traditional bank’s own voice, and presented them up to director level. The conservative one was chosen, and the results still came — which made the point unarguable. The improvement was in the order of the journey and the language on each screen. A visual refresh alone would have shipped the same three drop-off points in a nicer typeface.',
+              'I designed versions across the full range, from a digital-bank aesthetic to the bank’s own traditional voice, and presented them to director level. The conservative one was chosen — and the results still came, which made the point unarguable: the gain was in the order of the journey and the language on each screen, not the visual style. A refresh alone would have shipped the same three drop-off points in a nicer typeface.',
             ],
           },
         ],
@@ -299,9 +284,8 @@ export const CASES = [
     ],
 
     overview: [
-      'Itaú ran a promotional campaign across the 2026 World Cup, built inside Minhas Vantagens, the bank’s relationship programme, and fronted by Ronaldo. Customers earned lucky numbers and spins by completing weekly missions — registering a Pix key, connecting Open Finance, setting up automatic payments, starting to invest — which entered them into instant prizes and a set of headline draws, up to a million reais in gold bars, a trip, and dinner with Ronaldo. More than twenty products across the bank were wired into the mission system.',
-      'The hard part was not the interface. A spinning wheel with a gold jackpot behind it is, visually, the language of gambling, and this had to read as the opposite: a bank rewarding people who were already its customers. Three decisions carried that. Nothing was ever staked — customers did not bet, they earned chances, so there was no way to lose anything. Every customer received a lucky number each week simply for being a client, with more arriving the more they used the bank, which made the mechanic a reward rather than a lottery ticket. And the visual language was deliberately restrained, close to the bank’s own voice rather than to the loud register the category invites.',
-      'I worked closely with legal for the whole campaign, and the compliance work ended up being content design rather than legal notices. The rules had to be present at the moment they mattered, in words a customer could act on, with no fine print and no asterisks — while keeping the playful tone the mechanic needed to work at all. Alongside that ran research into game design: what makes a weekly loop worth coming back to, how instant reward and slower progression sit together, and why a player returns on week six. It launched to the whole customer base at once, which made the first hour its own design constraint.',
+      'Itaú ran a promotional campaign across the 2026 World Cup, built inside Minhas Vantagens and fronted by Ronaldo. Customers earned lucky numbers and spins by completing weekly missions — registering a Pix key, connecting Open Finance, setting up automatic payments, starting to invest — entering them into instant prizes and headline draws worth up to a million reais in gold bars, a trip, and dinner with Ronaldo. More than twenty products across the bank fed into the mission system.',
+      'The hard part was never the interface. A spinning wheel with a gold jackpot is, visually, the language of gambling, and this had to read as the opposite — a bank rewarding customers who were already its own. Three decisions carried that: nothing was ever staked, every customer got a lucky number just for being a client, and the visual language stayed close to the bank’s own restrained voice rather than the category’s loud default.',
     ],
 
     whatMadeItWork: [
@@ -318,15 +302,8 @@ export const CASES = [
         title: 'Rewarding, never wagering',
         sections: [
           {
-            title: 'Nothing is ever staked',
             body: [
-              'The mechanic was built so a customer could not lose anything: chances were earned by doing something, never bought or bet. That single rule did more for trust than any amount of visual reassurance, and it made every screen easier to write — there was never a loss to explain away.',
-            ],
-          },
-          {
-            title: 'Restraint reads as credible',
-            body: [
-              'The category pulls hard toward flashing, loud, jackpot-styled design. Staying close to the bank’s own visual language cost some immediate excitement and bought the thing it actually needed, which was for a customer to believe the prize was real.',
+              'The mechanic was built so a customer could never lose anything — chances were earned by doing something, never bought or bet. That rule did more for trust than any visual reassurance could, and it meant every screen was easier to write: there was never a loss to explain away. It’s also why we resisted the category’s pull toward flashing, jackpot-styled design — staying close to the bank’s own restrained visual language cost some immediate excitement but bought the thing that actually mattered, a customer believing the prize was real.',
             ],
           },
         ],
@@ -336,15 +313,8 @@ export const CASES = [
         title: 'Compliance is content design',
         sections: [
           {
-            title: 'No asterisks',
             body: [
-              'Rather than push the rules into a regulation document nobody opens, we put what mattered where the decision happened, in the customer’s words — when a spin unlocks, how long a mission takes to credit, when a result is published. Legal reviewed language rather than approving disclaimers, which meant the constraint shaped the writing instead of arriving after it.',
-            ],
-          },
-          {
-            title: 'Clear enough to be quiet',
-            body: [
-              'Across a campaign of this scale, support tickets stayed in the hundreds, and the recurring ones were about counting spins and registration rather than confusion about how to win. For a promotional mechanic that is the result worth reporting — it means the rules landed the first time.',
+              'Rather than push the rules into a regulation document nobody opens, we put what mattered where the decision happened, in the customer’s own words — when a spin unlocks, how long a mission takes to credit, when a result gets published. Legal reviewed language instead of approving disclaimers, so the constraint shaped the writing rather than arriving after it. It worked: across a campaign of this scale, support tickets stayed in the hundreds, and the recurring ones were about counting spins, not confusion about how to win.',
             ],
           },
         ],
@@ -354,16 +324,8 @@ export const CASES = [
         title: 'Borrowed from games, not from casinos',
         sections: [
           {
-            title: 'Designing the return, not the visit',
             body: [
-              'The team studied what genuinely brings people back to a game: a weekly rhythm, a reward that arrives immediately, and a slower progression underneath it. Level in the programme meant more lucky numbers, so a long-standing customer saw the relationship he already had reflected in his odds.',
-            ],
-          },
-          {
-            title: 'The first hour is a design problem',
-            body: [
-              'Launching to the entire base meant an enormous spike in the first minutes rather than a curve. Planning that with engineering and marketing ahead of time — what loads first, what can wait, what a customer sees if something is slow — was as much part of the design as the screens themselves.',
-              'The platform held. Reach on campaign communications ran to 19.7MM, and enrolment came in at roughly ten times the previous internal benchmark campaign.',
+              'We studied what genuinely brings people back to a game: a weekly rhythm, a reward that arrives immediately, and a slower progression underneath it — level in the programme meant more lucky numbers, so a long-standing customer saw the relationship they already had reflected in their odds. Launching to the entire base at once meant a spike in the first minutes rather than a curve, so planning what loads first, what can wait, and what a customer sees if something is slow — with engineering and marketing, ahead of time — was as much a part of the design as the screens themselves. The platform held: reach on campaign communications ran to 19.7MM, and enrolment came in at roughly ten times the previous internal benchmark.',
             ],
             // Compact figures rather than the big numerals used for Outcomes:
             // these are evidence for the point above, not headline results.
@@ -450,9 +412,8 @@ export const CASES = [
     ],
 
     overview: [
-      'A dedicated space within the Itaú app where retirees can link and manage their financial benefits in one place. Instead of tracking retirement pay, pensions, and government allowances across separate channels, customers get a single, clear view of everything they receive.',
-      'Retired customers often juggle multiple income sources: social security retirement (INSS), survivor pensions, temporary leave allowances, and other benefits. Each one lives in a different place, with different payment dates and rules. Keeping track of what arrives, when, and how much becomes a constant source of uncertainty for an audience that values stability and predictability above all.',
-      'We consolidated the product into a single cohesive experience — simplifying navigation and establishing a clear visual hierarchy. The new system scaled across all touchpoints while remaining flexible enough for future growth. Itaú makes it easy to add, consult and update benefits.',
+      'A dedicated space within the Itaú app where retirees can link and manage their financial benefits in one place. Retired customers often juggle several income sources — INSS retirement, survivor pensions, temporary leave allowances — each living in a different channel with its own payment dates and rules. For an audience that values stability above all, not knowing what’s arriving and when is a constant source of anxiety.',
+      'We consolidated it into a single, clear view: simplified navigation, a visual hierarchy that scales across touchpoints, and an easy path to add, consult and update each benefit.',
     ],
 
     takeaways: [
@@ -606,9 +567,8 @@ export const CASES = [
     ],
 
     overview: [
-      'A full redesign of Itaú’s ATM network, together with a new design system built for it from the ground up. The guiding principle was not visual: the terminal had to work for people with low vision, people with limited mobility, people who cannot read, and older customers standing in a queue with a line behind them.',
-      'An ATM is used standing up, often outdoors, often in a hurry, by a customer base that includes people who cannot read a sentence on a screen, people who cannot see it at all, and people whose hands do not land precisely where they aim. The existing terminal had grown into a wall of options of equal visual weight, with the important detail set in the smallest type on the screen. The technology running the machines could not support the screen reader software that already existed on phones and computers, so there was no accessible path at all for a blind customer.',
-      'We rebuilt the terminal around what field research showed people actually do at an ATM: they do not read, they orient by shape, colour, position and touch. Fewer options per screen, larger targets, higher contrast, icons carrying meaning alongside words, and the same three exits repeated in the same place on every screen. Underneath it sits a design system built from scratch for the terminal, inheriting the tokens and visual language of the bank’s app so the two products speak the same language. Because no existing screen reader would run on the machines, the bank built its own audio layer, and we designed every journey a second time as a spoken sequence.',
+      'A full redesign of Itaú’s ATM network, and a new design system built for it from the ground up. An ATM is used standing up, often outdoors, often in a hurry — by people with low vision, limited mobility, people who cannot read, and older customers with a queue behind them. The existing terminal had grown into a wall of equal-weight options with the important detail in the smallest type, and its hardware couldn’t run the screen-reader software already standard on phones, so there was no accessible path at all for a blind customer.',
+      'We rebuilt it around what field research showed people actually do at an ATM: they don’t read, they orient by shape, colour, position and touch. Fewer options per screen, larger targets, higher contrast, icons alongside words, the same three exits in the same place on every screen — on a design system inherited from the bank’s app, so the two speak the same language. And because no existing screen reader would run on the machines, the bank built its own audio layer, so every journey was designed twice: once on screen, once as a spoken sequence.',
     ],
 
     takeaways: [
@@ -650,24 +610,26 @@ export const CASES = [
     ],
 
     whatMadeItWork: [
-      'None of the assistive technology that works on a phone would run on the terminals, so the bank built proprietary audio software for its own ATMs',
-      'That left an open design question: what does a journey sound like. The customer never speaks — they listen and they touch the screen',
-      'Each flow was designed a second time as a spoken sequence, with its own wording, its own order, and its own decisions about what is said aloud in a public place',
-      'Developers received two specifications per journey, the screens and the voice, which is what made it possible to build consistently',
+      'No existing screen reader could run on the machines, so the bank built its own audio layer — a customer listens and touches, never speaks',
+      'Developers received two specifications per journey, screens and voice, which is what made it possible to build consistently',
     ],
   },
 
 
   // ── REAL CASE ────────────────────────────────────────────────────────────
-  // Short form: no outcomes, no quote, no "What I did". The template already
-  // skips sections with no data, so "short" needed no new layout — only the
-  // `notes` and `getInTouch` blocks, which render as ordinary labelled rows.
-  //
   //   [[ confirmar ]]  `role`. `year` is 2024, which the date picker in the
   //                    product confirms (screen shows 10/02/2024).
   //
-  //   Index is 04, not the 05 in the brief: that numbering assumed the
-  //   placeholder cases that have since been removed.
+  //   [[ confirmar ]]  `whatWeDid` was drafted from the overview rather than
+  //                    from a brief, so it describes what the screens imply was
+  //                    done, not a recorded account of it. Check it before this
+  //                    page is used.
+  //
+  //   [[ confirmar ]]  Outcomes. The block below is staged but commented out:
+  //                    there are no measured figures for this case, and the
+  //                    Outcomes treatment is a row of large numerals, so empty
+  //                    placeholders would render as a broken section rather than
+  //                    as an honest gap. Supply the three numbers and uncomment.
   {
     slug: 'minhas-vantagens-console',
     index: '05',
@@ -675,7 +637,7 @@ export const CASES = [
     headline: 'The manager who had to ask the client',
     description:
       'An internal console giving Itaú branch managers the same view of the relationship programme their clients see, plus the reasons a level was lost.',
-    tag: 'Banking',
+    tag: 'Product design',
     client: 'Itaú Unibanco',
     year: '2024',
     discipline: 'Product design',
@@ -695,24 +657,60 @@ export const CASES = [
       placement: 'after-overview',
     },
 
+    whatWeDid: [
+      'Discovery with branch managers to map what they couldn’t answer for clients',
+      'Information architecture for the client overview and step history',
+      'Interaction design for filtering history by event type and date',
+      'Content design translating programme rules into plain reasons for a lost or gained step',
+      'Handoff and build support',
+    ],
+
+    // Staged, not live — see the [[ confirmar ]] above this case. Three real
+    // numbers and this becomes a section; until then the page is honest about
+    // having none.
+    // outcomes: [
+    //   { value: '?', unit: '%', caption: 'Reduction in client questions managers could not answer' },
+    //   { value: '?', caption: 'Managers using the console, or rollout scope' },
+    //   { value: '?', caption: 'Change in time to resolve a “why did I lose this benefit” conversation' },
+    // ],
+
     overview: [
       'An internal console that shows a branch manager where a client stands in Minhas Vantagens, the bank’s relationship programme. Before it existed, managers had no view of the programme at all: when a client asked why a benefit had gone, the manager had to ask the client to explain their own account.',
     ],
 
-    // Label left, a few sentences right. Lighter than a takeaway chapter,
-    // which is what keeps this case short.
-    notes: [
+    takeaways: [
       {
+        index: '01',
         title: 'The question was pointed the wrong way',
-        body: 'A client walks into a branch and asks what happened to their level. The manager is the one person in the room who should be able to answer, and the only information available was whatever the client could recall. Giving the manager the same picture the client sees, plus the reasons behind it, was the whole project.',
+        sections: [
+          {
+            body: [
+              'A client walks into a branch and asks what happened to their level. The manager is the one person in the room who should be able to answer, and the only information available was whatever the client could recall. Giving the manager the same picture the client sees, plus the reasons behind it, was the whole project.',
+            ],
+          },
+        ],
       },
       {
+        index: '02',
         title: 'Loss is the part people ask about',
-        body: 'Programme dashboards tend to show progress and stop there. This one leads with the risk: steps lost, and a warning when the client is close to a downgrade. The history can be filtered to lost steps, rule changes and segment changes, because those are the events a client comes in angry about and the ones a manager could never explain.',
+        sections: [
+          {
+            body: [
+              'Programme dashboards tend to show progress and stop there. This one leads with the risk: steps lost, and a warning when the client is close to a downgrade. The history can be filtered to lost steps, rule changes and segment changes, because those are the events a client comes in angry about and the ones a manager could never explain.',
+            ],
+          },
+        ],
       },
       {
+        index: '03',
         title: 'An abstract programme priced in steps',
-        body: 'Each product carries what it is worth, and the accumulation products show a figure against a threshold rather than a vague sense of progress. That turns a loyalty programme into a concrete conversation at a desk: here is where you are, here is what closes the gap.',
+        sections: [
+          {
+            body: [
+              'Each product carries what it is worth, and the accumulation products show a figure against a threshold rather than a vague sense of progress. That turns a loyalty programme into a concrete conversation at a desk: here is where you are, here is what closes the gap.',
+            ],
+          },
+        ],
       },
     ],
 
