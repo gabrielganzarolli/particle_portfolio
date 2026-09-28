@@ -1,127 +1,86 @@
-# Case copy — open editorial work
+# Case copy — editorial pass, 2026-09-28
 
-Two unrelated problems found on 2026-09-28 while reviewing the case pages.
-Both live in `src/case/cases.js`; neither needs renderer or CSS changes.
-Regenerate with `npm run cases` after editing.
+Two problems found while reviewing the case pages. Both are fixed. This
+records what changed and why, so the reasoning survives the edit.
+
+All copy lives in `src/case/cases.js`; the `work/*.html` pages are generated.
+Regenerate with `npm run cases`.
 
 ---
 
-## 1. Two cases run long — approved in principle, not started
+## 1. Two cases read as walls of text — fixed
 
-Measured body prose — overview paragraphs plus takeaway bodies, which is what
-the reader actually reads through. Reproduce with the snippet at the bottom.
+Seleção de Prêmios and the ATM case ran 29–30 word sentences against the 22
+word average of the other three, with paragraphs up to 125 words. Structure
+was never the problem — every case has the same shape (overview, three
+takeaways).
 
-| prose words | avg sentence | longest para | case |
+**Decision:** tighten, keep every point. No takeaway dropped — the
+three-takeaway index is a structural rhythm across all five pages. Only the
+two outliers touched; the other three already read at the right density.
+
+**Result**, against the untouched cases as the benchmark:
+
+| case | avg sentence | longest para | paras over 70w |
 |---|---|---|---|
-| **456** | **30w** | **125w / 3 sentences** | selecao-de-premios |
-| **463** | **29w** | 96w (both overview paras >90w) | atm-accessibility |
-| 352 | 23w | 83w | uniclass-card-first-acquisition |
-| 263 | 22w | 68w | retiree-hub |
-| 216 | 22w | 60w | minhas-vantagens-console |
+| selecao-de-premios | 30w → **17w** | 125w → **58w** | 3 → **0 of 10** |
+| atm-accessibility | 29w → **20w** | 96w → **70w** | 2 → **0 of 10** |
+| retiree-hub *(untouched)* | 22w | 68w | 0 of 5 |
+| minhas-vantagens-console *(untouched)* | 22w | 60w | 0 of 4 |
 
-The bottom three are the healthy pattern. The top two run 30–35% longer
-sentences and roughly double the paragraph length. Structure is not the
-problem — every case has the same shape (2 overview paragraphs, 3 takeaways).
+**What actually did the work** — in order of effect:
 
-**Decided:** tighten the writing, keep every point. No takeaway gets dropped —
-the 3-takeaway index is a structural rhythm across all five pages. Touch only
-the two outliers; the other three already read at the right density.
+1. **Splitting run-on sentences.** The biggest lever by far. Three-clause
+   chains joined by em-dashes became two or three sentences. Nothing was cut
+   to achieve this.
+2. **Splitting paragraphs at their existing seams.** `.prose` is a CSS grid
+   (`case.css:232`) so it takes any number of paragraphs, and takeaway
+   `body` is already an array. Both overviews went from 2 dense blocks to 4
+   short ones; long takeaways split where they changed subject. This is what
+   removed the "wall" feeling — the word count barely moved.
+3. **Pulling metrics out of subordinate clauses.** `19.7MM` and "ten times
+   the benchmark" used to land at the tail of a 60-word sentence.
 
-**Targets**, derived from the lighter cases rather than picked arbitrarily:
-~22-word average sentence, no paragraph over ~70 words. That takes
-selecao-de-premios 456 → ~320 and atm-accessibility 463 → ~330, landing both
-between retiree-hub (263) and uniclass (352).
-
-**Method** — every argument, metric and concrete detail survives; only
-sentence construction changes:
-
-- Break 40-word chains into two sentences. Keep em-dash asides that carry a
-  real aside; drop them where they splice a third clause onto a full sentence.
-- Pull metrics out of subordinate clauses into their own short sentence.
-  `19.7MM` and "ten times the benchmark" currently land at the end of a
-  60-word sentence.
-- Cut throat-clearing that restates the heading. "That rule did more for trust
-  than any visual reassurance could" is the takeaway title in other words.
-
-**Worked example** — selecao-de-premios, takeaway 03, the worst offender
-(125 words, 3 sentences, ~42 w/sentence):
-
-> **Before** — "We studied what genuinely brings people back to a game: a
-> weekly rhythm, a reward that arrives immediately, and a slower progression
-> underneath it — level in the programme meant more lucky numbers, so a
-> long-standing customer saw the relationship they already had reflected in
-> their odds. Launching to the entire base at once meant a spike in the first
-> minutes rather than a curve, so planning what loads first, what can wait,
-> and what a customer sees if something is slow — with engineering and
-> marketing, ahead of time — was as much a part of the design as the screens
-> themselves. The platform held: reach on campaign communications ran to
-> 19.7MM, and enrolment came in at roughly ten times the previous internal
-> benchmark."
-
-> **After** (89 words, 5 sentences, ~18 w/sentence) — "We studied what brings
-> people back to a game: a weekly rhythm, an immediate reward, and a slower
-> progression underneath. Level in the programme meant more lucky numbers, so
-> a long-standing customer saw their relationship reflected in their odds.
-> Launching to the whole base at once meant a spike, not a curve. What loads
-> first, what can wait, what a customer sees when something is slow — settled
-> with engineering and marketing ahead of time. Reach ran to 19.7MM, and
-> enrolment came in at ten times the internal benchmark."
-
-**Suggested order:** do selecao-de-premios first and review the full diff
-before touching atm-accessibility. The real risk is flattening the voice.
+**Note on word count:** total words are roughly flat, not down 25–30% as
+first proposed. Cutting that much and keeping every point were incompatible
+goals, and keeping every point won. What changed is density and rhythm, which
+is what made the pages feel heavy — not their length.
 
 ---
 
-## 2. The Uniclass case does not state its own strategy clearly
+## 2. The Uniclass case never stated its own strategy — fixed
 
 The case is about **selling the account by leading with the card and its
-benefits.** That inversion is the interesting part — and it is stated once,
-late, then never again.
+benefits.** That inversion was stated once, in the Overview, and never again.
 
-Counting mentions across the whole case entry: "card" appears in 12 fields,
-"account" in 3 — and two of those three are invisible to a reader (the SEO
-`description` and a video `alt`). **On the visible page the word "account"
-appears exactly once**, in the first sentence of the Overview.
+"card" appeared in 12 fields, "account" in 3 — two of which are invisible to a
+reader (the SEO `description` and a video `alt`). So on the visible page the
+word appeared exactly once, below everything a skimmer reads first: the
+headline, the title, and the outcome figures all said *card* only.
 
-That matters because of reading order. The reader passes three things before
-the Overview, and all three say *card*:
+**Changed:**
 
-| What they hit | What it says | What's missing |
-|---|---|---|
-| Headline — biggest type on the page | "Leading with the card people actually came for" | the account entirely |
-| Title / tag | "Uniclass card-first acquisition" | acquisition *of what?* |
-| Outcomes — where skimmers jump | "+24% conversion from landing page to application start" | application *for what?* |
+- **Headline** — "Leading with the card people actually came for" →
+  **"The card they came for, the account they left with."** Carries both
+  halves; breaks across two lines with the pivot at the comma.
+- **Outcome captions** — "…to application start" → "…to **account**
+  application"; "in-app resumption step" → "in-app **account** resumption
+  step." The numbers a skimmer jumps to now say what they are about.
+- **Takeaway 01** — one closing sentence tying the monthly savings figure back
+  to the account application it was in service of. It built the figure out of
+  card benefits and never closed the loop.
 
-The Overview then lands it well, and this is the best line on the page:
+**Open, and deliberately left to you:** the headline is a voice decision I
+made rather than one you chose. The other candidates were "Selling the account
+by leading with the card" and "Leading with the card to win the account."
+One line in `cases.js` to swap.
 
-> "the premium card was what people were shopping for, the account was what
-> the bank needed them to leave with. One journey, two products."
-
-But the three takeaways never return to it. Takeaway 01 builds the savings
-figure out of cashback, loyalty and the waived fee — card benefits — and never
-closes the loop back to the account it was in service of. A skim-reader can
-finish this page thinking it was a credit card landing page project.
-
-**Fix — headline plus three captions, not a rewrite:**
-
-1. **Headline carries both halves.** Candidates (pick one; this is a voice
-   decision, not a mechanical one):
-   - "Selling the account by leading with the card"
-   - "The card they came for, the account they left with"
-   - "Leading with the card to win the account"
-2. **Attribute the outcome numbers** — "conversion from landing page to
-   **account** application start."
-3. **One clause in takeaway 01** tying the savings figure back to the account
-   opening it was buying.
-
-Note this case measured *fine* on density (352w, 23w sentences). This is a
-clarity problem, not a length problem — the two do not conflict.
+This case measured fine on density (23w sentences) and was left alone
+otherwise — clarity and length were separate problems.
 
 ---
 
 ## Measuring
-
-To re-run the numbers in the tables above:
 
 ```
 node --input-type=module -e '
@@ -135,6 +94,7 @@ for (const c of CASES) {
   const total = ws.reduce((a,b)=>a+b,0);
   console.log(String(total).padStart(4),
     "avg-sent", String(Math.round(total/paras.map(sent).reduce((a,b)=>a+b,0))).padStart(2)+"w",
-    "longest", String(Math.max(...ws)).padStart(3)+"w", c.slug);
+    "longest", String(Math.max(...ws)).padStart(3)+"w",
+    "over-70w", String(ws.filter(x=>x>70).length)+"/"+ws.length, c.slug);
 }'
 ```
