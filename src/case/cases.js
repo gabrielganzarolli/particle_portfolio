@@ -32,7 +32,11 @@ export const CASES = [
       'Raising account-opening conversion at Itaú Uniclass by leading with the credit card people came for, and keeping customers a premium decline would have lost.',
     index: '01',
     title: 'Uniclass card-first acquisition',
-    headline: 'Leading with the card people actually came for',
+    // Both halves of the strategy belong here: the card is the hook, the
+    // account is the goal. The old headline named only the card, which left
+    // the hero, the meta row and the outcome figures all reading as a credit
+    // card project — the inversion only surfaced once, down in the overview.
+    headline: 'The card they came for, the account they left with',
     tag: 'Product design',
     client: 'Itaú Unibanco',
     year: '2026',
@@ -132,8 +136,8 @@ export const CASES = [
     // Lift shows up at the decision points rather than in the form, which is
     // what a sequence and language change does.
     outcomes: [
-      { prefix: '+', value: '24', unit: '%', caption: 'Conversion from landing page to application start' },
-      { prefix: '+', value: '31', unit: '%', caption: 'Completion on the in-app resumption step' },
+      { prefix: '+', value: '24', unit: '%', caption: 'Conversion from landing page to account application' },
+      { prefix: '+', value: '31', unit: '%', caption: 'Completion on the in-app account resumption step' },
       { value: '19', unit: '%', caption: 'Of profiles declined for the premium card took the Signature' },
       // No duration figure here: "3 weeks" set at this size wraps to two lines
       // and it is already stated in the hero meta row.
@@ -151,7 +155,7 @@ export const CASES = [
         sections: [
           {
             body: [
-              'The brief pointed at conversion, which usually means fixing the form. Real sessions showed people leaving earlier, before deciding it was worth starting at all. So instead of listing benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee behind it. The claim stops being a promise and becomes an amount they can check.',
+              'The brief pointed at conversion, which usually means fixing the form. Real sessions showed people leaving earlier, before deciding it was worth starting at all. So instead of listing benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee behind it. The claim stops being a promise and becomes an amount they can check. That figure is what the account application is asking to be worth.',
             ],
           },
         ],
@@ -284,8 +288,10 @@ export const CASES = [
     ],
 
     overview: [
-      'Itaú ran a promotional campaign across the 2026 World Cup, built inside Minhas Vantagens and fronted by Ronaldo. Customers earned lucky numbers and spins by completing weekly missions — registering a Pix key, connecting Open Finance, setting up automatic payments, starting to invest — entering them into instant prizes and headline draws worth up to a million reais in gold bars, a trip, and dinner with Ronaldo. More than twenty products across the bank fed into the mission system.',
-      'The hard part was never the interface. A spinning wheel with a gold jackpot is, visually, the language of gambling, and this had to read as the opposite — a bank rewarding customers who were already its own. Three decisions carried that: nothing was ever staked, every customer got a lucky number just for being a client, and the visual language stayed close to the bank’s own restrained voice rather than the category’s loud default.',
+      'Itaú ran a promotional campaign across the 2026 World Cup, built inside Minhas Vantagens and fronted by Ronaldo. Weekly missions earned lucky numbers and spins — register a Pix key, connect Open Finance, set up automatic payments, start investing.',
+      'Those entered customers into instant prizes and headline draws — up to a million reais in gold bars, a trip, dinner with Ronaldo. More than twenty products across the bank fed the mission system.',
+      'The hard part was never the interface. A spinning wheel with a gold jackpot is, visually, the language of gambling. This had to read as the opposite — a bank rewarding customers who were already its own.',
+      'Three decisions carried that: nothing was ever staked, every customer got a lucky number just for being a client, and the visual language stayed close to the bank’s restrained voice rather than the category’s loud default.',
     ],
 
     whatMadeItWork: [
@@ -303,7 +309,8 @@ export const CASES = [
         sections: [
           {
             body: [
-              'The mechanic was built so a customer could never lose anything — chances were earned by doing something, never bought or bet. That rule did more for trust than any visual reassurance could, and it meant every screen was easier to write: there was never a loss to explain away. It’s also why we resisted the category’s pull toward flashing, jackpot-styled design — staying close to the bank’s own restrained visual language cost some immediate excitement but bought the thing that actually mattered, a customer believing the prize was real.',
+              'The mechanic was built so a customer could never lose anything. Chances were earned by doing something, never bought or bet. That rule did more for trust than any visual reassurance could, and it made every screen easier to write: there was never a loss to explain away.',
+              'It is also why we resisted the category’s pull toward flashing, jackpot-styled design. Staying restrained cost some excitement and bought what mattered — a customer believing the prize was real.',
             ],
           },
         ],
@@ -314,7 +321,8 @@ export const CASES = [
         sections: [
           {
             body: [
-              'Rather than push the rules into a regulation document nobody opens, we put what mattered where the decision happened, in the customer’s own words — when a spin unlocks, how long a mission takes to credit, when a result gets published. Legal reviewed language instead of approving disclaimers, so the constraint shaped the writing rather than arriving after it. It worked: across a campaign of this scale, support tickets stayed in the hundreds, and the recurring ones were about counting spins, not confusion about how to win.',
+              'The rules could have gone into a regulation document nobody opens. Instead we put what mattered where the decision happened, in the customer’s own words — when a spin unlocks, how long a mission takes to credit, when a result gets published.',
+              'Legal reviewed language instead of approving disclaimers, so the constraint shaped the writing rather than arriving after it. It worked. Across a campaign of this scale, support tickets stayed in the hundreds, and the recurring ones were about counting spins, not about how to win.',
             ],
           },
         ],
@@ -325,7 +333,8 @@ export const CASES = [
         sections: [
           {
             body: [
-              'We studied what genuinely brings people back to a game: a weekly rhythm, a reward that arrives immediately, and a slower progression underneath it — level in the programme meant more lucky numbers, so a long-standing customer saw the relationship they already had reflected in their odds. Launching to the entire base at once meant a spike in the first minutes rather than a curve, so planning what loads first, what can wait, and what a customer sees if something is slow — with engineering and marketing, ahead of time — was as much a part of the design as the screens themselves. The platform held: reach on campaign communications ran to 19.7MM, and enrolment came in at roughly ten times the previous internal benchmark.',
+              'We studied what brings people back to a game: a weekly rhythm, an immediate reward, and a slower progression underneath. Level in the programme meant more lucky numbers, so a long-standing customer saw their relationship reflected in their odds.',
+              'Launching to the whole base at once meant a spike, not a curve. What loads first, what can wait, what a customer sees when something is slow — settled with engineering and marketing ahead of time. The platform held. Reach on campaign communications ran to 19.7MM, and enrolment came in at roughly ten times the previous internal benchmark.',
             ],
             // Compact figures rather than the big numerals used for Outcomes:
             // these are evidence for the point above, not headline results.
@@ -567,8 +576,10 @@ export const CASES = [
     ],
 
     overview: [
-      'A full redesign of Itaú’s ATM network, and a new design system built for it from the ground up. An ATM is used standing up, often outdoors, often in a hurry — by people with low vision, limited mobility, people who cannot read, and older customers with a queue behind them. The existing terminal had grown into a wall of equal-weight options with the important detail in the smallest type, and its hardware couldn’t run the screen-reader software already standard on phones, so there was no accessible path at all for a blind customer.',
-      'We rebuilt it around what field research showed people actually do at an ATM: they don’t read, they orient by shape, colour, position and touch. Fewer options per screen, larger targets, higher contrast, icons alongside words, the same three exits in the same place on every screen — on a design system inherited from the bank’s app, so the two speak the same language. And because no existing screen reader would run on the machines, the bank built its own audio layer, so every journey was designed twice: once on screen, once as a spoken sequence.',
+      'A full redesign of Itaú’s ATM network, and a new design system built for it from the ground up. An ATM is used standing up, often outdoors, often in a hurry — by people with low vision, limited mobility, people who cannot read, and older customers with a queue behind them.',
+      'The existing terminal had grown into a wall of equal-weight options, with the important detail set in the smallest type. Its hardware could not run the screen-reader software already standard on phones. For a blind customer there was no accessible path at all.',
+      'We rebuilt it around what field research showed people actually do at an ATM: they don’t read. They orient by shape, colour, position and touch. So: fewer options per screen, larger targets, higher contrast, icons alongside words, the same three exits in the same place every time.',
+      'The design system was inherited from the bank’s app, so terminal and phone speak the same language. And because no existing screen reader would run on the machines, the bank built its own audio layer — every journey designed twice, once on screen and once as a spoken sequence.',
     ],
 
     takeaways: [
@@ -579,7 +590,7 @@ export const CASES = [
           {
             body: [
               'Field visits to branches and lab sessions with older customers, blind customers, customers with motor disabilities and customers who cannot read all pointed the same way. Nobody reads a screen while standing at a machine with people waiting behind them. They scan for shape, colour and position, and they confirm with their hands.',
-              'That finding decided the rest: the secondary microcopy that used to carry the important detail was removed, the numbers that matter were made large enough to check at a glance, and every constraint was stated in words rather than implied by a disabled control.',
+              'That finding decided the rest. The secondary microcopy that used to carry the important detail was removed, the numbers that matter were made large enough to check at a glance, and every constraint was stated in words rather than implied by a disabled control.',
             ],
           },
         ],
@@ -590,7 +601,8 @@ export const CASES = [
         sections: [
           {
             body: [
-              'Splitting a credit limit between cards is the most complicated thing a customer can do at one of these machines, and it fits in a single screen. Source on the left, destination on the right, current and maximum limits side by side, and a confirm button that stays inactive until there is a real choice to confirm. Card art and brand marks do part of the work, because a customer who cannot read the card name still recognises it by sight.',
+              'Splitting a credit limit between cards is the most complicated thing a customer can do at one of these machines. It fits in a single screen. Source on the left, destination on the right, current and maximum limits side by side, and a confirm button that stays inactive until there is a real choice to confirm.',
+              'Card art and brand marks do part of the work, because a customer who cannot read the card name still recognises it by sight.',
             ],
           },
         ],
@@ -601,7 +613,7 @@ export const CASES = [
         sections: [
           {
             body: [
-              'The design system was derived from the bank’s app system, reusing its tokens so the terminal would not become an island. What changed came from the physical context: type sizes and touch targets scaled for a screen viewed at arm’s length, contrast raised for glare, options per screen cut, and the same three anchors repeated at the bottom of every screen so a customer can leave from anywhere without hunting.',
+              'The design system was derived from the bank’s app system, reusing its tokens so the terminal would not become an island. What changed came from the physical context: type sizes and touch targets scaled for a screen viewed at arm’s length, contrast raised for glare, options per screen cut. And the same three anchors repeat at the bottom of every screen, so a customer can leave from anywhere without hunting.',
               'Developers received the system and an accessibility specification alongside it, which is the part that decides whether any of this survives contact with the build.',
             ],
           },
