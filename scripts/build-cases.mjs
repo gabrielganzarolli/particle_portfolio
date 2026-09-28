@@ -28,20 +28,40 @@ const SITE_URL = 'https://particle-portfolio.vercel.app';
 /**
  * Map every image in a case's folder by basename, so the data can name
  * "01-main.png" and still resolve after the file was re-encoded as .jpg.
+ *
+ * One basename can carry several files: a clip and the poster that covers it
+ * are "03-walkthrough-a.mp4" and "03-walkthrough-a.jpg". So keep every
+ * candidate and let the resolver choose, rather than letting whichever name
+ * sorts last win for both.
  */
 function imageIndex(slug) {
   const dir = resolvePath(root, 'src/images', slug);
   if (!existsSync(dir)) return new Map();
-  return new Map(readdirSync(dir).map((f) => [f.replace(/\.[^.]+$/, ''), f]));
+  const index = new Map();
+  for (const f of readdirSync(dir)) {
+    const base = f.replace(/\.[^.]+$/, '');
+    if (!index.has(base)) index.set(base, []);
+    index.get(base).push(f);
+  }
+  return index;
 }
+
+const isVideo = (f) => /\.(mp4|webm|mov|m4v)$/i.test(f);
 
 const missing = [];
 
 function makeResolver(slug) {
   const index = imageIndex(slug);
   return (_slug, file) => {
-    const base = String(file).replace(/\.[^.]+$/, '');
-    const found = index.get(base);
+    const name = String(file);
+    const base = name.replace(/\.[^.]+$/, '');
+    const candidates = index.get(base) ?? [];
+    // Exact name first, then anything of the same kind — so a re-encode still
+    // resolves, but a poster never lands on the clip it was meant to cover.
+    const found =
+      candidates.find((f) => f === name) ??
+      candidates.find((f) => isVideo(f) === isVideo(name)) ??
+      candidates[0];
     if (!found) {
       missing.push(`${slug}/${file}`);
       return null;
