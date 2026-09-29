@@ -15,9 +15,10 @@ word average of the other three, with paragraphs up to 125 words. Structure
 was never the problem — every case has the same shape (overview, three
 takeaways).
 
-**Decision:** tighten, keep every point. No takeaway dropped — the
-three-takeaway index is a structural rhythm across all five pages. Only the
-two outliers touched; the other three already read at the right density.
+**Decision at the time:** tighten, keep every point. No takeaway dropped.
+Only the two outliers touched; the other three already read at the right
+density. (Superseded in part — see §3, where the Seleção compliance takeaway
+was later removed outright.)
 
 **Result**, against the untouched cases as the benchmark:
 
@@ -77,6 +78,50 @@ One line in `cases.js` to swap.
 
 This case measured fine on density (23w sentences) and was left alone
 otherwise — clarity and length were separate problems.
+
+---
+
+## 3. Where the length actually comes from — and the compliance cut
+
+Trimming prose barely moved the pages, which prompted a measurement of what
+they are actually made of. On Seleção, at 12.9 screens:
+
+| share | what |
+|---|---|
+| **40%** | media — 4 full-bleed figures at ~840px each |
+| 22% | chapter text |
+| 7% | overview |
+| 31% | hero, outcomes, More work, What made it work, takeaways index, What I did |
+
+**Prose was 29% of the page.** That is why the earlier sentence-level pass
+changed nothing visible. Measured live in the browser: capping figure width
+at 680px gives −10%; tightening chapter type and padding gives −7%; dropping
+the takeaways index gives −4%.
+
+A single chapter breaks down as body copy 42%, heading 22%, padding and gap
+36% — so halving the writing in a chapter shrinks it by about a fifth. The
+title is 56px against 16px body.
+
+**Removed:** the Seleção takeaway 02, *Compliance is content design*, at the
+author's request. Knock-on changes handled with it:
+
+- Takeaway 03 renumbered to 02; the index label is computed from the list
+  length, so it says "2 takeaways" on its own.
+- `04-how-it-works.png` unplaced. It illustrated that chapter and its caption
+  carried the argument ("The rules, written where the decision happens…"), so
+  it had nothing left to support. The file remains in `src/images/`.
+- `05-progression.png` moved from `after-takeaway-03` to `after-takeaway-02`,
+  which would otherwise never render with only two takeaways.
+- The `580 support cases` outcome lost the chapter that explained it. Kept as
+  a figure — low support volume at scale stands on its own — but its caption
+  was cut back to match the plain style of its siblings.
+
+Result: **12.9 → 10.6 screens, −18%.**
+
+Still open, in order of remaining impact: constraining or pairing the
+full-bleed figures (40% of the page), cutting the takeaways index across all
+five cases, and dropping "What made it work" — five bullets of platform
+engineering (LE3, Kafka, Devin) in a product design case.
 
 ---
 
