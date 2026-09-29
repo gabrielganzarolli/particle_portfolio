@@ -248,18 +248,15 @@ export const CASES = [
         placement: 'after-takeaway-01',
         width: 'full',
       },
-      {
-        src: '04-how-it-works.png',
-        alt: 'How the mechanic works, explained in the flow itself, and the headline draws',
-        caption: 'The rules, written where the decision happens rather than in a regulation nobody opens.',
-        placement: 'after-takeaway-02',
-        width: 'full',
-      },
+      // 04-how-it-works is deliberately not placed: it illustrated the
+      // compliance takeaway, and its caption carried that argument. With the
+      // chapter gone the image has nothing to support. The file is still in
+      // src/images/ if it earns a place back.
       {
         src: '05-progression.png',
         alt: 'Programme level and progress, and the recommended next activity',
         caption: 'Programme level and the next step — the slower progression under the weekly loop.',
-        placement: 'after-takeaway-03',
+        placement: 'after-takeaway-02',
         width: 'full',
       },
     ],
@@ -283,7 +280,7 @@ export const CASES = [
       {
         value: '580',
         caption:
-          'Support cases across the whole campaign — spin accounting, sign-up and rules; low friction relative to volume',
+          'Support cases across the whole campaign — low friction relative to volume',
       },
     ],
 
@@ -317,18 +314,6 @@ export const CASES = [
       },
       {
         index: '02',
-        title: 'Compliance is content design',
-        sections: [
-          {
-            body: [
-              'The rules could have gone into a regulation document nobody opens. Instead we put what mattered where the decision happened, in the customer’s own words — when a spin unlocks, how long a mission takes to credit, when a result gets published.',
-              'Legal reviewed language instead of approving disclaimers, so the constraint shaped the writing rather than arriving after it. It worked. Across a campaign of this scale, support tickets stayed in the hundreds, and the recurring ones were about counting spins, not about how to win.',
-            ],
-          },
-        ],
-      },
-      {
-        index: '03',
         title: 'Borrowed from games, not from casinos',
         sections: [
           {
