@@ -19,197 +19,13 @@
 
 export const CASES = [
 
-  // ── REAL CASE ────────────────────────────────────────────────────────────
-  // Transcribed from case-01-uniclass-card-first.md. This is the first case to
-  // use the `videos` and `compareVideos` blocks; everything is a screen
-  // recording, so there are no stills on this page at all.
-  //
-  //   [[ confirmar ]]  Which of the two walkthrough directions won the A/B
-  //                    test. The caption says only that both were tested.
-  {
-    slug: 'uniclass-card-first-acquisition',
-    description:
-      'Raising account-opening conversion at Itaú Uniclass by leading with the credit card people came for, and keeping customers a premium decline would have lost.',
-    index: '01',
-    title: 'Uniclass card-first acquisition',
-    // Both halves of the strategy belong here: the card is the hook, the
-    // account is the goal. The old headline named only the card, which left
-    // the hero, the meta row and the outcome figures all reading as a credit
-    // card project — the inversion only surfaced once, down in the overview.
-    headline: 'The card they came for, the account they left with',
-    tag: 'Product design',
-    client: 'Itaú Unibanco',
-    year: '2026',
-    discipline: 'Product design',
-    role: 'Senior product designer',
-    duration: '3 weeks',
-
-    // Dimensions are the encoded size of each mp4, carried here so the renderer
-    // can reserve the right box before the file lands. `width: 'phone'` marks a
-    // portrait capture, which is bounded by height rather than by the text
-    // measure — at full width one would run close to two screens tall.
-    videos: [
-      {
-        src: '02-benefits-carousel.mp4',
-        poster: '02-benefits-carousel.jpg',
-        w: 732,
-        h: 1396,
-        alt: 'The landing page opening with card benefits, cycling through the global account, credit and the bank’s AI assistant',
-        // Sits with the savings calculator under the first takeaway: one shows
-        // the page leading with what the card gives you, the other turns that
-        // into a number. Same argument, two screens.
-        placement: 'after-takeaway-01',
-        width: 'phone',
-      },
-      {
-        src: '01-savings-calculator.mp4',
-        poster: '01-savings-calculator.jpg',
-        w: 728,
-        h: 1394,
-        alt: 'The savings panel, showing a monthly total that expands into cashback, loyalty programme and waived card fee',
-        placement: 'after-takeaway-01',
-        width: 'phone',
-      },
-      {
-        src: '06-decline-to-signature.mp4',
-        poster: '06-decline-to-signature.jpg',
-        w: 742,
-        h: 1376,
-        alt: 'The decline sequence, moving from the refusal to the alternative card and its limit',
-        placement: 'after-takeaway-02',
-        width: 'phone',
-      },
-      {
-        src: '05-black-approval.mp4',
-        poster: '05-black-approval.jpg',
-        w: 742,
-        h: 1376,
-        alt: 'The approval screen for the premium card, showing the approved limit',
-        placement: 'after-takeaway-02',
-        width: 'phone',
-      },
-      {
-        src: '07-personnalite-studies.mp4',
-        poster: '07-personnalite-studies.jpg',
-        w: 1080,
-        h: 960,
-        alt: 'Studies for the Itaú Personnalité landing page',
-        // The one caption left on this page. It is doing work the image cannot:
-        // without it these read as part of the Uniclass page rather than as the
-        // project the Uniclass result won.
-        caption:
-          'From a separate landing page project, for Itaú Personnalité — briefed right after the Uniclass page proved itself.',
-        placement: 'closing',
-      },
-    ],
-
-    compareVideos: [
-      {
-        a: '03-walkthrough-a.mp4',
-        aPoster: '03-walkthrough-a.jpg',
-        aLabel: 'Version A',
-        aW: 728,
-        aH: 1562,
-        b: '04-walkthrough-b.mp4',
-        bPoster: '04-walkthrough-b.jpg',
-        bLabel: 'Version B',
-        bW: 742,
-        bH: 1380,
-        alt: 'Two walkthroughs of the same landing page in two design directions',
-        caption:
-          'Both versions went to A/B test, with deliberately small differences between them.',
-        // The page's opening asset: the whole journey, twice, before any of the
-        // chapters start pulling single screens out of it.
-        placement: 'after-overview',
-      },
-    ],
-
-    whatWeDid: [
-      'Journey audit of the existing acquisition flow',
-      'Behavioural analysis of real sessions in FullStory',
-      'Facilitated a cross-functional pain-point and hypothesis workshop',
-      'Interaction and content design across landing, offer and in-app recovery',
-      'Alternative offer path for profiles declined on the premium card',
-      'Executive review and handoff to build',
-    ],
-
-    // No outcomes block. The lift figures this case used to show were removed
-    // by request; the renderer drops the whole section when there are none,
-    // rather than printing a label over empty space.
-
-    overview: [
-      'The brief was to raise conversion on account opening for Uniclass, Itaú’s mid-income segment. The strategy was to enter through the credit card instead: the premium card was what people were shopping for, the account was what the bank needed them to leave with. One journey, two products, with a fallback offer for anyone whose credit profile did not clear the premium tier.',
-      'I audited the journey against real behaviour — session recordings in FullStory, funnel data with the product manager and the data team — and found three drop-off points: the landing page, the final offer screen, and the resumption screen in the app. All three were the same mistake, the product describing the bank’s process instead of the customer’s reason for being there.',
-    ],
-
-    takeaways: [
-      {
-        index: '01',
-        title: 'Selling the reason, not the process',
-        sections: [
-          {
-            body: [
-              'The brief pointed at conversion, which usually means fixing the form. Real sessions showed people leaving earlier, before deciding it was worth starting at all. So instead of listing benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee behind it. The claim stops being a promise and becomes an amount they can check. That figure is what the account application is asking to be worth.',
-            ],
-          },
-        ],
-      },
-      {
-        index: '02',
-        title: 'A decline that keeps the customer',
-        sections: [
-          {
-            body: [
-              'The alternative card appears only after credit analysis, so it reads as an approved offer rather than a hedge — earlier would have made the premium card feel conditional for everyone, later would have lost the customer at the moment of rejection. The sequence states the decline once, plainly, then spends the rest of the screen on what the customer can have: the limit, the waived fee, what it does for them now. Clarity about the no is what makes the yes credible.',
-            ],
-          },
-        ],
-      },
-      {
-        index: '03',
-        title: 'Structure outperformed style',
-        sections: [
-          {
-            body: [
-              'I designed versions across the full range, from a digital-bank aesthetic to the bank’s own traditional voice, and presented them to director level. The conservative one was chosen — and the results still came, which made the point unarguable: the gain was in the order of the journey and the language on each screen, not the visual style. A refresh alone would have shipped the same three drop-off points in a nicer typeface.',
-            ],
-          },
-        ],
-      },
-    ],
-
-    notes: [
-      {
-        title: 'Adjacent work',
-        body: 'Studies for the Personnalité landing page, the bank’s high-income segment. The Uniclass page working is what won the next brief, and the same approach carried over to a different product and a different audience.',
-      },
-    ],
-
-    getInTouch: {
-      text: 'Want the longer version of this one? That is a better conversation than a page.',
-      button: 'Ask me about it',
-      href: 'mailto:gabrielganza@gmail.com',
-    },
-  },
-
-  // ── REAL CASE ────────────────────────────────────────────────────────────
-  // Transcribed from case02selecaodepremios.md. Two notes carried over from the
-  // brief's own annotations:
-  //
-  //   [[ confirmar ]]  `duration` is the campaign length, not necessarily how
-  //                    long you were on it. Confirm before publishing.
-  //
-  //   [[ sigilo ]]     If outcomes are added back, note that the absolute
-  //                    figures in the brief (customer counts, mission and spin
-  //                    totals, the cross-campaign comparison) expose base size
-  //                    and were meant for the NDA version only.
   {
     slug: 'selecao-de-premios',
     // Social/search description. 120-160 chars, drawn from this page's own
     // content rather than boilerplate.
     description:
       'A World Cup prize mechanic inside Itaú\'s relationship programme: weekly spins and missions built to reward customers, never to feel like a bet.',
-    index: '02',
+    index: '01',
     title: 'Seleção de Prêmios',
     headline: 'A prize mechanic that had to feel like a bank, not a bet',
     tag: 'Gamification',
@@ -301,7 +117,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '01',
+        index: '05',
         title: 'Rewarding, never wagering',
         sections: [
           {
@@ -313,7 +129,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '01',
         title: 'Borrowed from games, not from casinos',
         sections: [
           {
@@ -347,7 +163,7 @@ export const CASES = [
     // content rather than boilerplate.
     description:
       'A space inside the Itaú app where retirees link and manage INSS benefits, pensions and allowances in one place instead of across separate channels.',
-    index: '03',
+    index: '02',
     title: 'Retiree Hub',
     headline: 'A unified space for financial benefits',
     tag: 'Banking',
@@ -412,7 +228,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '01',
+        index: '05',
         title: 'A number nobody has memorised',
         sections: [
           {
@@ -423,7 +239,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '01',
         title: 'Nobody has exactly one benefit',
         sections: [
           {
@@ -434,7 +250,7 @@ export const CASES = [
         ],
       },
       {
-        index: '03',
+        index: '02',
         title: 'Saying “wait” without losing anyone',
         sections: [
           {
@@ -472,7 +288,7 @@ export const CASES = [
     // content rather than boilerplate.
     description:
       'A full redesign of Itaú\'s ATM network and the design system built for it, for customers who cannot read a screen, see it, or aim precisely.',
-    index: '04',
+    index: '03',
     title: 'ATM redesign',
     headline: 'Rebuilding the ATM and its design system around accessibility',
     tag: 'Design system',
@@ -569,7 +385,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '01',
+        index: '05',
         title: 'People do not read at an ATM',
         sections: [
           {
@@ -581,7 +397,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '01',
         title: 'Complexity does not need more steps',
         sections: [
           {
@@ -593,7 +409,7 @@ export const CASES = [
         ],
       },
       {
-        index: '03',
+        index: '02',
         title: 'A system built to be built',
         sections: [
           {
@@ -629,7 +445,7 @@ export const CASES = [
   //                    as an honest gap. Supply the three numbers and uncomment.
   {
     slug: 'minhas-vantagens-console',
-    index: '05',
+    index: '04',
     title: 'Minhas Vantagens console',
     headline: 'The manager who had to ask the client',
     description:
@@ -680,7 +496,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '01',
+        index: '05',
         title: 'The question was pointed the wrong way',
         sections: [
           {
@@ -691,7 +507,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '01',
         title: 'Loss is the part people ask about',
         sections: [
           {
@@ -702,7 +518,7 @@ export const CASES = [
         ],
       },
       {
-        index: '03',
+        index: '02',
         title: 'An abstract programme priced in steps',
         sections: [
           {
@@ -731,6 +547,202 @@ export const CASES = [
     },
   },
 
+
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  // Transcribed from case-01-uniclass-card-first.md. This is the first case to
+  // use the `videos` and `compareVideos` blocks; everything is a screen
+  // recording, so there are no stills on this page at all.
+  //
+  //   [[ confirmar ]]  Which of the two walkthrough directions won the A/B
+  //                    test. The caption says only that both were tested.
+  {
+    slug: 'uniclass-card-first-acquisition',
+    // Client work that cannot be shown. Every figure on this page is blurred
+    // by the stylesheet. See the note in renderHtml.js about what that does
+    // and does not protect: the files are still served as they are.
+    confidential: true,
+    description:
+      'Raising account-opening conversion at Itaú Uniclass by leading with the credit card people came for, and keeping customers a premium decline would have lost.',
+    index: '05',
+    title: 'Uniclass card-first acquisition',
+    // Still naming both products, but not as a swap performed on someone.
+    // "The card they came for, the account they left with" described the same
+    // journey as a bait — which is not what the work was, and not a thing to
+    // put at the top of a page. This is the overview's own phrase.
+    headline: 'One journey, two products',
+    tag: 'Product design',
+    client: 'Itaú Unibanco',
+    year: '2026',
+    discipline: 'Product design',
+    role: 'Senior product designer',
+    duration: '3 weeks',
+
+    // Dimensions are the encoded size of each mp4, carried here so the renderer
+    // can reserve the right box before the file lands. `width: 'phone'` marks a
+    // portrait capture, which is bounded by height rather than by the text
+    // measure — at full width one would run close to two screens tall.
+    videos: [
+      {
+        src: '02-benefits-carousel.mp4',
+        contentWidth: 0.817,
+        poster: '02-benefits-carousel.jpg',
+        w: 732,
+        h: 1396,
+        alt: 'The landing page opening with card benefits, cycling through the global account, credit and the bank’s AI assistant',
+        // Sits with the savings calculator under the first takeaway: one shows
+        // the page leading with what the card gives you, the other turns that
+        // into a number. Same argument, two screens.
+        placement: 'after-takeaway-01',
+        width: 'phone',
+      },
+      {
+        src: '01-savings-calculator.mp4',
+        contentWidth: 0.94,
+        poster: '01-savings-calculator.jpg',
+        w: 728,
+        h: 1394,
+        alt: 'The savings panel, showing a monthly total that expands into cashback, loyalty programme and waived card fee',
+        placement: 'after-takeaway-01',
+        width: 'phone',
+      },
+      {
+        src: '06-decline-to-signature.mp4',
+        contentWidth: 0.806,
+        poster: '06-decline-to-signature.jpg',
+        w: 742,
+        h: 1376,
+        alt: 'The decline sequence, moving from the refusal to the alternative card and its limit',
+        placement: 'after-takeaway-02',
+        width: 'phone',
+      },
+      {
+        src: '05-black-approval.mp4',
+        contentWidth: 0.805,
+        poster: '05-black-approval.jpg',
+        w: 742,
+        h: 1376,
+        alt: 'The approval screen for the premium card, showing the approved limit',
+        placement: 'after-takeaway-02',
+        width: 'phone',
+      },
+      {
+        src: '07-personnalite-studies.mp4',
+        contentWidth: 0.805,
+        poster: '07-personnalite-studies.jpg',
+        w: 1080,
+        h: 960,
+        alt: 'Studies for the Itaú Personnalité landing page',
+        // The one caption left on this page. It is doing work the image cannot:
+        // without it these read as part of the Uniclass page rather than as the
+        // project the Uniclass result won.
+        caption:
+          'From a separate landing page project, for Itaú Personnalité — briefed right after the Uniclass page proved itself.',
+        placement: 'closing',
+      },
+    ],
+
+    compareVideos: [
+      {
+        a: '03-walkthrough-a.mp4',
+        aContentWidth: 0.99,
+        aPoster: '03-walkthrough-a.jpg',
+        aLabel: 'Version A',
+        aW: 728,
+        aH: 1562,
+        b: '04-walkthrough-b.mp4',
+        bContentWidth: 0.817,
+        bPoster: '04-walkthrough-b.jpg',
+        bLabel: 'Version B',
+        bW: 742,
+        bH: 1380,
+        alt: 'Two walkthroughs of the same landing page in two design directions',
+        caption:
+          'Both versions went to A/B test, with deliberately small differences between them.',
+        // The page's opening asset: the whole journey, twice, before any of the
+        // chapters start pulling single screens out of it.
+        placement: 'after-overview',
+      },
+    ],
+
+    whatWeDid: [
+      'Journey audit of the existing acquisition flow',
+      'Behavioural analysis of real sessions in FullStory',
+      'Facilitated a cross-functional pain-point and hypothesis workshop',
+      'Interaction and content design across landing, offer and in-app recovery',
+      'Alternative offer path for profiles declined on the premium card',
+      'Executive review and handoff to build',
+    ],
+
+    // No outcomes block. The lift figures this case used to show were removed
+    // by request; the renderer drops the whole section when there are none,
+    // rather than printing a label over empty space.
+
+    overview: [
+      'The brief was to raise conversion on account opening for Uniclass, Itaú’s mid-income segment. The strategy was to enter through the credit card instead: the premium card was what people were shopping for, the account was what the bank needed them to leave with. One journey, two products, with a fallback offer for anyone whose credit profile did not clear the premium tier.',
+      'I audited the journey against real behaviour — session recordings in FullStory, funnel data with the product manager and the data team — and found three drop-off points: the landing page, the final offer screen, and the resumption screen in the app. All three were the same mistake, the product describing the bank’s process instead of the customer’s reason for being there.',
+    ],
+
+    takeaways: [
+      {
+        index: '05',
+        title: 'Selling the reason, not the process',
+        sections: [
+          {
+            body: [
+              'The brief pointed at conversion, which usually means fixing the form. Real sessions showed people leaving earlier, before deciding it was worth starting at all. So instead of listing benefits, the page adds them up — one figure for what the customer saves each month, opened into the cashback, the loyalty programme and the waived fee behind it. The claim stops being a promise and becomes an amount they can check. That figure is what the account application is asking to be worth.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '01',
+        title: 'A decline that keeps the customer',
+        sections: [
+          {
+            body: [
+              'The alternative card appears only after credit analysis, so it reads as an approved offer rather than a hedge — earlier would have made the premium card feel conditional for everyone, later would have lost the customer at the moment of rejection. The sequence states the decline once, plainly, then spends the rest of the screen on what the customer can have: the limit, the waived fee, what it does for them now. Clarity about the no is what makes the yes credible.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '02',
+        title: 'Structure outperformed style',
+        sections: [
+          {
+            body: [
+              'I designed versions across the full range, from a digital-bank aesthetic to the bank’s own traditional voice, and presented them to director level. The conservative one was chosen — and the results still came, which made the point unarguable: the gain was in the order of the journey and the language on each screen, not the visual style. A refresh alone would have shipped the same three drop-off points in a nicer typeface.',
+            ],
+          },
+        ],
+      },
+    ],
+
+    notes: [
+      {
+        title: 'Adjacent work',
+        body: 'Studies for the Personnalité landing page, the bank’s high-income segment. The Uniclass page working is what won the next brief, and the same approach carried over to a different product and a different audience.',
+      },
+    ],
+
+    getInTouch: {
+      text: 'Want the longer version of this one? That is a better conversation than a page.',
+      button: 'Ask me about it',
+      href: 'mailto:gabrielganza@gmail.com',
+    },
+  },
+
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  // Transcribed from case02selecaodepremios.md. Two notes carried over from the
+  // brief's own annotations:
+  //
+  //   [[ confirmar ]]  `duration` is the campaign length, not necessarily how
+  //                    long you were on it. Confirm before publishing.
+  //
+  //   [[ sigilo ]]     If outcomes are added back, note that the absolute
+  //                    figures in the brief (customer counts, mission and spin
+  //                    totals, the cross-campaign comparison) expose base size
+  //                    and were meant for the NDA version only.
 ];
 
 export const bySlug = (slug) => CASES.find((c) => c.slug === slug);

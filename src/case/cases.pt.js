@@ -17,7 +17,7 @@
 export const CASES_PT = {
   'uniclass-card-first-acquisition': {
     title: 'Aquisição Uniclass pelo cartão',
-    headline: 'O cartão que vieram buscar, a conta que levaram',
+    headline: 'Uma jornada, dois produtos',
     description:
       'Elevar a conversão de abertura de conta no Itaú Uniclass começando pelo cartão de crédito que as pessoas vinham procurar — e segurando os clientes que uma recusa no premium teria perdido.',
     tag: 'Product design',

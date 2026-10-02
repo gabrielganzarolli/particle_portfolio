@@ -1061,3 +1061,81 @@ a {
     grid-column: 2;
   }
 }
+
+/* Confidential media ------------------------------------------------------
+   Work that cannot be shown, behind a pane of frosted glass.
+
+   What this does and does not do: the browser applies the frost after the file
+   arrives, so the clip is served exactly as it sits on disk and can still be
+   fetched from its URL. It tells a reader the work is withheld; it does not
+   withhold it. Real redaction means re-encoding the source.
+
+   Why a pane rather than `filter: blur()` on the media: a filter reads as a
+   soft photograph — as though the capture itself were out of focus, which
+   looks like a mistake. A surface laid over the top reads as something put
+   there on purpose. backdrop-filter blurs what is behind it, so the glass is
+   doing the work and the media underneath is untouched. */
+.frost {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: clamp(5px, 0.5vw, 8px);
+}
+
+.frost > img,
+.frost > video {
+  display: block;
+}
+
+.frost::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  /* The frost itself. Saturation is pulled down with the blur so colour does
+     not bleed through as recognisable brand blocks. */
+  backdrop-filter: blur(26px) saturate(0.6) brightness(0.92);
+  -webkit-backdrop-filter: blur(26px) saturate(0.6) brightness(0.92);
+
+  /* What makes it read as glass rather than as a blur: a faint sheen across
+     the surface, brightest at the top left, and a hairline edge. Without
+     these the pane has no surface of its own and the eye reads it as the
+     image being out of focus again. */
+  background:
+    linear-gradient(
+      142deg,
+      rgba(244, 236, 220, 0.1) 0%,
+      rgba(244, 236, 220, 0.035) 38%,
+      rgba(7, 6, 12, 0.06) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(244, 236, 220, 0.16),
+    inset 0 0 0 1px rgba(244, 236, 220, 0.07);
+}
+
+/* Safari and Firefox without backdrop-filter get the filter on the media
+   instead, so the content is still covered. Worse looking, never leakier. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .frost > img,
+  .frost > video {
+    filter: blur(22px) saturate(0.6);
+    transform: scale(calc(1.08 / var(--content-w, 1)));
+  }
+}
+
+/* Normalising the interface width -----------------------------------------
+   Several of these recordings were captured with the phone centred in a wider
+   dark surround, and the amount varies per clip: one fills 99% of its frame,
+   the next 81%. Rendered at the same element width the same phone comes out
+   noticeably smaller in one than the other, which defeats a comparison that
+   is supposed to differ only in the design.
+
+   --content-w is the share of the frame the interface occupies, measured off
+   each clip and written onto the element by the renderer. Scaling by its
+   reciprocal brings every interface to the same width. Clips without the
+   property resolve to 1 and are untouched. */
+.case-video {
+  transform: scale(calc(1 / var(--content-w, 1)));
+  transform-origin: center center;
+}

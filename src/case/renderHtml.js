@@ -28,6 +28,28 @@ const esc = (s) =>
 // renderCaseHtml sets it on entry.
 let ui = UI.en;
 
+// Set per page by renderCaseHtml. A case under NDA gets every figure marked,
+// and the stylesheet blurs them.
+//
+// Worth being exact about what this is: a CSS filter over the element. The
+// file behind it is served untouched and can still be fetched from its URL.
+// It states an intention to a reader; it does not withhold anything from
+// someone who looks. Redacting for real means re-encoding the source.
+let confidential = false;
+
+/** Figure classes, plus the confidentiality marker when the case carries one. */
+const fig = (base) => (confidential ? `${base} is-confidential` : base);
+
+/**
+ * Wraps one media element in the pane that frosts it.
+ *
+ * A pseudo-element cannot be attached to <img> or <video>, so the glass needs
+ * something of its own to sit in. The wrapper only appears on a confidential
+ * case: every other page renders exactly the markup it did before, so this
+ * cannot disturb a layout it is not needed in.
+ */
+const frost = (el) => (confidential ? `<span class="frost">${el}</span>` : el);
+
 /** Label in the left gutter, content in the right column. */
 const row = (label, body, className = '') =>
   `<section class="row${className ? ' ' + className : ''}">` +
@@ -50,12 +72,14 @@ function image(c, placement, resolve, { hero = false } = {}) {
   // The cover is above the fold on every case page; everything below is not.
   const eager = placement === 'after-cover';
   const width = spec.width && spec.width !== 'full' ? ` data-width="${esc(spec.width)}"` : '';
-  const cls = hero ? 'case-figure hero-media' : 'case-figure reveal';
+  const cls = fig(hero ? 'case-figure hero-media' : 'case-figure reveal');
 
   return (
     `<figure class="${cls}"${width}>` +
-    `<img src="${esc(url)}" alt="${esc(spec.alt ?? '')}" ` +
-    `loading="${eager ? 'eager' : 'lazy'}" decoding="async">` +
+    frost(
+      `<img src="${esc(url)}" alt="${esc(spec.alt ?? '')}" ` +
+        `loading="${eager ? 'eager' : 'lazy'}" decoding="async">`
+    ) +
     (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
     `</figure>`
   );
@@ -84,7 +108,7 @@ function gif(c, placement, resolve) {
     `<img src="${esc(src)}" alt="${esc(g.alt ?? '')}"${dims} loading="lazy" decoding="async">`;
 
   return (
-    `<figure class="case-figure reveal">` +
+    `<figure class="${fig('case-figure reveal')}">` +
     (still
       ? `<picture>` +
         `<source srcset="${esc(still)}" media="(prefers-reduced-motion: reduce)">` +
@@ -111,7 +135,7 @@ function gif(c, placement, resolve) {
  * scroll to. The poster is what holds the space and shows the first frame, so
  * nothing looks unloaded while waiting.
  */
-function videoEl({ src, poster, alt, width, height }) {
+function videoEl({ src, poster, alt, width, height, contentWidth }) {
   // The box has to be right before anything loads, and `preload="none"` means
   // nothing loads until the clip is scrolled to. The width/height attributes
   // alone are not enough: the stylesheet gives these a definite width and lets
@@ -120,9 +144,19 @@ function videoEl({ src, poster, alt, width, height }) {
   // 300x150 (or collapses to nothing inside a shrink-to-fit wrapper) and the
   // page jumps when the poster finally decodes.
   const dims = width && height ? ` width="${esc(width)}" height="${esc(height)}"` : '';
-  const ratio = width && height ? ` style="aspect-ratio:${esc(width)}/${esc(height)}"` : '';
 
-  return (
+  // `--content-w` is the share of the frame the interface occupies. Several of
+  // these were captured with the phone centred in a wider dark surround, and
+  // the amount varies per clip, so without this the same phone comes out at a
+  // different size in each — which ruins a side-by-side meant to differ only
+  // in the design. The stylesheet scales by its reciprocal.
+  const styles = [
+    width && height ? `aspect-ratio:${esc(width)}/${esc(height)}` : '',
+    contentWidth && contentWidth < 1 ? `--content-w:${esc(contentWidth)}` : '',
+  ].filter(Boolean);
+  const ratio = styles.length ? ` style="${styles.join(';')}"` : '';
+
+  return frost(
     `<video class="case-video" src="${esc(src)}"` +
     (poster ? ` poster="${esc(poster)}"` : '') +
     dims +
@@ -150,7 +184,7 @@ function video(c, placement, resolve) {
   if (!items.length) return '';
 
   const hero = placement === 'after-cover';
-  const cls = hero ? 'case-figure video-figure hero-media' : 'case-figure video-figure reveal';
+  const cls = fig(hero ? 'case-figure video-figure hero-media' : 'case-figure video-figure reveal');
 
   const el = ({ spec, src }) =>
     videoEl({
@@ -159,6 +193,7 @@ function video(c, placement, resolve) {
       alt: spec.alt,
       width: spec.w,
       height: spec.h,
+      contentWidth: spec.contentWidth,
     });
 
   const caption = (text) => (text ? `<figcaption>${esc(text)}</figcaption>` : '');
@@ -194,7 +229,7 @@ function compareVideo(c, placement, resolve) {
   const b = resolve(c.slug, spec.b);
   if (!a || !b) return '';
 
-  const side = (src, posterSrc, label, alt, w, h) =>
+  const side = (src, posterSrc, label, alt, w, h, contentWidth) =>
     `<div class="cv-side">` +
     `<p class="cv-label">${esc(label)}</p>` +
     videoEl({
@@ -203,6 +238,7 @@ function compareVideo(c, placement, resolve) {
       alt,
       width: w,
       height: h,
+      contentWidth,
     }) +
     `</div>`;
 
@@ -211,10 +247,10 @@ function compareVideo(c, placement, resolve) {
   const lb = spec.bLabel ?? 'B';
 
   return (
-    `<figure class="case-figure compare-video reveal">` +
+    `<figure class="${fig('case-figure compare-video reveal')}">` +
     `<div class="cv-pair">` +
-    side(a, spec.aPoster, la, `${alt} — ${la.toLowerCase()}`.trim(), spec.aW, spec.aH) +
-    side(b, spec.bPoster, lb, `${alt} — ${lb.toLowerCase()}`.trim(), spec.bW, spec.bH) +
+    side(a, spec.aPoster, la, `${alt} — ${la.toLowerCase()}`.trim(), spec.aW, spec.aH, spec.aContentWidth) +
+    side(b, spec.bPoster, lb, `${alt} — ${lb.toLowerCase()}`.trim(), spec.bW, spec.bH, spec.bContentWidth) +
     `</div>` +
     (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
     `</figure>`
@@ -458,7 +494,7 @@ function group(c, resolve) {
   const count = 1 + (g.rest?.length ?? 0);
 
   return (
-    `<figure class="case-figure gallery-figure reveal">` +
+    `<figure class="${fig('case-figure gallery-figure reveal')}">` +
     `<div class="gallery" data-count="${count}">` +
     `<div class="gallery-lead">${shot(lead, g.leadAlt)}</div>` +
     (rest ? `<div class="gallery-stack">${rest}</div>` : '') +
@@ -492,6 +528,7 @@ function more(current) {
  */
 export function renderCaseHtml(c, resolve, lang = 'en') {
   ui = UI[lang] ?? UI.en;
+  confidential = Boolean(c.confidential);
 
   // Page order is fixed by the brief; images sit between sections rather than
   // inside them, so they run the full width of the container.
