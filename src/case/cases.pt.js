@@ -389,7 +389,7 @@ export const CASES_PT = {
     notes: [
       {
         title: 'Reconhecimento',
-        body: 'A plataforma Minhas Vantagens foi premiada no Itubers Transformam, no Itaú.',
+        body: 'A plataforma Minhas Vantagens foi vencedora do prêmio Itubers Transformam, no Itaú.',
       },
     ],
 

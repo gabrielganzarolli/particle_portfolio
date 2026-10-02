@@ -153,6 +153,125 @@ export const CASES = [
   },
 
 
+  // ── REAL CASE ────────────────────────────────────────────────────────────
+  //   [[ confirmar ]]  `role`. `year` is 2024, which the date picker in the
+  //                    product confirms (screen shows 10/02/2024).
+  //
+  //   [[ confirmar ]]  `whatWeDid` was drafted from the overview rather than
+  //                    from a brief, so it describes what the screens imply was
+  //                    done, not a recorded account of it. Check it before this
+  //                    page is used.
+  //
+  //   [[ confirmar ]]  Outcomes. The block below is staged but commented out:
+  //                    there are no measured figures for this case, and the
+  //                    Outcomes treatment is a row of large numerals, so empty
+  //                    placeholders would render as a broken section rather than
+  //                    as an honest gap. Supply the three numbers and uncomment.
+  {
+    slug: 'minhas-vantagens-console',
+    index: '02',
+    title: 'Minhas Vantagens console',
+    headline: 'The manager who had to ask the client',
+    description:
+      'An internal console giving Itaú branch managers the same view of the relationship programme their clients see, plus the reasons a level was lost.',
+    tag: 'Product design',
+    client: 'Itaú Unibanco',
+    year: '2024',
+    discipline: 'Product design',
+    role: 'Senior product designer',
+
+    // A looping walkthrough rather than stills. The three frames this replaced
+    // were all pulled from this same recording.
+    gif: {
+      src: 'console.gif',
+      // Shown instead of the animation under prefers-reduced-motion.
+      still: '01-client-overview.png',
+      width: 999,
+      height: 737,
+      alt: 'A walkthrough of the console: the client overview, the step history, and the history filtered by event type and date',
+      caption:
+        'The console end to end: the client overview, then the step history filtered to the events a client actually asks about.',
+      placement: 'after-overview',
+    },
+
+    whatWeDid: [
+      'Discovery with branch managers to map what they couldn’t answer for clients',
+      'Information architecture for the client overview and step history',
+      'Interaction design for filtering history by event type and date',
+      'Content design translating programme rules into plain reasons for a lost or gained step',
+      'Handoff and build support',
+    ],
+
+    // Live at last: read off the internal results deck for the platform.
+    //
+    //   [[ confirmar ]]  The fourth card on that slide reports a drop in
+    //                    escalation to second-level support. The figure under
+    //                    it is obscured by glare in the photo, so the claim is
+    //                    stated without a number rather than guessed at.
+    outcomes: [
+      { prefix: '+', value: '81', unit: 'K', caption: 'Views of the step history, around 2,300 a day' },
+      { value: '7', unit: 'd', caption: 'The old wait for an answer, now given live at the desk' },
+      { value: '12', unit: 'K', caption: 'Hours of support work removed in 2026' },
+    ],
+
+    overview: [
+      'An internal console that shows a branch manager where a client stands in Minhas Vantagens, the bank’s relationship programme. Before it existed, managers had no view of the programme at all: when a client asked why a benefit had gone, the manager had to ask the client to explain their own account.',
+    ],
+
+    takeaways: [
+      {
+        index: '05',
+        title: 'The question was pointed the wrong way',
+        sections: [
+          {
+            body: [
+              'A client walks into a branch and asks what happened to their level. The manager is the one person in the room who should be able to answer, and the only information available was whatever the client could recall. Giving the manager the same picture the client sees, plus the reasons behind it, was the whole project.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '01',
+        title: 'Loss is the part people ask about',
+        sections: [
+          {
+            body: [
+              'Programme dashboards tend to show progress and stop there. This one leads with the risk: steps lost, and a warning when the client is close to a downgrade. The history can be filtered to lost steps, rule changes and segment changes, because those are the events a client comes in angry about and the ones a manager could never explain.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '02',
+        title: 'An abstract programme priced in steps',
+        sections: [
+          {
+            body: [
+              'Each product carries what it is worth, and the accumulation products show a figure against a threshold rather than a vague sense of progress. That turns a loyalty programme into a concrete conversation at a desk: here is where you are, here is what closes the gap.',
+            ],
+          },
+        ],
+      },
+    ],
+
+    // Stated plainly and no further: the award's name is known, its categories
+    // and criteria are not, and a portfolio is the wrong place to pad a
+    // credential with detail nobody checked.
+    notes: [
+      {
+        title: 'Recognition',
+        body: 'The Minhas Vantagens platform won the Itubers Transformam award at Itaú.',
+      },
+    ],
+
+    getInTouch: {
+      text: 'Want the longer version of this one? That is a better conversation than a page.',
+      button: 'Ask me about it',
+      href: 'mailto:gabrielganza@gmail.com',
+    },
+  },
+
+
 
   // ── REAL CASE ────────────────────────────────────────────────────────────
   // Same template and palette as selecao-de-premios. Notes from the brief:
@@ -163,7 +282,7 @@ export const CASES = [
     // content rather than boilerplate.
     description:
       'A space inside the Itaú app where retirees link and manage INSS benefits, pensions and allowances in one place instead of across separate channels.',
-    index: '02',
+    index: '03',
     title: 'Retiree Hub',
     headline: 'A unified space for financial benefits',
     tag: 'Banking',
@@ -288,7 +407,7 @@ export const CASES = [
     // content rather than boilerplate.
     description:
       'A full redesign of Itaú\'s ATM network and the design system built for it, for customers who cannot read a screen, see it, or aim precisely.',
-    index: '03',
+    index: '04',
     title: 'ATM redesign',
     headline: 'Rebuilding the ATM and its design system around accessibility',
     tag: 'Design system',
@@ -426,125 +545,6 @@ export const CASES = [
       'No existing screen reader could run on the machines, so the bank built its own audio layer — a customer listens and touches, never speaks',
       'Developers received two specifications per journey, screens and voice, which is what made it possible to build consistently',
     ],
-  },
-
-
-  // ── REAL CASE ────────────────────────────────────────────────────────────
-  //   [[ confirmar ]]  `role`. `year` is 2024, which the date picker in the
-  //                    product confirms (screen shows 10/02/2024).
-  //
-  //   [[ confirmar ]]  `whatWeDid` was drafted from the overview rather than
-  //                    from a brief, so it describes what the screens imply was
-  //                    done, not a recorded account of it. Check it before this
-  //                    page is used.
-  //
-  //   [[ confirmar ]]  Outcomes. The block below is staged but commented out:
-  //                    there are no measured figures for this case, and the
-  //                    Outcomes treatment is a row of large numerals, so empty
-  //                    placeholders would render as a broken section rather than
-  //                    as an honest gap. Supply the three numbers and uncomment.
-  {
-    slug: 'minhas-vantagens-console',
-    index: '04',
-    title: 'Minhas Vantagens console',
-    headline: 'The manager who had to ask the client',
-    description:
-      'An internal console giving Itaú branch managers the same view of the relationship programme their clients see, plus the reasons a level was lost.',
-    tag: 'Product design',
-    client: 'Itaú Unibanco',
-    year: '2024',
-    discipline: 'Product design',
-    role: 'Senior product designer',
-
-    // A looping walkthrough rather than stills. The three frames this replaced
-    // were all pulled from this same recording.
-    gif: {
-      src: 'console.gif',
-      // Shown instead of the animation under prefers-reduced-motion.
-      still: '01-client-overview.png',
-      width: 999,
-      height: 737,
-      alt: 'A walkthrough of the console: the client overview, the step history, and the history filtered by event type and date',
-      caption:
-        'The console end to end: the client overview, then the step history filtered to the events a client actually asks about.',
-      placement: 'after-overview',
-    },
-
-    whatWeDid: [
-      'Discovery with branch managers to map what they couldn’t answer for clients',
-      'Information architecture for the client overview and step history',
-      'Interaction design for filtering history by event type and date',
-      'Content design translating programme rules into plain reasons for a lost or gained step',
-      'Handoff and build support',
-    ],
-
-    // Live at last: read off the internal results deck for the platform.
-    //
-    //   [[ confirmar ]]  The fourth card on that slide reports a drop in
-    //                    escalation to second-level support. The figure under
-    //                    it is obscured by glare in the photo, so the claim is
-    //                    stated without a number rather than guessed at.
-    outcomes: [
-      { prefix: '+', value: '81', unit: 'K', caption: 'Views of the step history, around 2,300 a day' },
-      { value: '7', unit: 'd', caption: 'The old wait for an answer, now given live at the desk' },
-      { value: '12', unit: 'K', caption: 'Hours of support work removed in 2026' },
-    ],
-
-    overview: [
-      'An internal console that shows a branch manager where a client stands in Minhas Vantagens, the bank’s relationship programme. Before it existed, managers had no view of the programme at all: when a client asked why a benefit had gone, the manager had to ask the client to explain their own account.',
-    ],
-
-    takeaways: [
-      {
-        index: '05',
-        title: 'The question was pointed the wrong way',
-        sections: [
-          {
-            body: [
-              'A client walks into a branch and asks what happened to their level. The manager is the one person in the room who should be able to answer, and the only information available was whatever the client could recall. Giving the manager the same picture the client sees, plus the reasons behind it, was the whole project.',
-            ],
-          },
-        ],
-      },
-      {
-        index: '01',
-        title: 'Loss is the part people ask about',
-        sections: [
-          {
-            body: [
-              'Programme dashboards tend to show progress and stop there. This one leads with the risk: steps lost, and a warning when the client is close to a downgrade. The history can be filtered to lost steps, rule changes and segment changes, because those are the events a client comes in angry about and the ones a manager could never explain.',
-            ],
-          },
-        ],
-      },
-      {
-        index: '02',
-        title: 'An abstract programme priced in steps',
-        sections: [
-          {
-            body: [
-              'Each product carries what it is worth, and the accumulation products show a figure against a threshold rather than a vague sense of progress. That turns a loyalty programme into a concrete conversation at a desk: here is where you are, here is what closes the gap.',
-            ],
-          },
-        ],
-      },
-    ],
-
-    // Stated plainly and no further: the award's name is known, its categories
-    // and criteria are not, and a portfolio is the wrong place to pad a
-    // credential with detail nobody checked.
-    notes: [
-      {
-        title: 'Recognition',
-        body: 'The Minhas Vantagens platform won Itubers Transformam, an award at Itaú.',
-      },
-    ],
-
-    getInTouch: {
-      text: 'Want the longer version of this one? That is a better conversation than a page.',
-      button: 'Ask me about it',
-      href: 'mailto:gabrielganza@gmail.com',
-    },
   },
 
 

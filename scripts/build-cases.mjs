@@ -159,6 +159,10 @@ const page = (c, content, pt) => {
 `;
 };
 
+// Every case in Portuguese, built once: the "More work" list on a translated
+// page has to name its siblings in the language the reader is in.
+const CASES_PT_FULL = CASES.map((c) => applyTranslation(c, CASES_PT[c.slug]));
+
 let written = 0;
 const untranslated = [];
 const problems = [];
@@ -179,7 +183,7 @@ for (const c of CASES) {
   // tab and a shared link show, and the labels outside #case.
   const pt = overlay
     ? {
-        html: renderCaseHtml(applyTranslation(c, overlay), resolver, 'pt'),
+        html: renderCaseHtml(applyTranslation(c, overlay), resolver, 'pt', CASES_PT_FULL),
         title: `${applyTranslation(c, overlay).title} — Gabriel Ganzarolli`,
         description: overlay.description ?? c.description ?? c.headline,
         lang: HTML_LANG.pt,

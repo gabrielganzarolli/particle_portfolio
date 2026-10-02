@@ -37,6 +37,12 @@ let ui = UI.en;
 // someone who looks. Redacting for real means re-encoding the source.
 let confidential = false;
 
+// Every case, in the language being rendered — what the "More work" list is
+// built from. It defaults to the English data the module imports; the build
+// hands over the translated set when it renders a Portuguese page. Without
+// this the Portuguese page lists its sibling cases under English titles.
+let allCases = CASES;
+
 /** Figure classes, plus the confidentiality marker when the case carries one. */
 const fig = (base) => (confidential ? `${base} is-confidential` : base);
 
@@ -504,7 +510,7 @@ function group(c, resolve) {
 }
 
 function more(current) {
-  const items = CASES.filter((c) => c.slug !== current.slug)
+  const items = allCases.filter((c) => c.slug !== current.slug)
     .map(
       (c) =>
         `<li class="more-item reveal">` +
@@ -526,9 +532,10 @@ function more(current) {
  * is passed as `c` — the caller hands over the English or the Portuguese entry
  * and the two must agree, which build-cases.mjs checks before getting here.
  */
-export function renderCaseHtml(c, resolve, lang = 'en') {
+export function renderCaseHtml(c, resolve, lang = 'en', all = CASES) {
   ui = UI[lang] ?? UI.en;
   confidential = Boolean(c.confidential);
+  allCases = all;
 
   // Page order is fixed by the brief; images sit between sections rather than
   // inside them, so they run the full width of the container.
