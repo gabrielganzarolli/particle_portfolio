@@ -333,12 +333,8 @@ export const CASES = [
       'Handoff and build support',
     ],
 
-    outcomes: [
-      { value: '87', unit: '%', caption: 'Positive customer rating' },
-      { value: '5', unit: 'M+', caption: 'Clients impacted' },
-      { prefix: '+', value: '21', unit: '%', caption: 'In financial product sales to this audience' },
-      { prefix: '−', value: '67', unit: '%', caption: 'In customer service complaints' },
-    ],
+    // No outcomes block, by request. The renderer drops the whole section when
+    // there are none rather than printing a label over empty space.
 
     overview: [
       'A dedicated space within the Itaú app where retirees can link and manage their financial benefits in one place. Retired customers often juggle several income sources — INSS retirement, survivor pensions, temporary leave allowances — each living in a different channel with its own payment dates and rules. For an audience that values stability above all, not knowing what’s arriving and when is a constant source of anxiety.',

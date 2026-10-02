@@ -83,7 +83,7 @@ function image(c, placement, resolve, { hero = false } = {}) {
   return (
     `<figure class="${cls}"${width}>` +
     frost(
-      `<img src="${esc(url)}" alt="${esc(spec.alt ?? '')}" ` +
+      `<img src="${esc(url)}" data-media="${esc(spec.src)}" alt="${esc(spec.alt ?? '')}" ` +
         `loading="${eager ? 'eager' : 'lazy'}" decoding="async">`
     ) +
     (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
@@ -141,7 +141,7 @@ function gif(c, placement, resolve) {
  * scroll to. The poster is what holds the space and shows the first frame, so
  * nothing looks unloaded while waiting.
  */
-function videoEl({ src, poster, alt, width, height, contentWidth }) {
+function videoEl({ src, poster, alt, width, height, contentWidth, media }) {
   // The box has to be right before anything loads, and `preload="none"` means
   // nothing loads until the clip is scrolled to. The width/height attributes
   // alone are not enough: the stylesheet gives these a definite width and lets
@@ -164,6 +164,7 @@ function videoEl({ src, poster, alt, width, height, contentWidth }) {
 
   return frost(
     `<video class="case-video" src="${esc(src)}"` +
+    (media ? ` data-media="${esc(media)}"` : '') +
     (poster ? ` poster="${esc(poster)}"` : '') +
     dims +
     ratio +
@@ -200,6 +201,7 @@ function video(c, placement, resolve) {
       width: spec.w,
       height: spec.h,
       contentWidth: spec.contentWidth,
+      media: spec.src,
     });
 
   const caption = (text) => (text ? `<figcaption>${esc(text)}</figcaption>` : '');
@@ -235,7 +237,7 @@ function compareVideo(c, placement, resolve) {
   const b = resolve(c.slug, spec.b);
   if (!a || !b) return '';
 
-  const side = (src, posterSrc, label, alt, w, h, contentWidth) =>
+  const side = (src, posterSrc, label, alt, w, h, contentWidth, media) =>
     `<div class="cv-side">` +
     `<p class="cv-label">${esc(label)}</p>` +
     videoEl({
@@ -245,6 +247,7 @@ function compareVideo(c, placement, resolve) {
       width: w,
       height: h,
       contentWidth,
+      media,
     }) +
     `</div>`;
 
@@ -255,8 +258,8 @@ function compareVideo(c, placement, resolve) {
   return (
     `<figure class="${fig('case-figure compare-video reveal')}">` +
     `<div class="cv-pair">` +
-    side(a, spec.aPoster, la, `${alt} — ${la.toLowerCase()}`.trim(), spec.aW, spec.aH, spec.aContentWidth) +
-    side(b, spec.bPoster, lb, `${alt} — ${lb.toLowerCase()}`.trim(), spec.bW, spec.bH, spec.bContentWidth) +
+    side(a, spec.aPoster, la, `${alt} — ${la.toLowerCase()}`.trim(), spec.aW, spec.aH, spec.aContentWidth, spec.a) +
+    side(b, spec.bPoster, lb, `${alt} — ${lb.toLowerCase()}`.trim(), spec.bW, spec.bH, spec.bContentWidth, spec.b) +
     `</div>` +
     (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
     `</figure>`

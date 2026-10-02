@@ -58,11 +58,38 @@ export function attachLangToggle({ onSwap } = {}) {
   const versions = { en, pt };
   let current = 'en';
 
+  // Where each clip and still actually lives, taken off the page as served.
+  //
+  // The build writes the Portuguese markup into a JSON script tag, and the
+  // bundler does not look inside one — it rewrites `src` on real elements
+  // only. So the URLs inside the payload are the paths as authored, which
+  // exist in the source tree and not in a production build. Reading the
+  // resolved URLs off the English DOM and reapplying them by file name keeps
+  // the swap working wherever the page is served from. Media is identical in
+  // both languages; only the words around it differ.
+  const resolved = new Map();
+  for (const el of target.querySelectorAll('[data-media]')) {
+    resolved.set(el.dataset.media, { src: el.getAttribute('src'), poster: el.getAttribute('poster') });
+  }
+
+  /** Point swapped-in media back at the files the page was served with. */
+  function relinkMedia(root) {
+    for (const el of root.querySelectorAll('[data-media]')) {
+      const real = resolved.get(el.dataset.media);
+      if (!real) continue;
+      if (real.src) el.setAttribute('src', real.src);
+      if (real.poster) el.setAttribute('poster', real.poster);
+    }
+  }
+
   function show(lang) {
     const v = versions[lang];
     if (!v || lang === current) return;
 
     target.innerHTML = v.html;
+    // Before anything else touches the new nodes, and in the same tick, so a
+    // lazy image never gets the chance to request the authored path.
+    relinkMedia(target);
     document.documentElement.lang = v.lang;
     document.title = v.title;
     setMeta('description', v.description);

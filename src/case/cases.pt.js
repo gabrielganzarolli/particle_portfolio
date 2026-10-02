@@ -207,12 +207,7 @@ export const CASES_PT = {
       'Handoff e acompanhamento do desenvolvimento',
     ],
 
-    outcomes: [
-      'De avaliação positiva dos clientes',
-      'Clientes impactados',
-      'Em venda de produtos financeiros para esse público',
-      'Em reclamações no atendimento',
-    ],
+    // No outcomes: the case does not carry figures any more.
 
     overview: [
       'Um espaço dedicado dentro do app do Itaú onde o aposentado vincula e acompanha seus benefícios financeiros em um lugar só. Cliente aposentado costuma equilibrar várias fontes de renda — aposentadoria do INSS, pensão por morte, auxílio por afastamento —, cada uma vivendo num canal diferente, com suas próprias datas e regras. Para um público que valoriza estabilidade acima de tudo, não saber o que entra e quando é uma fonte constante de ansiedade.',
