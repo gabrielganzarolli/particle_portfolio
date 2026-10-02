@@ -248,15 +248,21 @@ export const CASES = [
         placement: 'after-takeaway-01',
         width: 'full',
       },
-      // 04-how-it-works is deliberately not placed: it illustrated the
-      // compliance takeaway, and its caption carried that argument. With the
-      // chapter gone the image has nothing to support. The file is still in
-      // src/images/ if it earns a place back.
       {
         src: '05-progression.png',
         alt: 'Programme level and progress, and the recommended next activity',
         caption: 'Programme level and the next step — the slower progression under the weekly loop.',
         placement: 'after-takeaway-02',
+        width: 'full',
+      },
+      // Stands on its own after the chapters rather than under one of them:
+      // it illustrated the compliance takeaway, which is gone, so the caption
+      // describes what the screen shows instead of arguing the removed point.
+      {
+        src: '04-how-it-works.png',
+        alt: 'How the mechanic works, explained in the flow itself, and the headline draws',
+        caption: 'How the mechanic works, and the draws it feeds — the campaign explained in the flow itself.',
+        placement: 'closing',
         width: 'full',
       },
     ],
