@@ -13,12 +13,20 @@ import { CASES } from './cases.js';
  * up as a visual change.
  */
 
+import { UI } from './ui.js';
+
 const esc = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+
+// The label set for the page currently being rendered. Held at module scope
+// rather than threaded through a dozen functions: the build renders one page
+// at a time, start to finish, so there is never a second locale in flight.
+// renderCaseHtml sets it on entry.
+let ui = UI.en;
 
 /** Label in the left gutter, content in the right column. */
 const row = (label, body, className = '') =>
@@ -225,11 +233,11 @@ function hero(c, resolve) {
   const cover = image(c, 'after-cover', resolve, { hero: true }) || video(c, 'after-cover', resolve);
 
   const meta = [
-    ['Client', c.client],
-    ['Year', c.year],
-    ['Discipline', c.discipline],
-    ['Role', c.role],
-    ['Duration', c.duration],
+    [ui.client, c.client],
+    [ui.year, c.year],
+    [ui.discipline, c.discipline],
+    [ui.role, c.role],
+    [ui.duration, c.duration],
   ]
     // Each pair is wrapped so it stays together as one grid cell. Loose dt/dd
     // children flow independently and split across rows once the column
@@ -282,9 +290,9 @@ function compare(c, resolve) {
     // Rendered with its resting value so the control is complete and operable
     // before any script runs.
     `<button type="button" class="compare-handle" role="slider" ` +
-    `aria-label="${esc(`Compare ${lb.toLowerCase()} and ${la.toLowerCase()}`)}" ` +
+    `aria-label="${esc(ui.compare(lb.toLowerCase(), la.toLowerCase()))}" ` +
     `aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" ` +
-    `aria-valuetext="${esc(`50% ${lb.toLowerCase()}, 50% ${la.toLowerCase()}`)}" ` +
+    `aria-valuetext="${esc(ui.compareValue(lb.toLowerCase(), la.toLowerCase()))}" ` +
     `aria-orientation="horizontal"></button>` +
     `</div>` +
     (spec.caption ? `<figcaption>${esc(spec.caption)}</figcaption>` : '') +
@@ -316,7 +324,7 @@ function outcomes(c) {
     )
     .join('');
 
-  return row('Outcomes', `<div class="outcomes">${cells}</div>`);
+  return row(ui.outcomes, `<div class="outcomes">${cells}</div>`);
 }
 
 const prose = (paras) =>
@@ -337,7 +345,7 @@ function takeaways(c, resolve) {
     )
     .join('');
 
-  let out = row(`${list.length} takeaways`, `<ol class="takeaway-index">${index}</ol>`, 'row-index');
+  let out = row(ui.takeaways(list.length), `<ol class="takeaway-index">${index}</ol>`, 'row-index');
 
   for (const t of list) {
     const sections = (t.sections ?? [])
@@ -416,7 +424,7 @@ function getInTouch(c) {
     : '';
 
   return row(
-    'Get in touch',
+    ui.getInTouch,
     `<div class="contact"><p class="contact-text reveal">${esc(g.text)}</p>${button}</div>`,
     'row-contact'
   );
@@ -472,24 +480,32 @@ function more(current) {
     )
     .join('');
 
-  return row('More work', `<ol class="more-list">${items}</ol>`, 'row-more');
+  return row(ui.moreWork, `<ol class="more-list">${items}</ol>`, 'row-more');
 }
 
-/** The full contents of the #case container, as a string. */
-export function renderCaseHtml(c, resolve) {
+/**
+ * The full contents of the #case container, as a string.
+ *
+ * `lang` picks the label set only. The case prose comes from whichever object
+ * is passed as `c` — the caller hands over the English or the Portuguese entry
+ * and the two must agree, which build-cases.mjs checks before getting here.
+ */
+export function renderCaseHtml(c, resolve, lang = 'en') {
+  ui = UI[lang] ?? UI.en;
+
   // Page order is fixed by the brief; images sit between sections rather than
   // inside them, so they run the full width of the container.
   const body = [
     compare(c, resolve),
-    listRow('What I did', c.whatWeDid),
+    listRow(ui.whatWeDid, c.whatWeDid),
     outcomes(c),
-    row('Overview', prose(c.overview)),
+    row(ui.overview, prose(c.overview)),
     media(c, 'after-overview', resolve),
     takeaways(c, resolve),
     notes(c, resolve),
     media(c, 'closing', resolve),
     group(c, resolve),
-    listRow('What made it work', c.whatMadeItWork),
+    listRow(ui.whatMadeItWork, c.whatMadeItWork),
     getInTouch(c),
     more(c),
   ].join('');

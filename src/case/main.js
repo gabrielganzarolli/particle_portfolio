@@ -1,6 +1,7 @@
 import './case.css';
 import { attachCompare } from './compare.js';
 import { attachVideos } from './video.js';
+import { attachLangToggle } from './i18n.js';
 
 /**
  * Interactive behaviour only. The case text and images are already in the HTML
@@ -57,3 +58,16 @@ if (reducedMotion || !('IntersectionObserver' in window)) {
     io.disconnect();
   }, 1200);
 }
+
+// Switching language replaces everything inside #case, which throws away the
+// elements the observer above was watching and the handlers the sliders and
+// clips were bound to. Rebind them, and show the new content outright rather
+// than observing it: the reader is already partway down a page they have read,
+// so fading paragraphs back in would animate text that never went away.
+attachLangToggle({
+  onSwap(root) {
+    for (const el of root.querySelectorAll('.reveal')) el.classList.add('is-in');
+    attachCompare();
+    attachVideos();
+  },
+});

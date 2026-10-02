@@ -15,7 +15,10 @@ import { resolve as resolvePath, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CASES } from '../src/case/cases.js';
+import { CASES_PT } from '../src/case/cases.pt.js';
+import { applyTranslation, translationIssues } from '../src/case/merge.js';
 import { renderCaseHtml } from '../src/case/renderHtml.js';
+import { UI, HTML_LANG } from '../src/case/ui.js';
 
 const root = resolvePath(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -77,11 +80,26 @@ const esc = (v) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-const page = (c, content) => {
+const page = (c, content, pt) => {
   const title = `${c.title} — Gabriel Ganzarolli`;
   const description = c.description ?? c.headline;
   const url = `${SITE_URL}/work/${c.slug}.html`;
   const ogImage = `${SITE_URL}/og/${c.slug}.png`;
+
+  // The Portuguese page, carried as data rather than as a second set of
+  // elements. Duplicating the markup and hiding one copy with CSS looked
+  // simpler until the reveal animation: src/case/main.js snapshots `.reveal`
+  // once at load and unobserves each element after it fires, so the hidden
+  // copy would be left outside that cycle and could stay invisible after a
+  // switch. One DOM, swapped on demand, has no such failure.
+  //
+  // `<` is escaped so the markup inside cannot close this script element.
+  const ptPayload = pt
+    ? `\n    <script type="application/json" id="i18n-pt">${JSON.stringify(pt).replace(
+        /</g,
+        '\\u003c'
+      )}</script>`
+    : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -119,16 +137,21 @@ const page = (c, content) => {
        Edit the case data, not this file. -->
   <body data-case="${esc(c.slug)}">
     <nav class="case-nav">
-      <a class="home" href="../index.html">Gabriel Ganzarolli</a>
-      <a href="../index.html#work">All work</a>
+      <a class="home" href="../index.html">${esc(UI.en.home)}</a>
+      <a href="../index.html#work" data-i18n="allWork">${esc(UI.en.allWork)}</a>
+      ${
+        pt
+          ? `<button type="button" class="lang-toggle" data-lang-toggle>${esc(UI.en.switchTo)}</button>`
+          : ''
+      }
     </nav>
 
     <div id="case">${content}</div>
 
     <footer class="case-foot">
-      <p>Gabriel Ganzarolli — São Paulo</p>
-      <a href="../index.html">Back to the work</a>
-    </footer>
+      <p>${esc(UI.en.footer)}</p>
+      <a href="../index.html" data-i18n="backToWork">${esc(UI.en.backToWork)}</a>
+    </footer>${ptPayload}
 
     <script type="module" src="/src/case/main.js"></script>
   </body>
@@ -137,13 +160,52 @@ const page = (c, content) => {
 };
 
 let written = 0;
+const untranslated = [];
+const problems = [];
+
 for (const c of CASES) {
-  const content = renderCaseHtml(c, makeResolver(c.slug));
-  writeFileSync(resolvePath(root, 'work', `${c.slug}.html`), page(c, content), 'utf8');
+  const resolver = makeResolver(c.slug);
+  const content = renderCaseHtml(c, resolver, 'en');
+
+  const overlay = CASES_PT[c.slug];
+  if (!overlay) untranslated.push(c.slug);
+
+  for (const issue of translationIssues(c, overlay)) {
+    problems.push(`${c.slug}: ${issue}`);
+  }
+
+  // Everything the switch has to replace, rendered once here rather than
+  // reconstructed in the browser: the body, the two strings in <head> that a
+  // tab and a shared link show, and the labels outside #case.
+  const pt = overlay
+    ? {
+        html: renderCaseHtml(applyTranslation(c, overlay), resolver, 'pt'),
+        title: `${applyTranslation(c, overlay).title} — Gabriel Ganzarolli`,
+        description: overlay.description ?? c.description ?? c.headline,
+        lang: HTML_LANG.pt,
+        ui: { allWork: UI.pt.allWork, backToWork: UI.pt.backToWork, switchTo: UI.pt.switchTo },
+        en: {
+          title: `${c.title} — Gabriel Ganzarolli`,
+          description: c.description ?? c.headline,
+          lang: HTML_LANG.en,
+          ui: { allWork: UI.en.allWork, backToWork: UI.en.backToWork, switchTo: UI.en.switchTo },
+        },
+      }
+    : null;
+
+  writeFileSync(resolvePath(root, 'work', `${c.slug}.html`), page(c, content, pt), 'utf8');
   written++;
 }
 
 console.log(`build-cases: wrote ${written} page(s)`);
+if (untranslated.length) {
+  console.log(
+    `build-cases: ${untranslated.length} case(s) still English-only: ${untranslated.join(', ')}`
+  );
+}
+if (problems.length) {
+  console.log(`build-cases: translation problems:\n  ${problems.join('\n  ')}`);
+}
 if (missing.length) {
   console.log(`build-cases: ${missing.length} image(s) not found:\n  ${missing.join('\n  ')}`);
 }

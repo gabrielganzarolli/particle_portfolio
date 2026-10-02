@@ -78,6 +78,33 @@ a {
   color: var(--ink);
 }
 
+/* Pushes itself and the language button to the right edge, leaving the name on
+   the left. Without this the three items space out evenly and the middle one
+   floats in the centre of the bar. */
+.case-nav [data-i18n='allWork'] {
+  margin-left: auto;
+}
+
+/* Reads as the nav's third link rather than as a control: same size, spacing
+   and colour, with the button chrome taken off. */
+.lang-toggle {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.lang-toggle:hover,
+.lang-toggle:focus-visible {
+  color: var(--ink);
+}
+
 /* Hero ------------------------------------------------------------------- */
 
 /* Gutter, text, image. The eyebrow keeps its gutter, the type keeps the
