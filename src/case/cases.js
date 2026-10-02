@@ -133,15 +133,9 @@ export const CASES = [
       'Executive review and handoff to build',
     ],
 
-    // Lift shows up at the decision points rather than in the form, which is
-    // what a sequence and language change does.
-    outcomes: [
-      { prefix: '+', value: '24', unit: '%', caption: 'Conversion from landing page to account application' },
-      { prefix: '+', value: '31', unit: '%', caption: 'Completion on the in-app account resumption step' },
-      { value: '19', unit: '%', caption: 'Of profiles declined for the premium card took the Signature' },
-      // No duration figure here: "3 weeks" set at this size wraps to two lines
-      // and it is already stated in the hero meta row.
-    ],
+    // No outcomes block. The lift figures this case used to show were removed
+    // by request; the renderer drops the whole section when there are none,
+    // rather than printing a label over empty space.
 
     overview: [
       'The brief was to raise conversion on account opening for Uniclass, Itaú’s mid-income segment. The strategy was to enter through the credit card instead: the premium card was what people were shopping for, the account was what the bank needed them to leave with. One journey, two products, with a fallback offer for anyone whose credit profile did not clear the premium tier.',
@@ -668,14 +662,17 @@ export const CASES = [
       'Handoff and build support',
     ],
 
-    // Staged, not live — see the [[ confirmar ]] above this case. Three real
-    // numbers and this becomes a section; until then the page is honest about
-    // having none.
-    // outcomes: [
-    //   { value: '?', unit: '%', caption: 'Reduction in client questions managers could not answer' },
-    //   { value: '?', caption: 'Managers using the console, or rollout scope' },
-    //   { value: '?', caption: 'Change in time to resolve a “why did I lose this benefit” conversation' },
-    // ],
+    // Live at last: read off the internal results deck for the platform.
+    //
+    //   [[ confirmar ]]  The fourth card on that slide reports a drop in
+    //                    escalation to second-level support. The figure under
+    //                    it is obscured by glare in the photo, so the claim is
+    //                    stated without a number rather than guessed at.
+    outcomes: [
+      { prefix: '+', value: '81', unit: 'K', caption: 'Views of the step history, around 2,300 a day' },
+      { value: '7', unit: 'd', caption: 'The old wait for an answer, now given live at the desk' },
+      { value: '12', unit: 'K', caption: 'Hours of support work removed in 2026' },
+    ],
 
     overview: [
       'An internal console that shows a branch manager where a client stands in Minhas Vantagens, the bank’s relationship programme. Before it existed, managers had no view of the programme at all: when a client asked why a benefit had gone, the manager had to ask the client to explain their own account.',
@@ -714,6 +711,16 @@ export const CASES = [
             ],
           },
         ],
+      },
+    ],
+
+    // Stated plainly and no further: the award's name is known, its categories
+    // and criteria are not, and a portfolio is the wrong place to pad a
+    // credential with detail nobody checked.
+    notes: [
+      {
+        title: 'Recognition',
+        body: 'The Minhas Vantagens platform won Itubers Transformam, an award at Itaú.',
       },
     ],
 

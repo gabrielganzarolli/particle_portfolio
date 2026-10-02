@@ -7,6 +7,8 @@ import { readyFonts } from './textTargets.js';
 import { backgroundOf } from './palette.js';
 import { hidePreloader, showFatal } from './overlay.js';
 import { createScrollWork } from './scrollWork.js';
+import { storedLang, applyHomeLang, attachHomeToggle } from './homeI18n.js';
+import { PHRASES as ALL_PHRASES } from './home.pt.js';
 
 const FOV = 50;
 const FIELD_WIDTH = 10;
@@ -28,7 +30,15 @@ const REST = 0;
 const HOVER = 1;
 const WORK = 2;
 const ABOUT = 3;
-const PHRASES = ['GABRIEL GANZAROLLI', 'PRODUCT DESIGNER', 'WORK', 'ABOUT ME'];
+// Language is settled before anything is built. The field rasterises each
+// phrase into a texture at construction, so picking the wrong set here would
+// mean rebuilding it later; reading the stored choice first avoids that
+// entirely, and a returning visitor never sees the other language flash past.
+const lang = storedLang() ?? 'en';
+applyHomeLang(lang);
+attachHomeToggle(lang);
+
+const PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
 
 // The phrases scroll walks through, in order. Scroll position maps to a single
 // scalar over this chain: 0..1 is REST -> WORK, 1..2 is WORK -> ABOUT. Because

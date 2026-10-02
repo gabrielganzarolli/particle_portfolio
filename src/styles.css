@@ -390,3 +390,32 @@ main {
     transition: none;
   }
 }
+
+/* Language switch ---------------------------------------------------------
+   The home page has no nav bar to sit in, and the whole page is one long
+   scroll over a fixed canvas — so the control is fixed to the corner rather
+   than placed in the flow, where it would scroll away and never come back.
+   Above the solid sections, which lift themselves over the canvas. */
+.lang-toggle-fixed {
+  position: fixed;
+  top: 1.25rem;
+  right: var(--edge, 1.5rem);
+  z-index: 20;
+
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0.25rem;
+  margin: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(244, 236, 220, 0.55);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.lang-toggle-fixed:hover,
+.lang-toggle-fixed:focus-visible {
+  color: rgba(244, 236, 220, 0.95);
+}
