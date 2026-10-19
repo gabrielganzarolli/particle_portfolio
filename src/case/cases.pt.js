@@ -117,11 +117,11 @@ export const CASES_PT = {
     duration: 'Campanha de 12 semanas',
 
     whatWeDid: [
-      'Design da mecânica de jogo com produto, engenharia e o parceiro de sorteio',
+      'Design da mecânica do jogo, com produto, engenharia e a empresa parceira dos sorteios',
       'Pesquisa de gamification sobre o que faz alguém voltar a um jogo',
       'Design de interação do giro semanal, das missões e das jornadas de prêmio',
       'Design de conteúdo junto do jurídico, transformando compliance em linguagem direta',
-      'Coordenação entre jurídico, marketing, engenharia e os times de marca',
+      'Coordenação entre jurídico, marketing, engenharia e marca',
       'Apresentações para superintendência e diretoria até o lançamento',
     ],
 
@@ -151,6 +151,17 @@ export const CASES_PT = {
       },
       {
         title: 'Emprestado de jogos, não de cassinos',
+        // Os números ficam como estão; só o rótulo é traduzido. O índice
+        // externo acompanha as seções do takeaway, o interno cada figura.
+        stats: [
+          [
+            'Visualizações de tela, em 50 minutos',
+            'Total de requisições, em 50 minutos',
+            'Requisições por segundo, em 50 minutos',
+            'Pico em uma janela de 3 minutos (21:40)',
+            'Adesões em menos de uma hora, na marca das 4h',
+          ],
+        ],
         body: [
           'Estudamos o que faz as pessoas voltarem a um jogo: um ritmo semanal, uma recompensa imediata e uma progressão mais lenta por baixo. Nível no programa significava mais números da sorte, então o cliente antigo via sua relação refletida nas próprias chances.',
           'Lançar para a base inteira de uma vez significava um pico, não uma curva. O que carrega primeiro, o que pode esperar, o que o cliente vê quando algo demora — tudo resolvido com engenharia e marketing antes. A plataforma aguentou. O alcance das comunicações da campanha chegou a 19,7MM, e a adesão veio em cerca de dez vezes o benchmark interno anterior.',

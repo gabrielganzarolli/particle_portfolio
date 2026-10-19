@@ -65,13 +65,25 @@ export function applyTranslation(en, pt) {
       return {
         ...t,
         title: pick(src.title, t.title),
-        sections: t.sections?.map((s) => {
-          if (!paras) return s;
+        sections: t.sections?.map((s, j) => {
+          // A section can carry compact figures under its prose. Only the
+          // label is translated — the figure is the measurement.
+          const stats = s.stats?.map((st, k) => ({
+            ...st,
+            label: pick(src.stats?.[j]?.[k], st.label),
+          }));
+
+          if (!paras) return stats ? { ...s, stats } : s;
+
           const body = paras.slice(taken, taken + s.body.length);
           taken += s.body.length;
           // Short translation: keep English for the paragraphs it did not reach,
           // rather than dropping them off the page.
-          return { ...s, body: body.length === s.body.length ? body : s.body };
+          return {
+            ...s,
+            body: body.length === s.body.length ? body : s.body,
+            ...(stats ? { stats } : {}),
+          };
         }),
       };
     }),
@@ -151,6 +163,23 @@ export function translationIssues(en, pt) {
   if (ptOut && ptOut !== enOut) {
     issues.push(`${ptOut} outcome captions translated but the case has ${enOut}`);
   }
+
+  // Stats sit two levels down, inside a takeaway's sections, and are easy to
+  // add to the English case without noticing the translation needs them too —
+  // which is exactly how they shipped untranslated the first time.
+  (en.takeaways ?? []).forEach((t, i) => {
+    (t.sections ?? []).forEach((s, j) => {
+      if (!s.stats?.length) return;
+      const translated = pt.takeaways?.[i]?.stats?.[j];
+      if (!translated) {
+        issues.push(`takeaway ${t.index} section ${j}: ${s.stats.length} stat label(s) not translated`);
+      } else if (translated.length !== s.stats.length) {
+        issues.push(
+          `takeaway ${t.index} section ${j}: ${translated.length} stat labels translated but there are ${s.stats.length}`
+        );
+      }
+    });
+  });
 
   return issues;
 }
