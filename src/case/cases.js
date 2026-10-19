@@ -117,7 +117,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '05',
+        index: '01',
         title: 'Rewarding, never wagering',
         sections: [
           {
@@ -129,22 +129,13 @@ export const CASES = [
         ],
       },
       {
-        index: '01',
+        index: '02',
         title: 'Borrowed from games, not from casinos',
         sections: [
           {
             body: [
               'We studied what brings people back to a game: a weekly rhythm, an immediate reward, and a slower progression underneath. Level in the programme meant more lucky numbers, so a long-standing customer saw their relationship reflected in their odds.',
               'Launching to the whole base at once meant a spike, not a curve. What loads first, what can wait, what a customer sees when something is slow — settled with engineering and marketing ahead of time. The platform held. Reach on campaign communications ran to 19.7MM, and enrolment came in at roughly ten times the previous internal benchmark.',
-            ],
-            // Compact figures rather than the big numerals used for Outcomes:
-            // these are evidence for the point above, not headline results.
-            stats: [
-              { value: '18×', label: 'Screen views, within 50 minutes' },
-              { value: '4.8×', label: 'Total requests, within 50 minutes' },
-              { value: '5×', label: 'Requests per second, within 50 minutes' },
-              { value: '3–3.8×', label: 'Peak burst in a 3-minute window (21:40)' },
-              { value: '13×', label: 'Opt-ins in under an hour, at the 4h mark' },
             ],
           },
         ],
@@ -220,7 +211,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '05',
+        index: '01',
         title: 'The question was pointed the wrong way',
         sections: [
           {
@@ -231,7 +222,7 @@ export const CASES = [
         ],
       },
       {
-        index: '01',
+        index: '02',
         title: 'Loss is the part people ask about',
         sections: [
           {
@@ -242,7 +233,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '03',
         title: 'An abstract programme priced in steps',
         sections: [
           {
@@ -343,7 +334,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '05',
+        index: '01',
         title: 'A number nobody has memorised',
         sections: [
           {
@@ -354,7 +345,7 @@ export const CASES = [
         ],
       },
       {
-        index: '01',
+        index: '02',
         title: 'Nobody has exactly one benefit',
         sections: [
           {
@@ -365,7 +356,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '03',
         title: 'Saying “wait” without losing anyone',
         sections: [
           {
@@ -500,7 +491,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '05',
+        index: '01',
         title: 'People do not read at an ATM',
         sections: [
           {
@@ -512,7 +503,7 @@ export const CASES = [
         ],
       },
       {
-        index: '01',
+        index: '02',
         title: 'Complexity does not need more steps',
         sections: [
           {
@@ -524,7 +515,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '03',
         title: 'A system built to be built',
         sections: [
           {
@@ -680,7 +671,7 @@ export const CASES = [
 
     takeaways: [
       {
-        index: '05',
+        index: '01',
         title: 'Selling the reason, not the process',
         sections: [
           {
@@ -691,7 +682,7 @@ export const CASES = [
         ],
       },
       {
-        index: '01',
+        index: '02',
         title: 'A decline that keeps the customer',
         sections: [
           {
@@ -702,7 +693,7 @@ export const CASES = [
         ],
       },
       {
-        index: '02',
+        index: '03',
         title: 'Structure outperformed style',
         sections: [
           {

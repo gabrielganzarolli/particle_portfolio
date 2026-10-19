@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CASES } from '../src/case/cases.js';
 import { CASES_PT } from '../src/case/cases.pt.js';
-import { applyTranslation, translationIssues } from '../src/case/merge.js';
+import { applyTranslation, translationIssues, caseIssues } from '../src/case/merge.js';
 import { renderCaseHtml } from '../src/case/renderHtml.js';
 import { UI, HTML_LANG } from '../src/case/ui.js';
 
@@ -173,6 +173,10 @@ for (const c of CASES) {
 
   const overlay = CASES_PT[c.slug];
   if (!overlay) untranslated.push(c.slug);
+
+  for (const issue of caseIssues(c)) {
+    problems.push(`${c.slug}: ${issue}`);
+  }
 
   for (const issue of translationIssues(c, overlay)) {
     problems.push(`${c.slug}: ${issue}`);

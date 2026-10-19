@@ -183,3 +183,40 @@ export function translationIssues(en, pt) {
 
   return issues;
 }
+
+/**
+ * Problems inside one case, regardless of language.
+ *
+ * Media is attached to a chapter by name — `after-takeaway-02` — and the
+ * renderer resolves that with `.find()`, so a placement naming a chapter that
+ * does not exist renders nothing and says nothing. A renumbering bug once
+ * shifted every takeaway index in the file and three cases silently lost a
+ * figure each; it survived several commits and a deploy because nothing ever
+ * looked. This is that check.
+ */
+export function caseIssues(c) {
+  const issues = [];
+  const indices = (c.takeaways ?? []).map((t) => t.index);
+
+  const expected = indices.map((_, i) => String(i + 1).padStart(2, '0'));
+  if (indices.join() !== expected.join()) {
+    issues.push(`takeaway indices are ${indices.join(', ')} — expected ${expected.join(', ')}`);
+  }
+
+  const chapters = new Set(indices.map((i) => `after-takeaway-${i}`));
+  const placements = [
+    ...(c.images ?? []),
+    ...(c.videos ?? []),
+    ...(c.compareVideos ?? []),
+    c.gif,
+  ].filter(Boolean);
+
+  for (const m of placements) {
+    const p = m.placement;
+    if (p?.startsWith('after-takeaway-') && !chapters.has(p)) {
+      issues.push(`"${m.src ?? m.a}" is placed at ${p}, which no takeaway provides`);
+    }
+  }
+
+  return issues;
+}
