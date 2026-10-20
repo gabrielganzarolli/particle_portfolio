@@ -45,9 +45,19 @@ export function applyTranslation(en, pt) {
     whatMadeItWork: pick(pt.whatMadeItWork, en.whatMadeItWork),
     overview: pick(pt.overview, en.overview),
 
-    // Only the caption is translated. The figure itself, its prefix and unit
-    // are the measurement and stay as they are.
-    outcomes: en.outcomes?.map((o, i) => ({ ...o, caption: pick(pt.outcomes?.[i], o.caption) })),
+    // Usually only the caption is translated: a figure, its prefix and its
+    // unit are the measurement and read the same in both languages.
+    //
+    // The exception is a result that is a word rather than a quantity — "a
+    // wait that disappeared" has no number — and a word does need
+    // translating. So an entry may be a bare string, which is the caption, or
+    // `{ value, caption }` when the figure itself is language.
+    outcomes: en.outcomes?.map((o, i) => {
+      const src = pt.outcomes?.[i];
+      if (src == null) return o;
+      if (typeof src === 'string') return { ...o, caption: src };
+      return { ...o, value: pick(src.value, o.value), caption: pick(src.caption, o.caption) };
+    }),
 
     // `index` comes from English, so the chapter numbering and the media
     // placements that point at it cannot come apart.
