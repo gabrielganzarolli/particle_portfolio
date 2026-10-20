@@ -201,9 +201,10 @@ export const CASES = [
     //                    stated without a number rather than guessed at.
     outcomes: [
       { prefix: '+', value: '81', unit: 'K', caption: 'Views of the step history, around 2,300 a day' },
-      // Seven days was the ceiling, not the typical wait — the caption says so,
-      // rather than the figure carrying a ≤ that reads as a spreadsheet.
-      { value: '7', unit: 'd', caption: 'The longest a client waited for an answer, now given at the desk' },
+      // Seven days was the ceiling, not the typical wait. "Could take" carries
+      // that without the figure needing a ≤, which reads as a spreadsheet, and
+      // without the caption turning into measurement-speak.
+      { value: '7', unit: 'd', caption: 'What an answer could take, now given at the desk' },
       { value: '12', unit: 'K', caption: 'Hours of support work removed in 2026' },
     ],
 
