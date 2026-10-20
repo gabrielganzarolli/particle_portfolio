@@ -352,6 +352,7 @@ export const CASES_PT = {
 
     outcomes: [
       'Acessos ao histórico de passos, cerca de 2,3 mil por dia',
+      'A espera antiga por uma resposta, agora dada na hora na mesa',
       'Horas de atendimento desoneradas em 2026',
     ],
 
