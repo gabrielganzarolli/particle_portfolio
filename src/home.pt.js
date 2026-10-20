@@ -29,7 +29,7 @@ export const HOME_PT = {
 
   aboutMe: 'Sobre mim',
 
-  lede: 'Sou product designer sênior em São Paulo, no Itaú Unibanco — um dos maiores bancos da América Latina. Sete anos de casa, entre produtos digitais e físicos.',
+  lede: 'Sou product designer sênior em São Paulo, no Itaú Unibanco — um dos maiores bancos da América Latina. Cinco anos de casa, entre produtos digitais e físicos.',
 
   about1:
     'Desenho jornadas de alto volume: aquisição de clientes, canais de atendimento e programas de relacionamento. Na prática isso quer dizer abertura de conta e pedido de cartão de crédito, mecânicas de gamification para o programa de relacionamento do banco, e pesquisa sobre as barreiras de acessibilidade que aposentados do INSS encontram ao usar produtos financeiros. Trabalho regulado, com o compliance na sala desde o começo e não no fim.',
