@@ -393,4 +393,107 @@ export const CASES_PT = {
       button: 'Me pergunta sobre isso',
     },
   },
+
+  'mercado-play-recommendations': {
+    title: 'Indicações no Mercado Play',
+    headline: 'Nenhuma indicação de quem você confia se perde',
+    description:
+      'Um projeto de estudo sobre o Mercado Play: dar às indicações de amigos e família um lugar no app, da sugestão até o retorno.',
+    tag: 'Projeto de estudo',
+    discipline: 'Product design',
+    role: 'Product designer',
+
+    compare: {
+      labelBefore: 'Antes',
+      labelAfter: 'Depois',
+      alt: 'A home do Mercado Play',
+      caption:
+        'A home antes e depois. O catálogo deixa de ser dividido por preço, o destaque fica menor e a primeira fileira pessoal aparece sem rolar.',
+    },
+
+    whatWeDid: [
+      'Recorte do problema a partir do modelo de negócio',
+      'Benchmark de streamings, games, redes sociais e apps de nicho',
+      'Crítica do app atual e protopersonas',
+      'Arquitetura de informação para celular e TV',
+      'Design de interação e de conteúdo, em alta fidelidade no Figma',
+      'Protótipo navegável e plano de validação',
+    ],
+
+    overview: [
+      'Um projeto de estudo sobre o Mercado Play, o streaming gratuito e com anúncios do Mercado Livre. A pergunta que me propus responder: como o app poderia aproveitar as indicações que as pessoas já trocam com amigos e família?',
+      'Comecei pelo app como ele é hoje. A home divide o catálogo por preço, nas abas Grátis e Premium. Um destaque ocupa quase metade da tela, os números do Top 10 somem no fundo claro e nada ali é pessoal: sem lista, sem continuar assistindo, sem navegação fixa. Compartilhar um título manda um link solto, e nada volta.',
+      'Enquanto isso, as pessoas indicam filmes umas para as outras o tempo todo, no WhatsApp e no almoço de domingo, muitas vezes descrevendo o filme em vez de dizer o nome. A indicação se perde entre quem sugere e quem assiste, e o app não dá a ninguém um motivo pessoal para abrir. Num catálogo pago por anúncios, menos sessões significam menos anúncios exibidos.',
+      'Por isso o projeto cabe numa frase: nenhuma indicação de quem você confia se perde. O que servia a essa frase ficou na primeira fase. O resto foi cortado ou foi para o roadmap, com a evidência de mercado por trás de cada decisão.',
+    ],
+
+    takeaways: [
+      {
+        title: 'Um lugar para a indicação chegar',
+        body: [
+          'Todos os streamings que analisei tratam compartilhar como uma saída: um link solto, e nada fica registrado para quem recebe. Aqui, Indicar fica ao lado de Salvar, logo abaixo do play. Você escolhe pessoas do seu círculo, escreve por que indica se quiser e envia pelo app ou pelo WhatsApp. Quem não tem conta recebe um link, e o título já está esperando depois do cadastro.',
+          'Do outro lado, o título chega com a origem: quem indicou, quando e o que disse. Ele aparece numa fileira da home e na TV, e fica em Meu Play com a identificação. Primeiro testei as indicações como um bloco em destaque na home. Ele competia com o conteúdo, então virou uma fileira comum, com o avatar do amigo no pôster como única diferença.',
+        ],
+      },
+      {
+        title: 'Um título que ninguém lembra',
+        body: [
+          'A cena que guiou o trabalho: o pai do Andrés indica filmes do jeito que quase todo mundo indica, descrevendo. “Aquele do Nolan sobre a bomba.” Andrés acaba no Google, procurando pelo ator e pela história. A indicação existia. O app não tinha onde recebê-la.',
+          'Por isso a busca aceita um print da conversa. O app lê a imagem no próprio aparelho, acha o título no catálogo e oferece Assistir e Salvar sem sair da busca. A imagem é descartada e só o título fica salvo. Dentro do Mercado Play, a câmera procura apenas filmes e séries. O app atual devolve produtos à venda quando você fotografa um pôster, e misturar a loja com o catálogo era parte do problema.',
+        ],
+      },
+      {
+        title: 'Um motivo para quem indica voltar',
+        body: [
+          'O desenho resolvia muito para quem recebe a indicação. A pergunta mais arriscada era por que alguém indicaria pelo app em vez do WhatsApp. A resposta é a única coisa que o WhatsApp não dá: saber que o outro assistiu.',
+          'A aba Amigos reúne o que você recebeu, o que você indicou e como isso chegou. “Andrés assistiu Interestelar, que você indicou”, com a reação dele e uma resposta de um toque que fecha a conversa sem transformar o app num mensageiro. Esse retorno é a premissa mais arriscada, então é a primeira que eu testaria: uma porta falsa que troca Compartilhar por Indicar e conta os toques, depois um teste A/B de sessões por usuário, com as notificações desativadas como guardrail.',
+        ],
+      },
+    ],
+
+    notes: [
+      {
+        title: 'O que eu cortei',
+        body: 'Assistir junto em tempo real: o Disney+ encerrou o GroupWatch em 2023 e o Prime Video tirou o Watch Party em 2024 por pouco uso, então virou um convite com data, na fase 2. O chat aberto virou uma conversa curta presa à indicação, também na fase 2. A atividade dos amigos em tempo real saiu, porque o que alguém assiste é mais íntimo do que o que ouve.',
+      },
+      {
+        title: 'Como trabalhei',
+        body: 'Cinco etapas curtas: entender, pesquisar, divergir e cortar, desenhar e propor a validação. A IA acelerou a pesquisa, a produção e a crítica, inclusive simulando revisões de design. O recorte, o escopo e as decisões de desenho foram meus, e cada número foi checado na fonte ou declarado como premissa.',
+      },
+    ],
+
+    prototype: {
+      title: 'Protótipo navegável do fluxo de indicações do Mercado Play',
+      caption:
+        'Indique Interestelar para o Andrés, abra o título que ele indicou, encontre um filme a partir de um print e veja em Amigos quem assistiu o quê.',
+      open: 'Abrir em tela cheia',
+    },
+
+    getInTouch: {
+      text: 'Posso te contar as decisões por trás dessas telas.',
+      button: 'Me pergunta sobre isso',
+    },
+
+    media: {
+      '01-home.jpg': {
+        alt: 'Home do Mercado Play no tema escuro, com uma fileira de títulos indicados por quem você conhece, cada pôster marcado com o avatar do amigo',
+      },
+      '02-recommend.jpg': {
+        alt: 'Página de um título com Salvar e Indicar abaixo do play, e a tela de indicar com contatos recentes, uma frase opcional e dois jeitos de enviar',
+        caption: 'Indicar fica ao lado de Salvar. Escolha as pessoas, diga por que se quiser e envie pelo app ou pelo WhatsApp.',
+      },
+      '05-saved-with-origin.jpg': {
+        alt: 'Um título indicado abrindo com a frase do Andrés, e Meu Play filtrado pelos indicados, cada um com quem indicou e quando',
+        caption: 'O título chega com quem indicou e o que disse, e continua identificado em Meu Play.',
+      },
+      '03-print-search.jpg': {
+        alt: 'A busca lendo no aparelho o print de uma conversa e depois oferecendo o filme encontrado com Assistir e Salvar',
+        caption: 'O print da conversa vira um título salvo. A imagem é lida no aparelho e descartada.',
+      },
+      '04-feedback.jpg': {
+        alt: 'A aba Amigos com um aviso de que o Andrés assistiu o filme indicado, a reação dele e uma resposta',
+        caption: 'A aba Amigos: o que você indicou, quem assistiu e uma resposta de um toque.',
+      },
+    },
+  },
 };

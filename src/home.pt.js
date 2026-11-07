@@ -26,6 +26,7 @@ export const HOME_PT = {
   c3: 'Hub do Aposentado',
   c4: 'Redesenho do caixa eletrônico',
   c5: 'Console do Minhas Vantagens',
+  c6: 'Indicações no Mercado Play',
 
   aboutMe: 'Sobre mim',
 

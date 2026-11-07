@@ -110,6 +110,23 @@ export function applyTranslation(en, pt) {
       button: pick(pt.getInTouch?.button, en.getInTouch.button),
     },
 
+    // The embedded prototype: words only, never the URLs.
+    prototype: en.prototype && {
+      ...en.prototype,
+      title: pick(pt.prototype?.title, en.prototype.title),
+      caption: pick(pt.prototype?.caption, en.prototype.caption),
+      open: pick(pt.prototype?.open, en.prototype.open),
+    },
+
+    // The before/after slider: labels and words only, never the files.
+    compare: en.compare && {
+      ...en.compare,
+      labelBefore: pick(pt.compare?.labelBefore, en.compare.labelBefore),
+      labelAfter: pick(pt.compare?.labelAfter, en.compare.labelAfter),
+      alt: pick(pt.compare?.alt, en.compare.alt),
+      caption: pick(pt.compare?.caption, en.compare.caption),
+    },
+
     images: en.images?.map((i) => ({
       ...i,
       alt: pick(m(i.src).alt, i.alt),

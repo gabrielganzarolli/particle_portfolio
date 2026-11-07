@@ -24,6 +24,7 @@ export const UI = {
     whatMadeItWork: 'What made it work',
     getInTouch: 'Get in touch',
     moreWork: 'More work',
+    prototype: 'Try the prototype',
 
     // Comparison slider, which is operable before any script runs and so needs
     // its accessible names written into the HTML.
@@ -55,6 +56,7 @@ export const UI = {
     whatMadeItWork: 'O que fez funcionar',
     getInTouch: 'Fale comigo',
     moreWork: 'Mais trabalhos',
+    prototype: 'Teste o protótipo',
 
     compare: (a, b) => `Comparar ${a} e ${b}`,
     compareValue: (a, b) => `50% ${a}, 50% ${b}`,

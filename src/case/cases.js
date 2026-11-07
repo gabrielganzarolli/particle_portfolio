@@ -160,7 +160,7 @@ export const CASES = [
   //                    as an honest gap. Supply the three numbers and uncomment.
   {
     slug: 'minhas-vantagens-console',
-    index: '02',
+    index: '04',
     title: 'Minhas Vantagens console',
     headline: 'The manager who had to ask the client',
     description:
@@ -276,7 +276,7 @@ export const CASES = [
     // content rather than boilerplate.
     description:
       'A space inside the Itaú app where retirees link and manage INSS benefits, pensions and allowances in one place instead of across separate channels.',
-    index: '03',
+    index: '05',
     title: 'Retiree Hub',
     headline: 'A unified space for financial benefits',
     tag: 'Banking',
@@ -397,7 +397,7 @@ export const CASES = [
     // content rather than boilerplate.
     description:
       'A full redesign of Itaú\'s ATM network and the design system built for it, for customers who cannot read a screen, see it, or aim precisely.',
-    index: '04',
+    index: '06',
     title: 'ATM redesign',
     headline: 'Rebuilding the ATM and its design system around accessibility',
     tag: 'Design system',
@@ -547,13 +547,9 @@ export const CASES = [
   //                    test. The caption says only that both were tested.
   {
     slug: 'uniclass-card-first-acquisition',
-    // Client work that cannot be shown. Every figure on this page is blurred
-    // by the stylesheet. See the note in renderHtml.js about what that does
-    // and does not protect: the files are still served as they are.
-    confidential: true,
     description:
       'Raising account-opening conversion at Itaú Uniclass by leading with the credit card people came for, and keeping customers a premium decline would have lost.',
-    index: '05',
+    index: '02',
     title: 'Uniclass card-first acquisition',
     // Still naming both products, but not as a swap performed on someone.
     // "The card they came for, the account they left with" described the same
@@ -612,7 +608,9 @@ export const CASES = [
         w: 742,
         h: 1376,
         alt: 'The approval screen for the premium card, showing the approved limit',
-        placement: 'after-takeaway-02',
+        // On its own, apart from the decline it used to sit beside: the
+        // finished journey in the conservative style the last chapter describes.
+        placement: 'after-takeaway-03',
         width: 'phone',
       },
       {
@@ -733,6 +731,158 @@ export const CASES = [
   //                    figures in the brief (customer counts, mission and spin
   //                    totals, the cross-campaign comparison) expose base size
   //                    and were meant for the NDA version only.
+
+  // ── STUDY PROJECT ────────────────────────────────────────────────────────
+  // Self-initiated, not client work: no `client` field, so the hero does not
+  // read as work done for Mercado Livre. Written from the project script and
+  // the Figma file (DP19LUhWp6dPzvG93SGaBx, page "0 · Protótipo navegável").
+  // Figures are composed from 3x Figma exports by scripts kept outside the
+  // repo, in estudos-claudecode/meli-case-assets (compose.py, compare.py).
+  // The "before" is a 402px print of the current app, upscaled.
+  {
+    slug: 'mercado-play-recommendations',
+    description:
+      'A study project on Mercado Play: giving recommendations from friends and family a place in the app, from the suggestion to the reply.',
+    index: '03',
+    title: 'Mercado Play recommendations',
+    headline: 'No recommendation from someone you trust gets lost',
+    tag: 'Study project',
+    year: '2026',
+    discipline: 'Product design',
+    role: 'Product designer',
+
+    // Before/after slider, shown in the hero position, as on the ATM case.
+    compare: {
+      before: '00a-home-before.jpg',
+      after: '00b-home-after.jpg',
+      labelBefore: 'Before',
+      labelAfter: 'After',
+      alt: 'The Mercado Play home screen',
+      caption:
+        'The home screen before and after. The catalogue is no longer split by price, the banner is smaller, and the first personal row shows without scrolling.',
+    },
+
+    images: [
+      {
+        src: '01-home.jpg',
+        alt: 'Mercado Play home in the dark theme, with a row of titles recommended by people you know, each poster marked with the friend’s avatar',
+        placement: 'after-cover',
+        width: 'full',
+      },
+      {
+        src: '02-recommend.jpg',
+        alt: 'A title page with Save and Recommend under the play button, and the recommend sheet with recent contacts, an optional note and two ways to send',
+        caption: 'Recommend sits next to Save. Pick people, say why if you want, send in the app or over WhatsApp.',
+        placement: 'after-overview',
+        width: 'full',
+      },
+      {
+        src: '05-saved-with-origin.jpg',
+        alt: 'A recommended title opening with Andrés’s note, and My Play filtered to recommended titles, each labelled with who sent it and when',
+        caption: 'The title arrives with who sent it and what they said, and stays labelled in My Play.',
+        placement: 'after-takeaway-01',
+        width: 'full',
+      },
+      {
+        src: '03-print-search.jpg',
+        alt: 'Search reading a screenshot of a chat on the device, then offering the film it found with Watch and Save',
+        caption: 'A screenshot of the conversation becomes a saved title. The image is read on the device and discarded.',
+        placement: 'after-takeaway-02',
+        width: 'full',
+      },
+      {
+        src: '04-feedback.jpg',
+        alt: 'The Friends tab with a banner saying Andrés watched the recommended film, his reaction and a reply',
+        caption: 'The Friends tab: what you sent, who watched it, and a one-tap reply.',
+        placement: 'after-takeaway-03',
+        width: 'full',
+      },
+    ],
+
+    whatWeDid: [
+      'Problem framing against the business model',
+      'Benchmark across streaming, games, social and niche apps',
+      'Critique of the current app and protopersonas',
+      'Information architecture for mobile and TV',
+      'Interaction and content design, high fidelity in Figma',
+      'Navigable prototype and a validation plan',
+    ],
+
+    overview: [
+      'A study project on Mercado Play, Mercado Livre’s free, ad-supported streaming service. The question I set out to answer: how could the app make use of the recommendations people already trade with friends and family?',
+      'I started from the app as it is. The home screen splits the catalogue by price, into Free and Premium tabs. A banner takes almost half the screen, the Top 10 numbers fade into the light background, and nothing on it is personal: no list, no continue watching, no fixed navigation. Sharing a title sends a loose link, and nothing comes back.',
+      'Meanwhile people recommend films to each other all the time, on WhatsApp and at dinner, often by describing them instead of naming them. The recommendation gets lost between the person who suggests and the person who watches, and the app gives nobody a personal reason to open it. For a catalogue paid for by ads, fewer sessions mean fewer ads served.',
+      'So the project fits in one line: no recommendation from someone you trust gets lost. What served that line stayed in the first phase. The rest was cut or moved to a roadmap, with market evidence behind each call.',
+    ],
+
+    takeaways: [
+      {
+        index: '01',
+        title: 'Giving the recommendation somewhere to land',
+        sections: [
+          {
+            body: [
+              'Every streaming app I studied treats sharing as a way out: a loose link, and nothing left behind for the person who gets it. Here Recommend sits next to Save, under the play button. You pick people from your circle, add a line on why if you want, and send it in the app or over WhatsApp. Someone without an account gets a link, and the title waits for them after sign-up.',
+              'On the other end, the title arrives with its origin: who sent it, when, and what they said. It shows up in a row on the home screen and on the TV, and stays in My Play, labelled. I first tried recommendations as a highlighted block on the home screen. It competed with the content, so it became an ordinary row, with the friend’s avatar on the poster as the only difference.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '02',
+        title: 'A title nobody remembers',
+        sections: [
+          {
+            body: [
+              'The scene that framed the work: Andrés’s father recommends films the way most people do, by describing them. “That Nolan one about the bomb.” Andrés ends up on Google, searching by actor and plot. The recommendation existed. The app had nowhere to receive it.',
+              'So search takes a screenshot of the conversation. The app reads it on the device, finds the title in the catalogue and offers Watch and Save without leaving search. The image is discarded and only the title is kept. Inside Mercado Play the camera looks for films and series only. The current app returns products for sale when you photograph a poster, and mixing the shop with the catalogue was part of the problem.',
+            ],
+          },
+        ],
+      },
+      {
+        index: '03',
+        title: 'A reason for the sender to come back',
+        sections: [
+          {
+            body: [
+              'The design did a lot for whoever receives a recommendation. The riskier question was why anyone would send one through the app instead of WhatsApp. The answer is the one thing WhatsApp cannot give: knowing the other person watched it.',
+              'The Friends tab holds what you received, what you sent and how it landed. “Andrés watched Interstellar, which you recommended”, with his reaction and a one-tap reply that closes the exchange without turning the app into a messenger. That return is the riskiest assumption, so it is the first I would test: a fake door that swaps Share for Recommend and counts taps, then an A/B test on sessions per user, with notification opt-outs as the guardrail.',
+            ],
+          },
+        ],
+      },
+    ],
+
+    notes: [
+      {
+        title: 'What I cut',
+        body: 'Watching together in real time: Disney+ ended GroupWatch in 2023 and Prime Video removed Watch Party in 2024 for low use, so it became a dated invitation in phase two. An open chat became a short thread tied to the recommendation, also phase two. Live friend activity was dropped, because what someone watches is more private than what they listen to.',
+      },
+      {
+        title: 'How I worked',
+        body: 'Five short stages: understand, research, diverge and cut, design, propose validation. AI sped up research, production and critique, including simulated design reviews. The framing, the scope and the design decisions were mine, and every figure was checked at the source or stated as an assumption.',
+      },
+    ],
+
+    // Figma prototype, page "0 · Protótipo navegável", starting on the home.
+    // Visitors only see it if the Figma file is shared by link.
+    prototype: {
+      embed:
+        'https://embed.figma.com/proto/DP19LUhWp6dPzvG93SGaBx/Mercado-Play?page-id=278%3A1072&node-id=278-1074&starting-point-node-id=278%3A1074&scaling=contain&content-scaling=fixed&hide-ui=1&embed-host=portfolio',
+      href: 'https://www.figma.com/proto/DP19LUhWp6dPzvG93SGaBx/Mercado-Play?page-id=278%3A1072&node-id=278-1074&starting-point-node-id=278%3A1074&scaling=contain&content-scaling=fixed&hide-ui=1',
+      title: 'Navigable prototype of the Mercado Play recommendations flow',
+      caption:
+        'Recommend Interstellar to Andrés, open the title he recommended, find a film from a screenshot, and see who watched what in Friends.',
+      open: 'Open full screen',
+    },
+
+    getInTouch: {
+      text: 'Happy to walk you through the decisions behind these screens.',
+      button: 'Ask me about it',
+      href: 'mailto:gabrielganza@gmail.com',
+    },
+  },
 ];
 
 export const bySlug = (slug) => CASES.find((c) => c.slug === slug);

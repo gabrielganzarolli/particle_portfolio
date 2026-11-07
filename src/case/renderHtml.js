@@ -345,6 +345,38 @@ function compare(c, resolve) {
   );
 }
 
+/**
+ * A live, embedded prototype (a Figma prototype embed URL). The iframe loads
+ * lazily, so the page does not pay for it until a reader scrolls near it, and
+ * the link under it opens the same prototype full screen in a new tab.
+ *
+ * The embed only works for viewers who can open the file: the Figma file has
+ * to be shared as "anyone with the link" for visitors to see anything.
+ */
+function prototype(c) {
+  const p = c.prototype;
+  if (!p?.embed) return '';
+  // A full-width panel like the other figures, not a row: in the narrow row
+  // column a portrait phone sat squeezed against one side.
+  return (
+    `<figure class="case-figure proto reveal">` +
+    `<div class="proto-stage">` +
+    `<figcaption class="proto-text">` +
+    `<span class="proto-label">${esc(ui.prototype)}</span>` +
+    (p.caption ? `<span class="proto-caption">${esc(p.caption)}</span>` : '') +
+    (p.href
+      ? `<a class="proto-open" href="${esc(p.href)}" target="_blank" rel="noopener">${esc(p.open ?? 'Open full screen')}</a>`
+      : '') +
+    `</figcaption>` +
+    `<div class="proto-frame">` +
+    `<iframe src="${esc(p.embed)}" title="${esc(p.title ?? c.title)}" ` +
+    `loading="lazy" allowfullscreen></iframe>` +
+    `</div>` +
+    `</div>` +
+    `</figure>`
+  );
+}
+
 const listRow = (label, items) =>
   items?.length
     ? row(label, `<ul class="did-list">${items.map((i) => `<li class="reveal">${esc(i)}</li>`).join('')}</ul>`)
@@ -513,7 +545,9 @@ function group(c, resolve) {
 }
 
 function more(current) {
-  const items = allCases.filter((c) => c.slug !== current.slug)
+  // In list order, by number, whatever order the cases sit in cases.js.
+  const items = [...allCases].sort((a, b) => a.index.localeCompare(b.index))
+    .filter((c) => c.slug !== current.slug)
     .map(
       (c) =>
         `<li class="more-item reveal">` +
@@ -549,6 +583,7 @@ export function renderCaseHtml(c, resolve, lang = 'en', all = CASES) {
     row(ui.overview, prose(c.overview)),
     media(c, 'after-overview', resolve),
     takeaways(c, resolve),
+    prototype(c),
     notes(c, resolve),
     media(c, 'closing', resolve),
     group(c, resolve),
