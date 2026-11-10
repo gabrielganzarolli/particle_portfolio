@@ -47,6 +47,19 @@ body {
   gap: 1rem;
 }
 
+/* The name and the language toggle are fixed over content that scrolls
+   beneath them. A short fade in the page colour behind them keeps the text
+   from running through the name. It sits inside the overlay's stacking
+   context, so it is above the scrolling content and below the name. */
+.overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--edge) * 2 + 1.5rem);
+  background: linear-gradient(var(--bg) 55%, rgba(7, 6, 12, 0));
+  z-index: -1;
+}
+
 .name {
   grid-column: 1;
   grid-row: 1;
@@ -251,6 +264,13 @@ main {
   .case-meta {
     grid-column: 2 / -1;
   }
+
+  /* Without a place of its own the year wrapped onto a third row under the
+     index. It keeps the title's row, at the right. */
+  .case-year {
+    grid-column: 3;
+    grid-row: 1;
+  }
 }
 
 .about-body {
@@ -398,8 +418,9 @@ main {
    Above the solid sections, which lift themselves over the canvas. */
 .lang-toggle-fixed {
   position: fixed;
-  top: 1.25rem;
-  right: var(--edge, 1.5rem);
+  /* Same top as the name: the overlay padding, minus this button's padding. */
+  top: calc(var(--edge, 1.5rem) - 0.25rem);
+  right: calc(var(--edge, 1.5rem) - 0.25rem);
   z-index: 20;
 
   appearance: none;

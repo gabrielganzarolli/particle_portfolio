@@ -64,6 +64,10 @@ a {
 }
 
 .case-nav a {
+  /* The type is 12px; the padding makes each link a 44px-tall target and the
+     negative margin gives the height back so the bar does not grow. */
+  padding-block: 0.9rem;
+  margin-block: -0.9rem;
   text-decoration: none;
   color: var(--ink-dim);
   transition: color 200ms ease;
@@ -1035,6 +1039,37 @@ a {
     gap: 0;
   }
 
+  /* The hero, image or not, is a single column here. `.is-textonly` sets
+     its own two-column template with higher specificity, and the cover kept
+     its `grid-column: 2` / `grid-row: span 3` from the wider layouts: in a
+     one-column grid that spawns an implicit second column and the image lands
+     on top of the title. Everything goes back to column 1, in flow, with the
+     cover after the headline and before the meta. */
+  .case-hero.is-textonly {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .case-eyebrow,
+  .case-hero .hero-media,
+  .case-hero .video-figure {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .case-eyebrow {
+    margin-bottom: 1.25rem;
+  }
+
+  .case-hero .hero-media,
+  .case-hero .video-figure {
+    order: 1;
+    margin-top: 2rem;
+  }
+
+  .case-hero .case-meta {
+    order: 2;
+  }
+
   .case-index,
   .case-title,
   .case-headline,
@@ -1138,6 +1173,18 @@ a {
 .case-video {
   transform: scale(calc(1 / var(--content-w, 1)));
   transform-origin: center center;
+  /* The scale enlarges the dark surround past the element's box. The frosted
+     version clipped it in its wrapper; without one it spilled over the page
+     and, on a phone, widened it sideways. This inset is in the element's own
+     coordinates, before the scale, so after scaling it lands exactly on the
+     original box. */
+  clip-path: inset(calc((1 - var(--content-w, 1)) * 50%) round calc(8px * var(--content-w, 1)));
+}
+
+/* Nothing in the body may widen the page sideways. `clip`, not `hidden`, so
+   no scroll container is created and the sticky row labels keep working. */
+.case-body {
+  overflow-x: clip;
 }
 
 /* Embedded prototype --------------------------------------------------------
