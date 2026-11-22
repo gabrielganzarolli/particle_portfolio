@@ -150,7 +150,7 @@ const page = (c, content, pt) => {
 
     <footer class="case-foot">
       <p>${esc(UI.en.footer)}</p>
-      <a href="../index.html" data-i18n="backToWork">${esc(UI.en.backToWork)}</a>
+      <a href="../index.html#work" data-i18n="backToWork">${esc(UI.en.backToWork)}</a>
     </footer>${ptPayload}
 
     <script type="module" src="/src/case/main.js"></script>

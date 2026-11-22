@@ -725,15 +725,21 @@ a {
   box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--ink);
 }
 
-/* Grows a little on hover, which also confirms it is the thing to grab. */
-.compare-handle::after,
-.compare-handle::before {
-  transition: transform 180ms ease, width 180ms ease, height 180ms ease;
+/* Grows a little on hover, which also confirms it is the thing to grab. Scaled
+   rather than resized, so the change stays on the compositor. 52/46 is the
+   size the knob used to grow to. */
+.compare-handle::after {
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .compare-frame:hover .compare-handle::after {
-  width: 52px;
-  height: 52px;
+  transform: translate(-50%, -50%) scale(1.13);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-handle::after {
+    transition: none;
+  }
 }
 
 .compare figcaption {
@@ -1005,13 +1011,13 @@ a {
    bundle turns into a blank page. */
 .js .reveal {
   opacity: 0;
-  transform: translate3d(0, 26px, 0);
-  /* Matches the home page: opacity runs longer and starts a beat later than the
-     movement, so the two don't land on the same frame. */
+  transform: translate3d(0, 18px, 0);
+  /* Matches the home page: both ramps decelerate from the first frame, and
+     opacity runs a little longer than the movement so the two don't land on
+     the same frame. */
   transition:
-    opacity 1500ms cubic-bezier(0.33, 0, 0.2, 1) 60ms,
-    transform 1250ms cubic-bezier(0.16, 0.62, 0.18, 1);
-  will-change: transform, opacity;
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .js .reveal.is-in {
@@ -1021,7 +1027,8 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .js .reveal {
-    transition: none;
+    transform: none;
+    transition: opacity 300ms ease-out;
   }
 }
 

@@ -2,15 +2,18 @@ uniform float uOpacity;
 
 varying vec3  vColor;
 varying float vSpeed;
+varying float vFocus;
 
 void main() {
-  // Soft round sprite — cheaper and crisper than sampling a texture.
+  // Squared falloff: a bright core and a soft edge, which bloom then picks up
+  // as glow instead of as a hard disc.
   float d = length(gl_PointCoord - vec2(0.5));
-  float a = smoothstep(0.5, 0.12, d);
-  if (a <= 0.002) discard;
+  if (d > 0.5) discard;
+  float a = smoothstep(0.5, 0.05, d);
+  a *= a;
 
   // Moving particles spark, so a transition visibly flares.
   vec3 col = vColor * (1.0 + clamp(vSpeed, 0.0, 4.0) * 0.42);
 
-  gl_FragColor = vec4(col, a * uOpacity);
+  gl_FragColor = vec4(min(col, vec3(1.6)), a * uOpacity * vFocus);
 }

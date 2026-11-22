@@ -8,7 +8,7 @@ import simPosition from './shaders/simPosition.frag?raw';
 import pointsVert from './shaders/points.vert?raw';
 import pointsFrag from './shaders/points.frag?raw';
 
-import { buildTarget, toDataTexture } from './textTargets.js';
+import { buildTarget, buildTargetInSlices, toDataTexture } from './textTargets.js';
 import { createPaletteTexture } from './palette.js';
 
 // No #include preprocessor here — the noise library is just concatenated in.
@@ -38,11 +38,22 @@ const DEFAULTS = {
   // ~2 device pixels per particle. Larger than that and 262k additive sprites
   // overdraw each other into a solid white slab with no letterforms left.
   pointSize: 0.008,
-  opacity: 0.62,
+  // Lower than the 0.62 this ran at before the bloom pass: the field now
+  // renders in linear light and is encoded on output, which lifts mid-tones,
+  // and the bloom adds its own glow on top.
+  opacity: 0.5,
   // Feature size of the hue field, in world units of ~1/colorScale. At 0.34 the
   // whole phrase fell inside one or two patches and read as flat tinting.
   colorScale: 1.1,
   colorSpread: 1.3,
+  // Screen-space fluid, in world units of push per texel-per-step of fluid
+  // velocity. The springs pull everything back, so this reads as a wave through
+  // the letterforms that settles rather than as a smear. Above ~12 a fast swipe
+  // tore the phrase apart into bright clumps.
+  fluidForce: 9.0,
+  // Depth of field. Particles away from the phrase's plane grow and dim, so
+  // anything flying in depth during a morph reads as out-of-focus light.
+  dof: 0.32,
 };
 
 export class ParticleField {
@@ -62,7 +73,7 @@ export class ParticleField {
     this.scene = new THREE.Scene();
 
     this.#buildTargets();
-    this.#buildCompute();
+    this.#buildCompute(opts.fluid);
     this.#buildPoints();
 
     // Invariant: at rest, morph is 0 and the field is showing indexA. `settle()`
@@ -75,28 +86,57 @@ export class ParticleField {
     this.#applyTargets();
   }
 
+  // Only the two phrases the top of the page needs are built up front. Each
+  // one rasterises a 2048×512 canvas and samples every particle from it, which
+  // is roughly 90ms of main thread apiece; building all four before the first
+  // frame was a 350ms stall behind the preloader. The rest are built in idle
+  // time by buildRemaining(), or on demand if scroll gets there first.
   #buildTargets() {
-    this.targets = [];
-    this.bounds = [];
-    let jitter = null;
+    this.targets = new Array(this.phrases.length).fill(null);
+    this.bounds = new Array(this.phrases.length).fill(null);
+    this.jitter = null;
 
-    for (const phrase of this.phrases) {
-      const { positions, jitter: j, bounds } = buildTarget(phrase, {
-        count: this.count,
-        fieldWidth: this.fieldWidth,
-      });
-      // Brightness is assigned once and travels with the particle. Re-rolling it
-      // per phrase would make the whole field flicker on every transition.
-      if (!jitter) jitter = j;
-      this.targets.push(toDataTexture(positions, this.size));
-      this.bounds.push(bounds);
-    }
+    this.#target(0);
+    this.#target(1);
 
-    this.jitter = jitter;
     this.firstPositions = this.targets[0].image.data;
   }
 
-  #buildCompute() {
+  #target(i) {
+    if (this.targets[i]) return this.targets[i];
+    const { positions, jitter, bounds } = buildTarget(this.phrases[i], {
+      count: this.count,
+      fieldWidth: this.fieldWidth,
+    });
+    this.#store(i, positions, jitter, bounds);
+    return this.targets[i];
+  }
+
+  #store(i, positions, jitter, bounds) {
+    // Brightness is assigned once and travels with the particle. Re-rolling it
+    // per phrase would make the whole field flicker on every transition.
+    if (!this.jitter) this.jitter = jitter;
+    this.targets[i] = toDataTexture(positions, this.size);
+    this.bounds[i] = bounds;
+  }
+
+  /**
+   * Build the phrases not needed at the top of the page in slices between
+   * frames. If scroll reaches one first, #target() builds it on the spot and
+   * the slower copy is dropped when it arrives.
+   */
+  async buildRemaining() {
+    for (let i = 0; i < this.phrases.length; i++) {
+      if (this.targets[i]) continue;
+      const { positions, jitter, bounds } = await buildTargetInSlices(this.phrases[i], {
+        count: this.count,
+        fieldWidth: this.fieldWidth,
+      });
+      if (!this.targets[i]) this.#store(i, positions, jitter, bounds);
+    }
+  }
+
+  #buildCompute(fluid) {
     const gpu = new GPUComputationRenderer(this.size, this.size, this.renderer);
     gpu.setDataType(THREE.FloatType);
 
@@ -104,10 +144,16 @@ export class ParticleField {
     const vel0 = gpu.createTexture();
 
     // Start as a loose cloud so the first formation is a visible gather rather
-    // than the phrase simply popping into existence.
+    // than the phrase simply popping into existence. Under reduced motion that
+    // gather is exactly the large movement the visitor asked not to see, so
+    // the field starts already formed.
     const p = pos0.image.data;
     const v = vel0.image.data;
-    for (let i = 0; i < this.count; i++) {
+    if (this.reducedMotion) {
+      p.set(this.firstPositions);
+      v.fill(0);
+    }
+    for (let i = 0; i < this.count && !this.reducedMotion; i++) {
       const i4 = i * 4;
       const r = this.fieldWidth * (0.45 + Math.random() * 0.75);
       const theta = Math.random() * Math.PI * 2;
@@ -147,7 +193,11 @@ export class ParticleField {
       uNoiseScale: { value: DEFAULTS.noiseScale },
       uFlow: { value: DEFAULTS.flow },
       uMaxSpeed: { value: DEFAULTS.maxSpeed },
+      uFluid: { value: fluid?.texture ?? null },
+      uFluidForce: { value: fluid ? DEFAULTS.fluidForce : 0 },
+      uViewProj: { value: new THREE.Matrix4() },
     });
+    this.fluid = fluid ?? null;
 
     for (const v2 of [this.posVar, this.velVar]) {
       v2.wrapS = THREE.ClampToEdgeWrapping;
@@ -196,6 +246,8 @@ export class ParticleField {
         uOpacity: { value: DEFAULTS.opacity },
         uColorScale: { value: DEFAULTS.colorScale },
         uColorSpread: { value: DEFAULTS.colorSpread },
+        uFocus: { value: 10 },
+        uDof: { value: this.reducedMotion ? 0 : DEFAULTS.dof },
       },
       vertexShader: POINTS_VERT,
       fragmentShader: pointsFrag,
@@ -213,8 +265,8 @@ export class ParticleField {
 
   #applyTargets() {
     const u = this.velVar.material.uniforms;
-    u.uTargetA.value = this.targets[this.indexA];
-    u.uTargetB.value = this.targets[this.indexB];
+    u.uTargetA.value = this.#target(this.indexA);
+    u.uTargetB.value = this.#target(this.indexB);
   }
 
   /**
@@ -271,6 +323,19 @@ export class ParticleField {
     this.material.uniforms.uPixelScale.value = scale;
   }
 
+  /**
+   * The camera moves with the pointer now, so the sim needs this frame's
+   * view-projection to find each particle on the fluid, and the render pass
+   * needs the distance to the phrase's plane to set the focus.
+   */
+  setCamera(camera) {
+    this.velVar.material.uniforms.uViewProj.value.multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
+    this.material.uniforms.uFocus.value = camera.position.length();
+  }
+
   /** 0..1, relative to the configured base opacity. */
   setDim(amount) {
     this.material.uniforms.uOpacity.value = DEFAULTS.opacity * (1 - amount);
@@ -283,6 +348,7 @@ export class ParticleField {
     pu.uDt.value = dt;
     vu.uDt.value = dt;
     vu.uTime.value = elapsed;
+    if (this.fluid) vu.uFluid.value = this.fluid.texture;
 
     this.gpu.compute();
     this.material.uniforms.uPositions.value =
@@ -293,7 +359,7 @@ export class ParticleField {
     this.gpu.dispose();
     this.points.geometry.dispose();
     this.material.dispose();
-    for (const t of this.targets) t.dispose();
+    for (const t of this.targets) t?.dispose();
     this.palette.dispose();
   }
 }

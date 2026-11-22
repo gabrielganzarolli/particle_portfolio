@@ -6,12 +6,15 @@ uniform float uSize;
 uniform float uPixelScale; // drawingBufferHeight / (2 * tan(fov/2))
 uniform float uColorScale;
 uniform float uColorSpread;
+uniform float uFocus;      // camera distance to the phrase's plane
+uniform float uDof;        // how fast particles off that plane defocus
 
 attribute vec2  aRef;
 attribute float aJitter;
 
 varying vec3  vColor;
 varying float vSpeed;
+varying float vFocus;
 
 void main() {
   vec4 p = texture2D(uPositions, aRef);
@@ -27,8 +30,18 @@ void main() {
   vSpeed = p.w;
 
   vec4 mv = modelViewMatrix * vec4(p.xyz, 1.0);
+  float depth = max(-mv.z, 0.001);
+
+  // Depth of field, as in the Cream v3 proof: a particle away from the
+  // phrase's plane grows and loses brightness in proportion, so its light is
+  // spread rather than added. At rest the field is within ±0.16 of the plane
+  // and stays sharp; mid-morph, particles flung forward turn into bokeh.
+  float defocus = abs(depth - uFocus) * uDof;
+  float grow = 1.0 + min(defocus, 3.0) * 1.1;
+  vFocus = 1.0 / (grow * grow);
+
   // Narrow viewports push the camera far enough back that points go sub-pixel,
   // where drivers clamp or drop them and the field turns to faint static.
-  gl_PointSize = max(uSize * uPixelScale / max(-mv.z, 0.001), 1.0);
+  gl_PointSize = max(uSize * uPixelScale / depth * grow, 1.0);
   gl_Position = projectionMatrix * mv;
 }

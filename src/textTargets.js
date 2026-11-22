@@ -63,7 +63,7 @@ function gaussian() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
 }
 
-export function buildTarget(phrase, { count, fieldWidth, depth = 0.32, strayRatio = 0.14 }) {
+function prepare(phrase, { count, fieldWidth, depth = 0.32, strayRatio = 0.14 }) {
   const pixels = rasterize(phrase);
   const n = RASTER_W * RASTER_H;
 
@@ -74,26 +74,36 @@ export function buildTarget(phrase, { count, fieldWidth, depth = 0.32, strayRati
     cdf[i] = acc;
   }
 
-  const positions = new Float32Array(count * 4);
-  // Per-particle luminance only. Hue is a shader-side function of world
-  // position — see createPaletteTexture in palette.js.
-  const jitter = new Float32Array(count);
-
   if (acc <= 0) {
     // Nothing was drawn (missing glyphs). Fail visibly rather than silently
     // emitting a NaN field that takes the whole simulation down.
     throw new Error(`Phrase "${phrase}" rasterized to an empty mask`);
   }
 
-  const fieldHeight = (fieldWidth * RASTER_H) / RASTER_W;
+  return {
+    n,
+    cdf,
+    acc,
+    count,
+    fieldWidth,
+    depth,
+    strayRatio,
+    fieldHeight: (fieldWidth * RASTER_H) / RASTER_W,
+    positions: new Float32Array(count * 4),
+    // Per-particle luminance only. Hue is a shader-side function of world
+    // position — see createPaletteTexture in palette.js.
+    jitter: new Float32Array(count),
+    // Extent of the glyphs themselves, strays excluded. Callers use this to
+    // hit-test against the word rather than against the raster box, which is
+    // much larger than the letterforms.
+    bounds: { halfW: 0, halfH: 0 },
+  };
+}
 
-  // Extent of the glyphs themselves, strays excluded. Callers use this to hit-
-  // test against the word rather than against the raster box, which is much
-  // larger than the letterforms.
-  let inkHalfW = 0;
-  let inkHalfH = 0;
+function sampleRange(job, from, to) {
+  const { n, cdf, acc, fieldWidth, fieldHeight, depth, strayRatio, positions, jitter, bounds } = job;
 
-  for (let p = 0; p < count; p++) {
+  for (let p = from; p < to; p++) {
     const target = Math.random() * acc;
 
     let lo = 0;
@@ -124,8 +134,8 @@ export function buildTarget(phrase, { count, fieldWidth, depth = 0.32, strayRati
     if (!stray) {
       const ax = Math.abs(x);
       const ay = Math.abs(y);
-      if (ax > inkHalfW) inkHalfW = ax;
-      if (ay > inkHalfH) inkHalfH = ay;
+      if (ax > bounds.halfW) bounds.halfW = ax;
+      if (ay > bounds.halfH) bounds.halfH = ay;
     }
 
     positions[i4 + 0] = x + gaussian() * spread;
@@ -138,8 +148,49 @@ export function buildTarget(phrase, { count, fieldWidth, depth = 0.32, strayRati
     const brightness = 0.5 + Math.random() * Math.random() * 0.85;
     jitter[p] = stray ? brightness * 0.55 : brightness; // strays read as atmosphere
   }
+}
 
-  return { positions, jitter, bounds: { halfW: inkHalfW, halfH: inkHalfH } };
+/**
+ * Rasterize `phrase` and draw `count` particle destinations from it.
+ *
+ * Sampling walks a prefix sum over pixel alpha and binary-searches it, which
+ * gives ink-weighted coverage in O(count log n) with no unbounded rejection
+ * loop — important because at 262k particles a reject-and-retry sampler stalls
+ * badly on sparse phrases.
+ */
+export function buildTarget(phrase, opts) {
+  const job = prepare(phrase, opts);
+  sampleRange(job, 0, job.count);
+  return job;
+}
+
+const nextIdle = () =>
+  new Promise((resolve) =>
+    window.requestIdleCallback
+      ? window.requestIdleCallback(resolve, { timeout: 500 })
+      : setTimeout(() => resolve(null), 16)
+  );
+
+/**
+ * The same result as buildTarget, sampled in slices between frames. Building a
+ * whole phrase in one go took 150–230ms, long enough to stutter the opening
+ * gather that is playing at the time; slices stay inside each idle period.
+ */
+export async function buildTargetInSlices(phrase, opts) {
+  await nextIdle();
+  const job = prepare(phrase, opts);
+  let p = 0;
+  while (p < job.count) {
+    const deadline = await nextIdle();
+    const start = performance.now();
+    const budget = deadline?.timeRemaining ? Math.max(deadline.timeRemaining() - 1, 4) : 8;
+    do {
+      const to = Math.min(p + 4096, job.count);
+      sampleRange(job, p, to);
+      p = to;
+    } while (p < job.count && performance.now() - start < budget);
+  }
+  return job;
 }
 
 /** Wrap a positions array from buildTarget in a DataTexture the sim can read. */

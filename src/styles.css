@@ -162,16 +162,19 @@ main {
 
 /* Scroll-staggered reveal. JS only toggles .is-in; the motion lives here, so it
    runs on its own clock instead of tracking the scroll wheel's discrete steps.
-   Opacity is given a longer, later ramp than the movement — text that finishes
-   sliding slightly before it finishes fading reads softer than the two landing
-   together. Scoped to .js so a failed bundle leaves the content visible. */
+   Both ramps decelerate from the first frame: the earlier 1.5s ease-in-out
+   kept text near invisible for its first 300ms and unreadable for a second,
+   which read as lag rather than softness. Opacity still runs a little longer
+   than the movement, so the two do not land on the same frame. No will-change:
+   opacity and transform transitions are composited anyway, and a permanent
+   hint kept fifteen layers alive for the life of the page.
+   Scoped to .js so a failed bundle leaves the content visible. */
 .js .reveal {
   opacity: 0;
-  transform: translate3d(0, 26px, 0);
+  transform: translate3d(0, 18px, 0);
   transition:
-    opacity 1500ms cubic-bezier(0.33, 0, 0.2, 1) 60ms,
-    transform 1250ms cubic-bezier(0.16, 0.62, 0.18, 1);
-  will-change: transform, opacity;
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .js .reveal.is-in {
@@ -179,9 +182,12 @@ main {
   transform: none;
 }
 
+/* Reduced motion keeps the fade, which carries the arrival, and drops the
+   travel. */
 @media (prefers-reduced-motion: reduce) {
   .js .reveal {
-    transition: none;
+    transform: none;
+    transition: opacity 300ms ease-out;
   }
 }
 

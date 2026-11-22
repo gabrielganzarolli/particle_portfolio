@@ -9,6 +9,10 @@ import { hidePreloader, showFatal } from './overlay.js';
 import { createScrollWork } from './scrollWork.js';
 import { storedLang, applyHomeLang, attachHomeToggle } from './homeI18n.js';
 import { PHRASES as ALL_PHRASES } from './home.pt.js';
+import { LEVELS, detectLevel } from './quality.js';
+import { createFluid } from './fluid.js';
+import { createPost } from './post.js';
+import { createDust } from './dust.js';
 
 const FOV = 50;
 const FIELD_WIDTH = 10;
@@ -22,6 +26,23 @@ const MORPH_MS = 1300;
 const HOVER_MARGIN = 0.12;
 // Hysteresis, so a cursor resting on the boundary doesn't chatter.
 const HOVER_SLACK = 0.18;
+
+// Scroll-linked morph. While the page is moving the phrase follows the scroll,
+// smoothed so a mouse wheel's discrete steps don't come through as jumps. Once
+// the scroll has been still for SETTLE_AFTER_MS, a half-formed phrase finishes
+// on its own in the direction the visitor was going, at the hover morph's pace,
+// so the field never rests as an unreadable cloud.
+const FOLLOW_RATE = 7; // 1/s, exponential approach to the scroll position
+const SETTLE_AFTER_MS = 160;
+const SETTLE_COMMIT = 0.12; // how far into a morph counts as having started it
+
+// Pointer parallax: the camera drifts with the cursor, in world units.
+const PARALLAX_X = 0.55;
+const PARALLAX_Y = 0.3;
+
+// Fluid input, from the Cream v3 proof.
+const FLUID_POINTER = 9;
+const FLUID_SCROLL = 0.22;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
@@ -45,15 +66,10 @@ const PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
 // consecutive links share a phrase, handing off between them needs no
 // unwinding — the end of one link and the start of the next are the same shape.
 const CHAIN = [REST, WORK, ABOUT];
+const CHAIN_MAX = CHAIN.length - 1;
 
 // How far the particles fade out once the work grid is covering them.
 const MAX_DIM = 0.7;
-
-function chooseSize() {
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const weak = (navigator.hardwareConcurrency ?? 8) <= 4;
-  return coarse || weak ? 256 : 512;
-}
 
 /**
  * easeInOutSine. Gentler than the cubic it replaced: no hard acceleration out
@@ -64,43 +80,79 @@ function ease(t) {
   return -(Math.cos(Math.PI * t) - 1) / 2;
 }
 
+/**
+ * The height CSS means by 100vh: the viewport with the browser's toolbar
+ * collapsed. The runway is sized in vh, so scroll maths and the canvas use this
+ * rather than innerHeight, which changes every time a phone's toolbar moves.
+ */
+function createViewportProbe() {
+  const probe = document.createElement('div');
+  probe.setAttribute('aria-hidden', 'true');
+  probe.style.cssText =
+    'position:fixed;top:0;left:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
+  return () => Math.max(probe.offsetHeight, window.innerHeight);
+}
+
 async function boot() {
   // Gates the hidden-until-revealed styles. If this module fails to load, the
   // .reveal elements never get opacity: 0 and the page still reads.
   document.documentElement.classList.add('js');
 
-  // The hero is the whole point of the page; restoring a reload to mid-scroll
-  // drops you into the card grid with the intro already over.
+  // The hero is the whole point of the page, so a plain reload starts at the
+  // top. A link to a section (#work from a case page) still lands on it: the
+  // browser applies the hash after this runs.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  window.scrollTo(0, 0);
+  if (!location.hash || location.hash.startsWith('#nivel')) window.scrollTo(0, 0);
 
   const canvas = document.getElementById('scene');
+  const background = backgroundOf('white');
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: false, // pointless for points, and it costs real fill rate
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
 
   const gl = renderer.getContext();
   if (!gl.getExtension('EXT_color_buffer_float')) {
     throw new Error('This GPU does not support float render targets.');
   }
 
-  const camera = new THREE.PerspectiveCamera(FOV, window.innerWidth / window.innerHeight, 0.1, 200);
+  let level = detectLevel(renderer);
+  let L = LEVELS[level];
+  const pixelRatio = () => Math.min(window.devicePixelRatio, L.dprCap);
+
+  const viewportHeight = createViewportProbe();
+  let vw = window.innerWidth;
+  let vh = viewportHeight();
+
+  renderer.setPixelRatio(pixelRatio());
+  renderer.setSize(vw, vh);
+
+  const camera = new THREE.PerspectiveCamera(FOV, vw / vh, 0.1, 200);
   camera.position.set(0, 0, 10);
+  let cameraZ = 10;
 
   await readyFonts();
 
+  const fluid = createFluid(renderer, { res: L.fluidRes, iterations: L.fluidIter });
+
   const field = new ParticleField(renderer, {
-    size: chooseSize(),
+    size: L.grid,
     fieldWidth: FIELD_WIDTH,
     phrases: PHRASES,
     palette: 'white',
     reducedMotion,
+    fluid,
   });
+  field.scene.background = new THREE.Color(background);
+
+  const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
+  dust.material.uniforms.uFluid.value = fluid.texture;
+  field.scene.add(dust);
+
+  const post = createPost(renderer, field.scene, camera, { background, bloomScale: L.bloom });
 
   // At the top of the page the morph runs REST -> PRODUCT DESIGNER under hover;
   // once scrolling starts it hands over to the scroll chain.
@@ -123,13 +175,14 @@ async function boot() {
   const timer = new THREE.Timer();
 
   function resize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    vw = window.innerWidth;
+    vh = viewportHeight();
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(w, h);
+    renderer.setPixelRatio(pixelRatio());
+    renderer.setSize(vw, vh);
+    post.setSize(vw, vh, pixelRatio());
 
-    camera.aspect = w / h;
+    camera.aspect = vw / vh;
 
     // Pull the camera back until the phrase fills FILL of the frame. Check the
     // vertical fit too, otherwise the field overflows on portrait windows.
@@ -137,19 +190,45 @@ async function boot() {
     const fieldHeight = FIELD_WIDTH * 0.25;
     const byWidth = FIELD_WIDTH / FILL / (2 * Math.tan(halfFov) * camera.aspect);
     const byHeight = fieldHeight / FILL / (2 * Math.tan(halfFov));
-    camera.position.z = Math.max(byWidth, byHeight);
+    cameraZ = Math.max(byWidth, byHeight);
+    camera.position.z = cameraZ;
     camera.updateProjectionMatrix();
 
     // gl_PointSize is in device pixels; convert world-space size to pixels.
-    field.setPixelScale(renderer.domElement.height / (2 * Math.tan(halfFov)));
+    const pixelScale = renderer.domElement.height / (2 * Math.tan(halfFov));
+    field.setPixelScale(pixelScale);
+    dust.material.uniforms.uPixelScale.value = pixelScale;
   }
 
   resize();
-  window.addEventListener('resize', resize);
+
+  // A phone's toolbar sliding in or out fires resize with only the height
+  // changed. The canvas is already sized to the tall viewport, so that case is
+  // ignored; reallocating the drawing buffer on every toolbar move was a visible
+  // hitch and nudged the phrase's size.
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === vw && viewportHeight() === vh) return;
+    resize();
+  });
+
+  // Screen-space pointer, for the fluid and the parallax. The Pointer class
+  // keeps the world-space position the hover test and the repel use.
+  let px = null;
+  let py = null;
+  let lastPx = null;
+  let lastPy = null;
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      px = e.clientX;
+      py = e.clientY;
+    },
+    { passive: true }
+  );
 
   // Hover ---------------------------------------------------------------
   let hovering = false;
-  let morphT = 0; // raw 0..1 ramp; ease() is applied on the way to the shader
+  let morphT = 0; // raw 0..1 ramp for hover; ease() is applied on the way to the shader
 
   const restBounds = field.boundsOf(REST);
 
@@ -165,54 +244,164 @@ async function boot() {
     );
   }
 
-  // Touch devices have no hover, so a tap toggles instead. Only wired up for
-  // coarse pointers — on a mouse it would fight the hover state.
+  // Touch devices have no hover, so a tap on the hero toggles instead. Only
+  // while the hero is showing: a tap anywhere further down, on the case list or
+  // the about text, used to flip the phrase waiting at the top.
   let tapped = false;
   if (coarsePointer && !reducedMotion) {
-    // On window for the same reason the pointer listeners are: the scrolling
-    // content sits above the canvas. Card links keep their own behaviour.
     window.addEventListener('click', (e) => {
-      if (e.target.closest?.('a')) return;
+      if (window.scrollY > 4) return;
+      if (e.target.closest?.('a, button, section, footer')) return;
       tapped = !tapped;
     });
+  }
+
+  // Scroll morph state (see FOLLOW_RATE above) ------------------------------
+  let chainShown = 0; // what the field displays, 0..CHAIN_MAX
+  let lastScrollY = window.scrollY;
+  let lastScrollAt = -Infinity;
+  let scrollDir = 1;
+
+  /** Where an idle morph should come to rest, given which way the visitor went. */
+  function settleTarget(mapped) {
+    const link = Math.min(Math.floor(mapped), CHAIN_MAX - 1);
+    const f = mapped - link;
+    if (f <= 0.0005 || f >= 0.9995) return mapped;
+    if (scrollDir > 0) return link + (f > SETTLE_COMMIT ? 1 : 0);
+    return link + (f < 1 - SETTLE_COMMIT ? 0 : 1);
+  }
+
+  // Frame probe: steps the quality level down if frames run long ----------
+  const probe = [];
+  let probing = level > 1 && !/nivel/.test(location.hash);
+
+  function stepDown() {
+    level -= 1;
+    L = LEVELS[level];
+    fluid.iterations = L.fluidIter;
+    post.setBloomScale(L.bloom);
+    dust.geometry.setDrawRange(0, L.dust);
+    resize();
+    probe.length = 0;
+    probing = level > 1;
   }
 
   // Frame loop ----------------------------------------------------------
   let elapsed = 0;
   let frames = 0;
+  let camX = 0;
+  let camY = 0;
+  let paused = false;
 
-  function step(dt) {
+  function step(dt, now) {
+    const { workProgress, aboutProgress, coverage, hidden } = scrollWork.update(vh);
+
+    // Track scroll direction and idleness for the morph, even while paused.
+    const sy = window.scrollY;
+    const dS = sy - lastScrollY;
+    if (Math.abs(dS) > 0.5) {
+      scrollDir = Math.sign(dS);
+      lastScrollAt = now;
+    }
+    lastScrollY = sy;
+
+    // Nothing of the canvas shows while an opaque section fills the screen, so
+    // neither simulate nor draw it. The particles hold their shape and pick up
+    // where they were when the gap opens again.
+    paused = hidden;
+    if (paused) {
+      // Forget the pointer's travel while hidden, or the first frame back would
+      // push the whole distance moved meanwhile into the fluid at once.
+      lastPx = px;
+      lastPy = py;
+      return;
+    }
+
     elapsed += dt;
     frames++;
+
+    // A median test let a machine sit at 45fps for good, since half its frames
+    // still made 60. This steps down when more than a quarter of 150 frames
+    // miss 60fps by a clear margin.
+    if (probing && frames > 30) {
+      probe.push(dt);
+      if (probe.length >= 150) {
+        const slow = probe.filter((d) => d > 0.021).length / probe.length;
+        if (slow > 0.25) stepDown();
+        else probing = false;
+      }
+    }
+
+    // Fluid: the pointer stirs it, the scroll pushes it upward or downward.
+    const strength = reducedMotion ? 0.4 : 1;
+    if (px !== null && lastPx !== null) {
+      const dx = (px - lastPx) / vw;
+      const dy = -(py - lastPy) / vh;
+      if (Math.abs(dx) + Math.abs(dy) > 1e-4) {
+        fluid.push(px / vw, 1 - py / vh, dx * FLUID_POINTER * strength, dy * FLUID_POINTER * strength, 0.0016);
+      }
+    }
+    lastPx = px;
+    lastPy = py;
+    if (!reducedMotion && Math.abs(dS) > 0.5) {
+      const v = THREE.MathUtils.clamp(dS / 80, -1, 1);
+      fluid.push(Math.random(), 0.2 + Math.random() * 0.6, (Math.random() - 0.5) * 0.1 * Math.abs(v), v * FLUID_SCROLL, 0.005);
+    }
+    fluid.step(dt);
+
+    // Camera parallax with the pointer.
+    if (!reducedMotion && px !== null) {
+      const k = 1 - Math.exp(-dt * 2.2);
+      camX += ((px / vw) * 2 - 1 - camX) * k;
+      camY += (-((py / vh) * 2 - 1) - camY) * k;
+    }
+    camera.position.set(camX * PARALLAX_X, camY * PARALLAX_Y, cameraZ);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    field.setCamera(camera);
 
     pointer.update(dt);
     field.setPointer(pointer);
 
-    const { workProgress, aboutProgress, coverage } = scrollWork.update();
     field.setDim(coverage * MAX_DIM);
+    dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     if (reducedMotion) {
       field.setMorph(0);
     } else {
       // Position along CHAIN. aboutProgress only leaves 0 long after
       // workProgress has reached 1, so this stays monotonic and continuous.
-      const chainT = workProgress + aboutProgress;
-      const scrolling = chainT > 0.001;
+      const mapped = workProgress + aboutProgress;
+      const idle = now - lastScrollAt > SETTLE_AFTER_MS;
 
       // A fixed-rate ramp rather than exponential smoothing: the shader staggers
-      // each particle over smoothstep(s, s + 0.55, uMorph) with s up to 0.45, so
+      // each particle over smoothstep(s, s + 0.45, uMorph) with s up to 0.55, so
       // the last particles only land when uMorph reaches exactly 1. An
       // asymptotic approach would leave the phrase permanently half-formed.
       const rate = dt / (MORPH_MS / 1000);
 
-      if (scrolling) {
-        const link = Math.min(Math.floor(chainT), CHAIN.length - 2);
+      if (!idle) {
+        // Follow the scroll, but never back away from a phrase that already
+        // settled ahead of it in the direction of travel.
+        const target = scrollDir > 0 ? Math.max(chainShown, mapped) : Math.min(chainShown, mapped);
+        const k = 1 - Math.exp(-dt * FOLLOW_RATE);
+        chainShown += (target - chainShown) * k;
+        if (Math.abs(target - chainShown) < 0.0005) chainShown = target;
+      } else {
+        const target = settleTarget(mapped);
+        const diff = target - chainShown;
+        chainShown += Math.sign(diff) * Math.min(Math.abs(diff), rate);
+      }
+
+      if (chainShown > 0.0005) {
+        const link = Math.min(Math.floor(chainShown), CHAIN_MAX - 1);
         usePair(CHAIN[link], CHAIN[link + 1]);
-        morphT = chainT - link; // scrubbed directly by scroll position
+        morphT = chainShown - link;
         hovering = false;
       } else if (pairB !== HOVER) {
         // Leaving the chain for hover mode. Both show REST at zero, so this
         // only has to wait out any residual blend before swapping.
+        chainShown = 0;
         morphT = Math.max(morphT - rate, 0);
         if (morphT === 0) usePair(REST, HOVER);
         hovering = false;
@@ -225,43 +414,36 @@ async function boot() {
     }
 
     field.update(dt, elapsed);
-    renderer.render(field.scene, camera);
+    dust.material.uniforms.uTime.value = elapsed;
+    dust.material.uniforms.uFocus.value = field.material.uniforms.uFocus.value;
+    post.render(dt, elapsed);
   }
 
   renderer.setAnimationLoop((time) => {
     timer.update(time);
     // A backgrounded tab produces one enormous delta on return; unclamped it
     // detonates the field and the spring never pulls it back.
-    step(Math.min(timer.getDelta(), 1 / 30));
+    step(Math.min(timer.getDelta(), 1 / 30), time);
   });
 
-  document.body.style.background = backgroundOf('white');
+  document.body.style.background = background;
   hidePreloader();
+  field.buildRemaining();
 
   if (import.meta.env.DEV) {
     const snapshot = () => ({
       frames,
+      level,
+      paused,
       hovering,
       morphT: +morphT.toFixed(3),
+      chainShown: +chainShown.toFixed(3),
       pair: `${PHRASES[pairA]} -> ${PHRASES[pairB]}`,
       phrase: PHRASES[field.currentIndex],
       scrollY: window.scrollY,
     });
 
-    // requestAnimationFrame is suspended in hidden tabs, which makes the scene
-    // unverifiable under browser automation. This lets a driver pump frames.
-    window.__pf = {
-      renderer,
-      camera,
-      field,
-      pointer,
-      step,
-      pump: (n = 60, dt = 1 / 60) => {
-        for (let i = 0; i < n; i++) step(dt);
-        return snapshot();
-      },
-      state: snapshot,
-    };
+    window.__pf = { renderer, camera, field, pointer, fluid, post, dust, state: snapshot };
   }
 }
 

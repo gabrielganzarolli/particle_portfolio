@@ -5,14 +5,6 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 // scroll without changing where any of them start. 1 = the earlier tuning.
 const PACE = 2.0;
 
-// Where an element flips to revealed, as a fraction of viewport height from the
-// top. Reveals used to be scrubbed — transform and opacity recomputed from
-// scroll offset every frame — which ties the motion to the scroll wheel's
-// discrete steps and reads as juddery however gently it's eased. They are now a
-// one-shot class toggle, with duration and travel handled by CSS transition, so
-// the motion is smooth regardless of how the page is being scrolled.
-const REVEAL_TRIGGER_VH = 0.92;
-
 // Scroll distance over which the particle text morphs into WORK. The phrase
 // should land before the case list starts covering it.
 const TEXT_MORPH_VH = 0.6 * PACE;
@@ -32,58 +24,94 @@ const ABOUT_MORPH_VH = 0.36 * PACE;
 const CHROME_FADE_VH = 0.45 * PACE;
 
 /**
+ * Reveals run on IntersectionObserver: the browser works out visibility off the
+ * main thread and each element is dropped once shown. They used to be read with
+ * getBoundingClientRect every frame, all fifteen of them, for the life of the
+ * page. The trigger line sits 8% above the bottom edge, as before.
+ */
+function observeReveals() {
+  const targets = Array.from(document.querySelectorAll('.reveal'));
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach((t) => t.classList.add('is-in'));
+    return;
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add('is-in');
+        io.unobserve(entry.target);
+      }
+    },
+    { rootMargin: '0px 0px -8% 0px', threshold: 0 }
+  );
+  targets.forEach((t) => io.observe(t));
+}
+
+/**
  * Reads scroll position once per frame and drives everything that depends on
- * it: the staggered reveals, the hero chrome fade, and the values main.js needs
- * back — how far each text morph has run, and how much solid content is
- * currently covering the canvas.
+ * it: the hero chrome fade and the values main.js needs back — how far each
+ * text morph has run, how much solid content is covering the canvas, and
+ * whether the canvas is hidden outright.
+ *
+ * `vh` comes from main.js rather than window.innerHeight. On a phone the
+ * browser's toolbar collapses and returns as you scroll, which changes
+ * innerHeight by about 10% each time; the CSS runway is sized in vh, which
+ * does not change, so reading innerHeight made the morph jump on every toolbar
+ * move.
  */
 export function createScrollWork() {
+  observeReveals();
+
   const aboutSpace = document.querySelector('.about-space');
-  const revealed = Array.from(document.querySelectorAll('.reveal'));
   const solids = Array.from(document.querySelectorAll('[data-solid]'));
   const chrome = Array.from(document.querySelectorAll('[data-fade-on-scroll]'));
 
-  // Reused so the per-frame read pass doesn't allocate.
-  const tops = new Float64Array(revealed.length);
+  // Each solid section declares the band of its height that is fully opaque —
+  // its gradient edges are not. When one band covers the whole viewport the
+  // canvas cannot be seen, so main.js stops simulating and drawing it.
+  const opaque = solids.map((el) => [
+    parseFloat(el.dataset.opaqueFrom ?? '0'),
+    parseFloat(el.dataset.opaqueTo ?? '1'),
+  ]);
+
   const solidTops = new Float64Array(solids.length);
   const solidBottoms = new Float64Array(solids.length);
+  let lastChrome = -1;
 
   return {
-    /** @returns {{ workProgress:number, aboutProgress:number, coverage:number }} */
-    update() {
-      const vh = window.innerHeight;
+    /** @returns {{ workProgress:number, aboutProgress:number, coverage:number, hidden:boolean }} */
+    update(vh) {
       const scrollY = window.scrollY;
 
-      // --- read pass. Batched ahead of every write below, so the frame costs
-      // one layout flush instead of one per element. ---
-      for (let i = 0; i < revealed.length; i++) {
-        tops[i] = revealed[i].getBoundingClientRect().top;
-      }
+      // Read pass first, then writes, so the frame costs one layout flush.
       for (let i = 0; i < solids.length; i++) {
         const r = solids[i].getBoundingClientRect();
         solidTops[i] = r.top;
         solidBottoms[i] = r.bottom;
       }
       const aboutSpaceTop = aboutSpace ? aboutSpace.getBoundingClientRect().top : Infinity;
-
-      // --- write pass ---
-      // A one-way class toggle. Each element still staggers itself by its own
-      // position on the page, so no per-element delays are needed, but the
-      // motion itself is now CSS's job.
-      for (let i = 0; i < revealed.length; i++) {
-        if (tops[i] < vh * REVEAL_TRIGGER_VH) revealed[i].classList.add('is-in');
-      }
+      const viewH = window.innerHeight;
 
       const chromeOpacity = 1 - clamp01(scrollY / (vh * CHROME_FADE_VH));
-      for (const el of chrome) el.style.opacity = chromeOpacity.toFixed(3);
+      if (chromeOpacity !== lastChrome) {
+        lastChrome = chromeOpacity;
+        for (const el of chrome) el.style.opacity = chromeOpacity.toFixed(3);
+      }
 
       // Largest share of the viewport that any one solid section is covering.
       // Drives the particle dim, and correctly drops back to 0 in the gap
       // between the sections where the field is meant to be visible again.
       let coverage = 0;
+      let hidden = false;
       for (let i = 0; i < solids.length; i++) {
-        const visible = Math.min(solidBottoms[i], vh) - Math.max(solidTops[i], 0);
-        if (visible > 0) coverage = Math.max(coverage, clamp01(visible / vh));
+        const top = solidTops[i];
+        const h = solidBottoms[i] - top;
+        const visible = Math.min(solidBottoms[i], viewH) - Math.max(top, 0);
+        if (visible > 0) coverage = Math.max(coverage, clamp01(visible / viewH));
+
+        const [from, to] = opaque[i];
+        if (top + h * from <= 0 && top + h * to >= viewH) hidden = true;
       }
 
       // Derived from the live rect rather than a hardcoded offset, so it stays
@@ -94,6 +122,7 @@ export function createScrollWork() {
         workProgress: clamp01(scrollY / (vh * TEXT_MORPH_VH)),
         aboutProgress: clamp01((scrollY - aboutStart) / (vh * ABOUT_MORPH_VH)),
         coverage,
+        hidden,
       };
     },
   };

@@ -23,6 +23,10 @@ uniform float uNoiseScale;
 uniform float uFlow;
 uniform float uMaxSpeed;
 
+uniform sampler2D uFluid;
+uniform float uFluidForce;
+uniform mat4 uViewProj;
+
 #define PI 3.14159265359
 
 float hash12(vec2 p) {
@@ -63,6 +67,15 @@ void main() {
   float falloff = exp(-dot(d, d) / (uRadius * uRadius)) * uMouseActive;
   force += normalize(d + 1e-5) * (uRepel * falloff);
   force += uMouseVel * (uRepel * uWake * falloff);
+
+  // Screen-space fluid stirred by the pointer and the scroll. Sampled where the
+  // particle currently sits on screen and applied in the camera's plane, so a
+  // swirl drawn by the cursor curls the letters under it and then lets go.
+  vec4 clip = uViewProj * vec4(pos, 1.0);
+  vec2 fuv = clip.xy / max(clip.w, 1e-3) * 0.5 + 0.5;
+  vec2 inside = step(vec2(0.0), fuv) * step(fuv, vec2(1.0));
+  vec2 flow = texture2D(uFluid, fuv).xy * inside.x * inside.y;
+  force.xy += flow * uFluidForce;
 
   // Framerate-independent damping.
   vel *= pow(uDamping, uDt * 60.0);
