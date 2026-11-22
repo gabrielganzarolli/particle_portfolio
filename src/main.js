@@ -13,6 +13,8 @@ import { LEVELS, detectLevel } from './quality.js';
 import { createFluid } from './fluid.js';
 import { createPost } from './post.js';
 import { createDust } from './dust.js';
+import { FIELD_DEFAULTS } from './ParticleField.js';
+import { readSavedPreset, applyPreset } from './tuning.js';
 
 const FOV = 50;
 const FIELD_WIDTH = 10;
@@ -36,13 +38,16 @@ const FOLLOW_RATE = 7; // 1/s, exponential approach to the scroll position
 const SETTLE_AFTER_MS = 160;
 const SETTLE_COMMIT = 0.12; // how far into a morph counts as having started it
 
-// Pointer parallax: the camera drifts with the cursor, in world units.
-const PARALLAX_X = 0.55;
-const PARALLAX_Y = 0.3;
-
-// Fluid input, from the Cream v3 proof.
-const FLUID_POINTER = 9;
-const FLUID_SCROLL = 0.22;
+// Values the tuning panel (#ajuste) can change live. Parallax is how far the
+// camera drifts with the cursor, in world units; the fluid values are the
+// Cream v3 proof's.
+const tune = {
+  parallaxX: 0.55,
+  parallaxY: 0.3,
+  fluidPointer: 9,
+  fluidScroll: 0.22,
+  dissipation: 0.972,
+};
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
@@ -103,7 +108,7 @@ async function boot() {
   // top. A link to a section (#work from a case page) still lands on it: the
   // browser applies the hash after this runs.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  if (!location.hash || location.hash.startsWith('#nivel')) window.scrollTo(0, 0);
+  if (!location.hash || /^#(nivel|ajuste)/.test(location.hash)) window.scrollTo(0, 0);
 
   const canvas = document.getElementById('scene');
   const background = backgroundOf('white');
@@ -338,16 +343,16 @@ async function boot() {
       const dx = (px - lastPx) / vw;
       const dy = -(py - lastPy) / vh;
       if (Math.abs(dx) + Math.abs(dy) > 1e-4) {
-        fluid.push(px / vw, 1 - py / vh, dx * FLUID_POINTER * strength, dy * FLUID_POINTER * strength, 0.0016);
+        fluid.push(px / vw, 1 - py / vh, dx * tune.fluidPointer * strength, dy * tune.fluidPointer * strength, 0.0016);
       }
     }
     lastPx = px;
     lastPy = py;
     if (!reducedMotion && Math.abs(dS) > 0.5) {
       const v = THREE.MathUtils.clamp(dS / 80, -1, 1);
-      fluid.push(Math.random(), 0.2 + Math.random() * 0.6, (Math.random() - 0.5) * 0.1 * Math.abs(v), v * FLUID_SCROLL, 0.005);
+      fluid.push(Math.random(), 0.2 + Math.random() * 0.6, (Math.random() - 0.5) * 0.1 * Math.abs(v), v * tune.fluidScroll, 0.005);
     }
-    fluid.step(dt);
+    fluid.step(dt, tune.dissipation);
 
     // Camera parallax with the pointer.
     if (!reducedMotion && px !== null) {
@@ -355,7 +360,7 @@ async function boot() {
       camX += ((px / vw) * 2 - 1 - camX) * k;
       camY += (-((py / vh) * 2 - 1) - camY) * k;
     }
-    camera.position.set(camX * PARALLAX_X, camY * PARALLAX_Y, cameraZ);
+    camera.position.set(camX * tune.parallaxX, camY * tune.parallaxY, cameraZ);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
     field.setCamera(camera);
@@ -429,6 +434,13 @@ async function boot() {
   document.body.style.background = background;
   hidePreloader();
   field.buildRemaining();
+
+  // Tuning panel, only with #ajuste in the address.
+  const tuningCtx = { tune, fieldDefaults: FIELD_DEFAULTS, field, post, dust, level: () => level };
+  applyPreset(readSavedPreset(), tuningCtx);
+  if (/ajuste/.test(location.hash)) {
+    import('./tuning.js').then(({ attachTuning }) => attachTuning(tuningCtx)).catch(console.warn);
+  }
 
   if (import.meta.env.DEV) {
     const snapshot = () => ({
