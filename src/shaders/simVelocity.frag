@@ -59,11 +59,13 @@ void main() {
   float stagger = hash12(uv * 511.0) * 0.55;
   float m = smoothstep(stagger, stagger + 0.45, uMorph);
 
-  vec3 ta = texture2D(uTargetA, uv).xyz;
-  vec3 tb = texture2D(uTargetB, uv).xyz;
-  ta = mix(ta, uHeadPivot + uHeadRot * (ta - uHeadPivot), uHeadA);
-  tb = mix(tb, uHeadPivot + uHeadRot * (tb - uHeadPivot), uHeadB);
-  vec3 goal = mix(ta, tb, m);
+  // The head's .w says how far each point follows the turn: all of the head,
+  // less and less down the neck, so the neck twists and its base stays put.
+  vec4 ta = texture2D(uTargetA, uv);
+  vec4 tb = texture2D(uTargetB, uv);
+  vec3 ga = mix(ta.xyz, uHeadPivot + uHeadRot * (ta.xyz - uHeadPivot), uHeadA * ta.w);
+  vec3 gb = mix(tb.xyz, uHeadPivot + uHeadRot * (tb.xyz - uHeadPivot), uHeadB * tb.w);
+  vec3 goal = mix(ga, gb, m);
 
   // Peaks at the midpoint of a transition and is zero while a phrase is held.
   float energy = sin(PI * clamp(uMorph, 0.0, 1.0));

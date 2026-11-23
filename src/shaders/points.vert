@@ -3,11 +3,6 @@
 uniform sampler2D uPositions;
 uniform sampler2D uPalette;
 uniform float uSize;
-// The head is drawn as dots of varied size: each particle reads its dot's
-// size from the head's destinations (.w), blended in by uHeadMix.
-uniform sampler2D uHeadTarget;
-uniform float uHeadMix;
-uniform float uHeadSize;
 uniform float uPixelScale; // drawingBufferHeight / (2 * tan(fov/2))
 uniform float uColorScale;
 uniform float uColorSpread;
@@ -47,7 +42,6 @@ void main() {
 
   // Narrow viewports push the camera far enough back that points go sub-pixel,
   // where drivers clamp or drop them and the field turns to faint static.
-  float headSize = uHeadMix > 0.0 ? uHeadSize * texture2D(uHeadTarget, aRef).w : 1.0;
-  gl_PointSize = max(uSize * mix(1.0, headSize, uHeadMix) * uPixelScale / depth * grow, 1.0);
+  gl_PointSize = max(uSize * uPixelScale / depth * grow, 1.0);
   gl_Position = projectionMatrix * mv;
 }

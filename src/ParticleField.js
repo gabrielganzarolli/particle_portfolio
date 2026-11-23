@@ -322,9 +322,6 @@ export class ParticleField {
         // diameter. Without this the low-power path renders a threadbare field.
         uSize: { value: DEFAULTS.pointSize * (512 / this.size) },
         uPixelScale: { value: 1 },
-        uHeadTarget: { value: null },
-        uHeadMix: { value: 0 },
-        uHeadSize: { value: 1 },
         uOpacity: { value: DEFAULTS.opacity },
         uColorScale: { value: DEFAULTS.colorScale },
         uColorSpread: { value: DEFAULTS.colorSpread },
@@ -418,30 +415,35 @@ export class ParticleField {
   /**
    * The head as a solid that only writes depth: drawn before the points, it
    * hides the grain on the far side, so the head reads as a surface rather
-   * than a glass shell. It turns with the head (setHeadPose).
+   * than a glass shell.
    */
-  setHeadOccluder(v, faces, scale) {
+  setHeadOccluder(v, faces, scale, turn) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(v, (x) => x * scale), 3));
+    geometry.setAttribute('aTurn', new THREE.BufferAttribute(Float32Array.from(turn, (t) => t / 255), 1));
     geometry.setIndex(new THREE.BufferAttribute(faces, 1));
-    this.occluder = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide }));
+    const vu = this.velVar.material.uniforms;
+    // It bends the way the particles do: all of the head turns, the neck less
+    // and less toward its base.
+    const material = new THREE.ShaderMaterial({
+      uniforms: { uHeadRot: { value: new THREE.Matrix3() }, uHeadPivot: vu.uHeadPivot },
+      vertexShader: `
+        uniform mat3 uHeadRot;
+        uniform vec3 uHeadPivot;
+        attribute float aTurn;
+        void main() {
+          vec3 p = mix(position, uHeadPivot + uHeadRot * (position - uHeadPivot), aTurn);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        }`,
+      fragmentShader: 'void main() { gl_FragColor = vec4(0.0); }',
+      colorWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.occluder = new THREE.Mesh(geometry, material);
     this.occluder.renderOrder = -1;
-    this.occluder.matrixAutoUpdate = false;
     this.occluder.visible = false;
     this.occluder.frustumCulled = false;
     this.scene.add(this.occluder);
-  }
-
-  /**
-   * 0..1: how far the points have turned into the head's dots, whose mean
-   * size is `size` world units. The letters' grain scales with the grid; the
-   * dots don't.
-   */
-  setHeadLook(t, size) {
-    const u = this.material.uniforms;
-    if (t > 0 && this.headIndex >= 0) u.uHeadTarget.value = this.#target(this.headIndex);
-    u.uHeadMix.value = u.uHeadTarget.value ? t : 0;
-    u.uHeadSize.value = size / (DEFAULTS.pointSize * (512 / this.size));
   }
 
   /**
@@ -458,15 +460,14 @@ export class ParticleField {
   setHeadPose(matrix3) {
     const u = this.velVar.material.uniforms;
     u.uHeadRot.value.copy(matrix3);
-    if (this.occluder) {
-      const p = u.uHeadPivot.value;
-      const m = this.occluder.matrix;
-      m.setFromMatrix3(matrix3);
-      // p + R (x - p) = R x + (p - R p)
-      const rp = p.clone().applyMatrix3(matrix3);
-      m.setPosition(p.x - rp.x, p.y - rp.y, p.z - rp.z);
-      this.occluder.matrixWorldNeedsUpdate = true;
-    }
+  }
+
+  /**
+   * The occluder's own turn. The particles reach a new pose a beat late, on
+   * their springs; an occluder at the new pose would cover them on the way.
+   */
+  setOccluderPose(matrix3) {
+    if (this.occluder) this.occluder.material.uniforms.uHeadRot.value.copy(matrix3);
   }
 
   /** Multiplies the cursor's push; the head takes a gentler one. */

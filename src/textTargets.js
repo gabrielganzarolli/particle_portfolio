@@ -240,7 +240,7 @@ export async function loadHeadMesh(url) {
   if (!res.ok) throw new Error(`Head: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x46525348) throw new Error('Head: bad header'); // 'HSRF'
+  if (view.getUint32(0, true) !== 0x32525348) throw new Error('Head: bad header'); // 'HSR2'
   const n = view.getUint32(4, true);
   const nf = view.getUint32(8, true);
   const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
@@ -250,6 +250,8 @@ export async function loadHeadMesh(url) {
   const ov = Float32Array.from(new Int16Array(buf, o, n * 3), (x) => x / 30000);
   o += n * 6;
   const w = new Uint8Array(buf, o, n);
+  o += n;
+  const turn = new Uint8Array(buf, o, n);
   o += n + ((o + n) % 2);
   const faces = new Uint16Array(buf, o, nf * 3);
 
@@ -259,19 +261,18 @@ export async function loadHeadMesh(url) {
     minX = Math.min(minX, v[i * 3]);
     maxX = Math.max(maxX, v[i * 3]);
   }
-  return { mesh: { v, w, faces, pivot }, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
+  return { mesh: { v, w, turn, faces, pivot }, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
 }
 
 /**
- * Particle destinations on the head, in the same shape buildTarget returns.
- * The head is drawn as `head.dots` separate dots, like a photo turned to
- * dots: each dot sits at a point on the surface drawn by area times light,
- * and the particles share the dots, more of them on lit ones, so those shine.
- * Each dot has its own size, kept in the destination's fourth component for
- * the render pass (points.vert).
+ * Particle destinations on the head, in the same shape buildTarget returns,
+ * spread over its surface the way the letters' ink is: triangles drawn by
+ * area times light, each particle at its own point inside one. The lit planes
+ * fill in and the hollows stay dark, which is all that draws the face; the
+ * particles are the names' own grain. The glasses are part of the mesh.
  */
-export function buildMeshTarget(head, { count }) {
-  const { v, w, faces } = head.mesh;
+export function buildMeshTarget(head, { count, strayRatio = 0.03 }) {
+  const { v, w, turn, faces } = head.mesh;
   const s = head.height;
   const nt = faces.length / 3;
   const cdf = new Float32Array(nt);
@@ -288,12 +289,10 @@ export function buildMeshTarget(head, { count }) {
   }
   if (acc <= 0) throw new Error('Head mesh is empty');
 
-  const dots = Math.min(count, head.dots ?? count);
   const positions = new Float32Array(count * 4);
   const jitter = new Float32Array(count);
-  const lit = new Float32Array(dots);
   const bounds = { halfW: 0, halfH: 0 };
-  for (let p = 0; p < dots; p++) {
+  for (let p = 0; p < count; p++) {
     const target = Math.random() * acc;
     let lo = 0;
     let hi = nt - 1;
@@ -302,42 +301,30 @@ export function buildMeshTarget(head, { count }) {
       if (cdf[mid] < target) lo = mid + 1;
       else hi = mid;
     }
-    const ia = faces[lo * 3], ib = faces[lo * 3 + 1], ic = faces[lo * 3 + 2];
-    const a = ia * 3, b = ib * 3, c = ic * 3;
+    const a = faces[lo * 3] * 3;
+    const b = faces[lo * 3 + 1] * 3;
+    const c = faces[lo * 3 + 2] * 3;
     const r = Math.sqrt(Math.random());
     const r2 = Math.random();
     const wa = 1 - r, wb = r * (1 - r2), wc = r * r2;
     const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s;
     const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s;
     const z = (v[a + 2] * wa + v[b + 2] * wb + v[c + 2] * wc) * s;
-    lit[p] = (w[ia] * wa + w[ib] * wb + w[ic] * wc) / 255;
-    bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
-    bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
-    const i4 = p * 4;
-    positions[i4 + 0] = x;
-    positions[i4 + 1] = y;
-    positions[i4 + 2] = z;
-    // Sizes vary a lot, small dots outnumbering big ones; lit dots run larger.
-    positions[i4 + 3] = (0.45 + 1.6 * Math.random() ** 2.2) * (0.65 + 0.35 * Math.sqrt(lit[p]));
-    jitter[p] = 0.5 + Math.random() * Math.random() * 0.85;
-  }
-  // Every other particle joins a dot, in proportion to its light.
-  const dcdf = new Float32Array(dots);
-  let dacc = 0;
-  for (let i = 0; i < dots; i++) {
-    dacc += 0.4 + lit[i];
-    dcdf[i] = dacc;
-  }
-  for (let p = dots; p < count; p++) {
-    const target = Math.random() * dacc;
-    let lo = 0;
-    let hi = dots - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (dcdf[mid] < target) lo = mid + 1;
-      else hi = mid;
+
+    const stray = Math.random() < strayRatio;
+    const spread = stray ? s * 0.02 : 0;
+    if (!stray) {
+      bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
+      bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
     }
-    positions.copyWithin(p * 4, lo * 4, lo * 4 + 4);
+    const i4 = p * 4;
+    positions[i4 + 0] = x + gaussian() * spread;
+    positions[i4 + 1] = y + gaussian() * spread;
+    positions[i4 + 2] = z + gaussian() * spread;
+    // How far this point follows the head's turn (simVelocity.frag).
+    positions[i4 + 3] = (turn[faces[lo * 3]] * wa + turn[faces[lo * 3 + 1]] * wb + turn[faces[lo * 3 + 2]] * wc) / 255;
+    const brightness = 0.5 + Math.random() * Math.random() * 0.85;
+    jitter[p] = stray ? brightness * 0.55 : brightness;
   }
   return { positions, jitter, bounds };
 }

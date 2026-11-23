@@ -9,10 +9,11 @@ Source: "Infinite, 3D Head Scan" by Lee Perry-Smith, CC BY 3.0
 head and neck, shading baked into a per-vertex weight.
 
 The file holds the mesh, a copy pulled slightly inside it (drawn as a depth
-occluder, so grain on the far side stays hidden), a weight per vertex (light
-from the front left, the neck dissolving) and the pivot the head turns on.
+occluder, so grain on the far side stays hidden), a weight per vertex (ambient occlusion
+and a soft front light, more on the face, less on the crown and neck), how
+far each vertex turns with the head, and the pivot it turns on.
 
-  python3 surface.py LeePerrySmith.glb   # writes head.bin (HSRF)
+  python3 surface.py LeePerrySmith.glb   # writes head.bin (HSR2)
 """
 import numpy as np, sys, struct
 import trimesh, cv2
@@ -49,26 +50,79 @@ idx = -np.ones(len(v), int); idx[region] = np.arange(region.sum())
 faces = idx[fsel]
 vr, nr = v[region], n[region]
 
-Lk = np.array([-0.35, 0.3, 0.88]); Lk /= np.linalg.norm(Lk)
-light = 0.16 + 0.84 * np.clip(nr @ Lk, 0, 1) ** 1.4
+Lk = np.array([0.0, 0.3, 0.95]); Lk /= np.linalg.norm(Lk)
+# The light is baked into the model, so it turns with the head: a light from
+# one side put that side in shadow, and turning toward the cursor showed the
+# camera a dark, half-empty face. The features come from ambient occlusion
+# instead (how open each point is to the sky around it), which darkens the
+# eye sockets, nostrils, lips and ear folds and no side as a whole; a soft
+# frontal light only shapes the planes.
+def ambient_occlusion(mesh, pts, nrm, rays=48, reach=0.9):
+    rng = np.random.default_rng(5)
+    d = rng.normal(size=(rays, 3)); d /= np.linalg.norm(d, axis=1, keepdims=True)
+    open_ = np.zeros(len(pts))
+    for k in range(rays):
+        dirs = np.where((nrm @ d[k])[:, None] < 0, -d[k], d[k])
+        origins = pts + nrm * 0.01
+        hit = mesh.ray.intersects_any(origins, dirs)
+        loc, ri, _ = mesh.ray.intersects_location(origins[hit], dirs[hit], multiple_hits=False)
+        near = np.zeros(len(pts), bool)
+        idx_hit = np.flatnonzero(hit)[ri]
+        near[idx_hit] = np.linalg.norm(loc - origins[idx_hit], axis=1) < reach
+        open_ += ~near
+    return open_ / rays
+import os
+cache = f'ao-{len(vr)}.npy'
+if os.path.exists(cache):
+    ao = np.load(cache)
+else:
+    ao = ambient_occlusion(trimesh.Trimesh(v, f, process=False), vr, nr)
+    np.save(cache, ao)
+lam = np.clip(nr @ Lk, 0, 1)
+light = (0.15 + 0.85 * ao ** 2.2) * (0.6 + 0.4 * lam)
 # Sampling goes by area, and a surface seen edge-on packs its area into a
 # thin band on screen, which glowed along the outline. Weighting by the
 # facing (nz) makes dots on screen follow the light, as in a photo; a floor
 # keeps the sides from going empty when the head turns.
-facing = 0.08 + 0.92 * np.clip(nr[:, 2], 0, 1)
+facing = 0.1 + 0.9 * np.clip(nr[:, 2], 0, 1)
 neck = np.clip((vr[:, 1] - NECK_CUT) / (NECK_FADE - NECK_CUT), 0, 1) ** 2
-w = light * facing * neck
+def smooth(e0, e1, x):
+    t = np.clip((x - e0) / (e1 - e0), 0, 1)
+    return t * t * (3 - 2 * t)
+# Density by part of the head: the face carries the most particles, the
+# crown and the back of the skull fewer, the ears in between, and the neck
+# thins out toward its base.
+x, y, z = vr[:, 0], vr[:, 1], vr[:, 2]
+face = smooth(0.9, 1.6, z) * smooth(-1.1, -0.6, y) * (1 - smooth(2.3, 2.8, y)) * (1 - smooth(1.15, 1.45, np.abs(x + 0.05)))
+crown = smooth(2.2, 3.4, y) * (1 - face)
+ear = smooth(1.45, 1.65, np.abs(x)) * smooth(0.4, 0.8, y) * (1 - smooth(2.0, 2.3, y))
+part = 1.0 + 0.9 * face - 0.45 * crown - 0.1 * ear
+w = light * facing * neck * part
 
-lo, hi = vr.min(0), vr.max(0); H = hi[1] - lo[1]; cy = (lo[1] + hi[1]) / 2
-zf = np.percentile(vr[:, 2], 99.5)
+# How far each point follows the head's turn: all of the head, then the neck
+# twisting less and less toward its base, which stays put.
+turn = smooth(NECK_CUT, -0.45, y)
+
+vr_head = vr
+lo, hi = vr_head.min(0), vr_head.max(0); H = hi[1] - lo[1]; cy = (lo[1] + hi[1]) / 2
+zf = np.percentile(vr_head[:, 2], 99.5)
 out = (vr - [0, cy, zf]) / H
-occ = (vr - nr * 0.035 - [0, cy, zf]) / H
-pivot = (np.array([0, -1.0, -0.6]) - [0, cy, zf]) / H
+# The occluder sits a little inside the surface. The scan's normals point
+# the wrong way in places (patches around the eyes and nose), which pushed the
+# occluder out in front of the face there, so it is pulled in toward the
+# head's vertical axis instead.
+axis = np.c_[np.full(len(vr), -0.05), vr[:, 1], np.full(len(vr), -0.45)]
+to_axis = axis - vr
+to_axis /= np.linalg.norm(to_axis, axis=1, keepdims=True) + 1e-9
+occ = (vr + to_axis * 0.09 - [0, cy, zf]) / H
+# The head turns on the top of the spine, behind the jaw at the earlobes.
+pivot = (np.array([-0.05, 0.6, -0.45]) - [0, cy, zf]) / H
 print('verts', len(out), 'faces', len(faces), 'pivot', pivot.round(3))
 
-buf = struct.pack('<4sII', b'HSRF', len(out), len(faces)) + struct.pack('<3f', *pivot)
+buf = struct.pack('<4sII', b'HSR2', len(out), len(faces)) + struct.pack('<3f', *pivot)
 buf += np.round(out * 30000).astype(np.int16).tobytes() + np.round(occ * 30000).astype(np.int16).tobytes()
 buf += np.round(w / w.max() * 255).astype(np.uint8).tobytes()
+buf += np.round(turn * 255).astype(np.uint8).tobytes()
 if len(buf) % 2: buf += b'\0'
 buf += faces.astype(np.uint16).tobytes()
 open('head.bin', 'wb').write(buf); print(len(buf), 'bytes')

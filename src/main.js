@@ -73,18 +73,15 @@ const WORK = 2;
 const ABOUT = 3;
 // Gabriel's head in particles, shown by clicking the name (see the click below).
 const HEAD = 4;
-// The head is drawn as this many dots of varied size (mean HEAD_POINT world
-// units). Each dot carries many particles, so the field is dimmed to about
-// HEAD_LIGHT particles' worth per dot, and the bloom steps back.
-const HEAD_DOTS = 16000;
-const HEAD_POINT = 0.021;
-const HEAD_LIGHT = 1.1;
 // How far the head turns toward the pointer, in radians, at the screen's edge.
 const HEAD_YAW = 0.35;
 const HEAD_PITCH = 0.3;
 // A small nod once the head has formed, and a tilt as it turns.
 const HEAD_NOD = 0.14;
 const HEAD_ROLL = 0.25;
+// The turn's spring: about half a second to settle, with a slight overshoot.
+const HEAD_STIFF = 34;
+const HEAD_DAMP = 9.5;
 // Language is settled before anything is built. The field rasterises each
 // phrase into a texture at construction, so picking the wrong set here would
 // mean rebuilding it later; reading the stored choice first avoids that
@@ -185,7 +182,6 @@ async function boot() {
     const visW = visH * aspect;
     const ratio = map.ratio;
     map.height = Math.min(visH * 0.9, (visW * 0.8) / ratio);
-    map.dots = HEAD_DOTS;
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
@@ -203,7 +199,7 @@ async function boot() {
   field.scene.background = new THREE.Color(background);
   if (headMap) {
     field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height));
-    field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height);
+    field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height, headMap.mesh.turn);
   }
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
@@ -451,11 +447,17 @@ async function boot() {
   let camX = 0;
   let headYaw = 0;
   let headSolid = 0;
-  let headLook = 0;
-  let leftHeadAt = -1e9;
-  let wasHeadOn = false;
   let nodAt = -1e9;
   let headPitch = 0;
+  let headYawV = 0;
+  const occEuler = [0, 0, 0];
+  const occE = new THREE.Euler(0, 0, 0, 'YXZ');
+  const occRot = new THREE.Matrix3();
+  let headTurning = false;
+  let headBloom = 0;
+  let leftHeadAt = -1e9;
+  let wasHeadOn = false;
+  let headPitchV = 0;
   const headEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const headRot4 = new THREE.Matrix4();
   const headRot = new THREE.Matrix3();
@@ -538,13 +540,30 @@ async function boot() {
           pitch = Math.sin(elapsed * 0.31) * 0.06;
         }
       }
-      const kh = 1 - Math.exp(-dt * 3);
-      headYaw += (yaw - headYaw) * kh;
-      headPitch += (pitch - headPitch) * kh;
+      // A head has weight: it turns on a spring that eases in, slightly
+      // overshoots and settles, instead of gliding at a constant rate. Its
+      // small sway and breathing keep it alive while the pointer is still.
+      if (!reducedMotion) {
+        yaw += Math.sin(elapsed * 0.37) * 0.03 + Math.sin(elapsed * 0.83 + 2) * 0.012;
+        pitch += Math.sin(elapsed * 0.53 + 1) * 0.015 + Math.sin(elapsed * 1.4) * 0.006;
+      }
+      const step = Math.min(dt, 1 / 30);
+      headYawV += ((yaw - headYaw) * HEAD_STIFF - headYawV * HEAD_DAMP) * step;
+      headPitchV += ((pitch - headPitch) * HEAD_STIFF - headPitchV * HEAD_DAMP) * step;
+      headYaw += headYawV * step;
+      headPitch += headPitchV * step;
       const tn = (now - nodAt) / 1000;
       const nod = !reducedMotion && tn > 0 && tn < 2.5 ? HEAD_NOD * Math.sin(tn * Math.PI * 3) * Math.exp(-tn * 2.2) : 0;
-      headEuler.set(headPitch + nod, headYaw, -headYaw * HEAD_ROLL);
+      // Turning, a head also tilts a little toward the side it turns to, and
+      // leads with the chin while it moves.
+      headEuler.set(headPitch + nod + Math.abs(headYawV) * 0.04, headYaw, -headYaw * HEAD_ROLL - headYawV * 0.05);
       field.setHeadPose(headRot.setFromMatrix4(headRot4.makeRotationFromEuler(headEuler)));
+      // The occluder follows the particles, which trail the pose.
+      const ko = 1 - Math.exp(-dt * 5);
+      for (let i = 0; i < 3; i++) occEuler[i] += (headEuler.toArray()[i] - occEuler[i]) * ko;
+      occE.set(occEuler[0], occEuler[1], occEuler[2], 'YXZ');
+      field.setOccluderPose(occRot.setFromMatrix4(headRot4.makeRotationFromEuler(occE)));
+      headTurning = Math.abs(headYawV) + Math.abs(headPitchV) > 0.25;
     }
     camera.updateMatrixWorld();
     field.setCamera(camera);
@@ -554,20 +573,21 @@ async function boot() {
 
     // The far side of the head hides once it has formed, and shows again as
     // soon as it starts to leave, so no particle vanishes mid-flight.
-    const formedHead = headOn && morphT === 1;
+    // Off while the head turns quickly: the particles trail the turn too far
+    // for any occluder to stay behind them.
+    const formedHead = headOn && morphT === 1 && !headTurning;
     headSolid += ((formedHead ? 1 : 0) - headSolid) * Math.min(1, dt * (formedHead ? 2.5 : 12));
     field.setHeadSolid(headSolid);
-    // The dots stay small and dim until the particles leaving the head have
-    // landed: they fly out in tight bunches, which at full light flashed.
+    field.setDim(coverage * MAX_DIM);
+    // The head packs its light into a smaller area than the name, and the
+    // full bloom haloed its outline; it takes a quarter of it. The bloom stays
+    // down until particles leaving the head have landed: they fly out bunched
+    // together, and at full bloom the bunch flashed white.
     if (wasHeadOn && !headOn) leftHeadAt = now;
     wasHeadOn = headOn;
-    const leaving = !headOn && now - leftHeadAt < CHAIN_MS + 150;
-    const lookTarget = headOn ? morphT : leaving ? 1 : 0;
-    headLook += (lookTarget - headLook) * Math.min(1, dt * (headOn || leaving ? 8 : 4));
-    field.setHeadLook(headLook, HEAD_POINT);
-    const headLight = Math.min(1, (HEAD_LIGHT * HEAD_DOTS) / field.count);
-    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - (1 - headLight) * headLook));
-    post.setBloomScale(L.bloom * (1 - headLook));
+    const keepLow = headOn || now - leftHeadAt < CHAIN_MS + 250;
+    headBloom += ((keepLow ? 1 : 0) - headBloom) * Math.min(1, dt * (keepLow ? 4 : 2.5));
+    post.setBloomScale(L.bloom * (1 - 0.75 * headBloom));
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     // One clock for every phrase change (CHAIN_MS).
