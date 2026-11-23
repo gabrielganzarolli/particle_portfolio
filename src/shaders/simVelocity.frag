@@ -22,6 +22,7 @@ uniform float uTurbulence;
 uniform float uNoiseScale;
 uniform float uFlow;
 uniform float uMaxSpeed;
+uniform float uSnap;
 
 uniform sampler2D uFluid;
 uniform float uFluidForce;
@@ -55,7 +56,12 @@ void main() {
   float energy = sin(PI * clamp(uMorph, 0.0, 1.0));
 
   // Slacken the spring mid-flight so particles arc rather than track straight.
-  vec3 force = (goal - pos) * (uSpring * mix(1.0, 0.45, energy));
+  // While a scroll morph lands (uSnap), the spring is four times as stiff near
+  // the ends of the transition, so the letters settle in under half the time;
+  // the extra damping below keeps that spring near critical (spring 36 wants
+  // about 12/s of damping, the base gives 5.7), so it lands without bounce.
+  float snap = uSnap * (1.0 - energy);
+  vec3 force = (goal - pos) * (uSpring * mix(1.0, 0.45, energy) * (1.0 + 3.0 * snap));
 
   vec3 swirl = curlNoise(pos * uNoiseScale + vec3(0.0, 0.0, uTime * uFlow));
   force += swirl * (uTurbulence * (1.0 + 4.0 * energy));
@@ -79,6 +85,7 @@ void main() {
 
   // Framerate-independent damping.
   vel *= pow(uDamping, uDt * 60.0);
+  vel *= exp(-uDt * 6.3 * snap);
   vel += force * uDt;
 
   float speed = length(vel);

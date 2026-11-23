@@ -193,6 +193,7 @@ export class ParticleField {
       uNoiseScale: { value: DEFAULTS.noiseScale },
       uFlow: { value: DEFAULTS.flow },
       uMaxSpeed: { value: DEFAULTS.maxSpeed },
+      uSnap: { value: 0 },
       uFluid: { value: fluid?.texture ?? null },
       uFluidForce: { value: fluid ? DEFAULTS.fluidForce : 0 },
       uViewProj: { value: new THREE.Matrix4() },
@@ -321,6 +322,11 @@ export class ParticleField {
 
   setPixelScale(scale) {
     this.material.uniforms.uPixelScale.value = scale;
+  }
+
+  /** 0..1: how much stiffer the springs are while a scroll morph lands. */
+  setSnap(v) {
+    this.velVar.material.uniforms.uSnap.value = v;
   }
 
   /**

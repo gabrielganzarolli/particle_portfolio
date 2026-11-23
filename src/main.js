@@ -29,14 +29,26 @@ const HOVER_MARGIN = 0.12;
 // Hysteresis, so a cursor resting on the boundary doesn't chatter.
 const HOVER_SLACK = 0.18;
 
-// Scroll-linked morph. While the page is moving the phrase follows the scroll,
-// smoothed so a mouse wheel's discrete steps don't come through as jumps. Once
-// the scroll has been still for SETTLE_AFTER_MS, a half-formed phrase finishes
-// on its own in the direction the visitor was going, at the hover morph's pace,
-// so the field never rests as an unreadable cloud.
-const FOLLOW_RATE = 7; // 1/s, exponential approach to the scroll position
-const SETTLE_AFTER_MS = 160;
-const SETTLE_COMMIT = 0.12; // how far into a morph counts as having started it
+// Scroll-triggered morph. Scroll decides which phrase should be showing; the
+// change itself runs on its own clock. A morph that tracked the scroll
+// position finished only when the scroll did, and the particles need about a
+// second after that to land, so at any brisk pace the section arrived over a
+// half-formed word. Now a morph starts once the visitor is SCROLL_COMMIT of
+// the way into it and runs at CHAIN_MS per phrase whatever the scroll does,
+// and it reverses the same way when they scroll back.
+const CHAIN_MS = 550;
+const SCROLL_COMMIT = 0.03;
+
+// After a scroll morph lands, the springs stiffen for a moment (uSnap in the
+// velocity shader) so the letters settle in about half the time. It fades
+// out after SNAP_HOLD_MS, so the cursor's push on a resting phrase keeps its
+// usual give.
+const SNAP_HOLD_MS = 1000;
+
+// Each section's text waits until its phrase has settled this long, so the
+// title and the list never come in over a word still forming. Scrolling past
+// a phrase without stopping releases its section anyway.
+const FORMED_MS = 400;
 
 // Values the tuning panel (#ajuste) can change live. Parallax is how far the
 // camera drifts with the cursor, in world units; the fluid values are the
@@ -261,19 +273,32 @@ async function boot() {
     });
   }
 
-  // Scroll morph state (see FOLLOW_RATE above) ------------------------------
+  // Scroll morph state (see CHAIN_MS above) --------------------------------
   let chainShown = 0; // what the field displays, 0..CHAIN_MAX
   let lastScrollY = window.scrollY;
-  let lastScrollAt = -Infinity;
   let scrollDir = 1;
+  let landedAt = -Infinity; // when chainShown last arrived on a phrase
+  let snap = 0;
+  const released = { work: reducedMotion, about: reducedMotion };
+  if (!reducedMotion) {
+    scrollWork.setGate('work', false);
+    scrollWork.setGate('about', false);
+  }
 
-  /** Where an idle morph should come to rest, given which way the visitor went. */
-  function settleTarget(mapped) {
+  /** Which phrase the scroll asks for, given which way the visitor is going. */
+  function chainTarget(mapped) {
     const link = Math.min(Math.floor(mapped), CHAIN_MAX - 1);
     const f = mapped - link;
-    if (f <= 0.0005 || f >= 0.9995) return mapped;
-    if (scrollDir > 0) return link + (f > SETTLE_COMMIT ? 1 : 0);
-    return link + (f < 1 - SETTLE_COMMIT ? 0 : 1);
+    if (f <= 0.0005 || f >= 0.9995) return Math.round(mapped);
+    if (scrollDir > 0) return link + (f > SCROLL_COMMIT ? 1 : 0);
+    return link + (f < 1 - SCROLL_COMMIT ? 0 : 1);
+  }
+
+  /** Opens a section's text once its phrase has formed, or been passed. */
+  function release(name) {
+    if (released[name]) return;
+    released[name] = true;
+    scrollWork.setGate(name, true);
   }
 
   // Frame probe: steps the quality level down if frames run long ----------
@@ -304,10 +329,7 @@ async function boot() {
     // Track scroll direction and idleness for the morph, even while paused.
     const sy = window.scrollY;
     const dS = sy - lastScrollY;
-    if (Math.abs(dS) > 0.5) {
-      scrollDir = Math.sign(dS);
-      lastScrollAt = now;
-    }
+    if (Math.abs(dS) > 0.5) scrollDir = Math.sign(dS);
     lastScrollY = sy;
 
     // Nothing of the canvas shows while an opaque section fills the screen, so
@@ -377,7 +399,6 @@ async function boot() {
       // Position along CHAIN. aboutProgress only leaves 0 long after
       // workProgress has reached 1, so this stays monotonic and continuous.
       const mapped = workProgress + aboutProgress;
-      const idle = now - lastScrollAt > SETTLE_AFTER_MS;
 
       // A fixed-rate ramp rather than exponential smoothing: the shader staggers
       // each particle over smoothstep(s, s + 0.45, uMorph) with s up to 0.55, so
@@ -385,18 +406,20 @@ async function boot() {
       // asymptotic approach would leave the phrase permanently half-formed.
       const rate = dt / (MORPH_MS / 1000);
 
-      if (!idle) {
-        // Follow the scroll, but never back away from a phrase that already
-        // settled ahead of it in the direction of travel.
-        const target = scrollDir > 0 ? Math.max(chainShown, mapped) : Math.min(chainShown, mapped);
-        const k = 1 - Math.exp(-dt * FOLLOW_RATE);
-        chainShown += (target - chainShown) * k;
-        if (Math.abs(target - chainShown) < 0.0005) chainShown = target;
-      } else {
-        const target = settleTarget(mapped);
-        const diff = target - chainShown;
-        chainShown += Math.sign(diff) * Math.min(Math.abs(diff), rate);
-      }
+      const target = chainTarget(mapped);
+      const before = chainShown;
+      const diff = target - chainShown;
+      chainShown += Math.sign(diff) * Math.min(Math.abs(diff), dt / (CHAIN_MS / 1000));
+      if (chainShown === target && before !== target) landedAt = now;
+
+      const moving = chainShown !== target;
+      const settling = now - landedAt < SNAP_HOLD_MS;
+      snap += ((chainShown > 0 && (moving || settling) ? 1 : 0) - snap) * Math.min(1, dt * 5);
+      field.setSnap(snap);
+
+      const formed = !moving && now - landedAt > FORMED_MS;
+      if (chainShown > 1 || (formed && chainShown === 1)) release('work');
+      if (chainShown === 2 && formed) release('about');
 
       if (chainShown > 0.0005) {
         const link = Math.min(Math.floor(chainShown), CHAIN_MAX - 1);

@@ -21,7 +21,7 @@ const HOLD_VH = 0.35;
 // the viewport. The WORK glyphs occupy roughly 0.34–0.66 of the viewport
 // height, but the work section's bottom 22% is a gradient fade, so the word is
 // already legible through it before the gap proper arrives.
-const ABOUT_MORPH_START_VH = 0.44;
+const ABOUT_MORPH_START_VH = 0.75;
 
 // A morph never gets squeezed into less scroll than this, whatever the layout.
 const MIN_MORPH_VH = 0.3;
@@ -35,23 +35,40 @@ const CHROME_FADE_VH = 0.45 * PACE;
  * getBoundingClientRect every frame, all fifteen of them, for the life of the
  * page. The trigger line sits 8% above the bottom edge, as before.
  */
-function observeReveals() {
+function observeReveals(gates) {
   const targets = Array.from(document.querySelectorAll('.reveal'));
+  // Text inside a gated section waits for its gate (see setGate below).
+  const gateOf = (el) => (el.closest('.work') ? 'work' : el.closest('.about') ? 'about' : null);
+  const waiting = { work: [], about: [] };
+
+  const show = (el) => {
+    const g = gateOf(el);
+    if (g && !gates[g]) waiting[g].push(el);
+    else el.classList.add('is-in');
+  };
+
   if (!('IntersectionObserver' in window)) {
-    targets.forEach((t) => t.classList.add('is-in'));
-    return;
+    targets.forEach(show);
+  } else {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          show(entry.target);
+          io.unobserve(entry.target);
+        }
+      },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0 }
+    );
+    targets.forEach((t) => io.observe(t));
   }
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.add('is-in');
-        io.unobserve(entry.target);
-      }
-    },
-    { rootMargin: '0px 0px -8% 0px', threshold: 0 }
-  );
-  targets.forEach((t) => io.observe(t));
+
+  return (name) => {
+    // Everything that came into view while the gate was shut, in page order,
+    // a short beat apart so the list still reads top to bottom.
+    waiting[name].forEach((el, i) => setTimeout(() => el.classList.add('is-in'), i * 70));
+    waiting[name].length = 0;
+  };
 }
 
 /**
@@ -67,7 +84,9 @@ function observeReveals() {
  * move.
  */
 export function createScrollWork() {
-  observeReveals();
+  // Gates start open: if the particle field never starts, nothing waits.
+  const gates = { work: true, about: true };
+  const flush = observeReveals(gates);
 
   const main = document.querySelector('main');
   const aboutSpace = document.querySelector('.about-space');
@@ -89,6 +108,15 @@ export function createScrollWork() {
   let lastChrome = -1;
 
   return {
+    /**
+     * Hold a section's text back until its phrase has formed, then let it in.
+     * main.js shuts both gates at start and opens each when its word settles.
+     */
+    setGate(name, open) {
+      gates[name] = open;
+      if (open) flush(name);
+    },
+
     /** @returns {{ workProgress:number, aboutProgress:number, coverage:number, hidden:boolean }} */
     update(vh) {
       const scrollY = window.scrollY;
