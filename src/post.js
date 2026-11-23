@@ -19,12 +19,13 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 // over the whole viewport, which then showed as a band where the page's own
 // background starts under the name; at 0.12 the glow stays on the letters and
 // the screen edges measure the page colour exactly.
+// Tuned by Gabriel in the #ajuste panel (2026-11-23).
 export const POST_DEFAULTS = {
   bloom: 0.7,
-  radius: 0.12,
-  threshold: 0.32,
-  grain: 0.026,
-  vignette: 0.5,
+  radius: 0.054,
+  threshold: 0.36,
+  grain: 0.022,
+  vignette: 0.28,
 };
 
 export function createPost(renderer, scene, camera, { background, bloomScale = 1 }) {

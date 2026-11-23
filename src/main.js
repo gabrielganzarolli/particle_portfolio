@@ -53,15 +53,15 @@ const SNAP_HOLD_MS = 1000;
 // a phrase without stopping releases its section anyway.
 const FORMED_MS = 400;
 
-// Values the tuning panel (#ajuste) can change live. Parallax is how far the
-// camera drifts with the cursor, in world units; the fluid values are the
-// Cream v3 proof's.
+// Values the tuning panel (#ajuste) can change live, as Gabriel tuned them
+// (2026-11-23). Parallax is how far the camera drifts with the cursor, in
+// world units.
 const tune = {
-  parallaxX: 0.55,
-  parallaxY: 0.3,
-  fluidPointer: 9,
+  parallaxX: 0.46,
+  parallaxY: 0.5,
+  fluidPointer: 7.5,
   fluidScroll: 0.22,
-  dissipation: 0.972,
+  dissipation: 0.927,
 };
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -83,18 +83,19 @@ const HEAD_NOD = 0.14;
 // how much it tilts into the turn; stiffness and damping are the turn's
 // spring (about half a second to settle, with a slight overshoot); sway is
 // its idle movement.
+// Values tuned by Gabriel in the panel (2026-11-23).
 const headTune = {
-  size: 1.2,
+  size: 1.44,
   x: 0,
-  y: 0,
-  brightness: 1,
+  y: 0.1,
+  brightness: 1.3,
   ...HEAD_LOOK,
-  yaw: 0.35,
-  pitch: 0.3,
-  roll: 0.25,
-  stiffness: 34,
-  damping: 9.5,
-  sway: 1,
+  yaw: 0.78,
+  pitch: 0.5,
+  roll: 0.1,
+  stiffness: 39,
+  damping: 10.5,
+  sway: 4,
 };
 // Language is settled before anything is built. The field rasterises each
 // phrase into a texture at construction, so picking the wrong set here would
@@ -589,12 +590,21 @@ async function boot() {
       // leads with the chin while it moves.
       headEuler.set(headPitch + nod + Math.abs(headYawV) * 0.04, headYaw, -headYaw * headTune.roll - headYawV * 0.05);
       field.setHeadPose(headRot.setFromMatrix4(headRot4.makeRotationFromEuler(headEuler)));
-      // The occluder follows the particles, which trail the pose.
-      const ko = 1 - Math.exp(-dt * 5);
-      for (let i = 0; i < 3; i++) occEuler[i] += (headEuler.toArray()[i] - occEuler[i]) * ko;
+      // The occluder follows the particles, which trail the pose by about a
+      // third of a second on their springs.
+      const ko = 1 - Math.exp(-dt * 3);
+      const pose = headEuler.toArray();
+      let gap = 0;
+      for (let i = 0; i < 3; i++) {
+        occEuler[i] += (pose[i] - occEuler[i]) * ko;
+        gap = Math.max(gap, Math.abs(pose[i] - occEuler[i]));
+      }
       occE.set(occEuler[0], occEuler[1], occEuler[2], 'YXZ');
       field.setOccluderPose(occRot.setFromMatrix4(headRot4.makeRotationFromEuler(occE)));
-      headTurning = Math.abs(headYawV) + Math.abs(headPitchV) > 0.25;
+      // Off while the pose runs ahead of the particles: after a wide, quick
+      // turn they are still on their way, and an occluder at the new pose
+      // punched holes in the face.
+      headTurning = Math.abs(headYawV) + Math.abs(headPitchV) > 0.25 || gap > 0.03;
     }
     camera.updateMatrixWorld();
     field.setCamera(camera);

@@ -19,29 +19,29 @@ const POINTS_VERT = `${simplex}\n${pointsVert}`;
 // damping sits at spring = (c/2)^2 — about 8.0 at 0.91. Sitting just above it
 // gives a soft arrival with the faintest overshoot, settling over ~0.8s. The
 // earlier 16/0.88 pair was well above critical and snapped into place.
+// Tuned by Gabriel in the #ajuste panel (2026-11-23).
 const DEFAULTS = {
-  spring: 9.0,
+  spring: 8.1,
   damping: 0.91,
-  // Bigger, slower eddies. Amplitude came down because the weaker spring lets
-  // the same force push further — displacement is force/spring, so holding
-  // turbulence at 0.28 would have loosened the letterforms.
-  turbulence: 0.24,
+  // Bigger, slower eddies. Displacement is force/spring, so a softer spring
+  // lets the same turbulence loosen the letterforms more.
+  turbulence: 0.28,
   noiseScale: 0.28,
   flow: 0.055,
   maxSpeed: 10.0,
-  // Equilibrium displacement under the cursor is repel/spring world units, so
-  // 8/9 keeps roughly the previous reach while the wider radius spreads it over
-  // more of the field — a soft swell rather than a sharp dent.
-  repel: 8.0,
+  // Equilibrium displacement under the cursor is repel/spring world units:
+  // about 0.6 here, spread over a radius of 1.27 — a soft swell rather than a
+  // sharp dent.
+  repel: 4.8,
   wake: 0.06,
-  radius: 1.6,
+  radius: 1.27,
   // ~2 device pixels per particle. Larger than that and 262k additive sprites
   // overdraw each other into a solid white slab with no letterforms left.
-  pointSize: 0.008,
+  pointSize: 0.0075,
   // Lower than the 0.62 this ran at before the bloom pass: the field now
   // renders in linear light and is encoded on output, which lifts mid-tones,
   // and the bloom adds its own glow on top.
-  opacity: 0.5,
+  opacity: 0.52,
   // Feature size of the hue field, in world units of ~1/colorScale. At 0.34 the
   // whole phrase fell inside one or two patches and read as flat tinting.
   colorScale: 1.1,
@@ -50,10 +50,10 @@ const DEFAULTS = {
   // velocity. The springs pull everything back, so this reads as a wave through
   // the letterforms that settles rather than as a smear. Above ~12 a fast swipe
   // tore the phrase apart into bright clumps.
-  fluidForce: 9.0,
+  fluidForce: 7.2,
   // Depth of field. Particles away from the phrase's plane grow and dim, so
   // anything flying in depth during a morph reads as out-of-focus light.
-  dof: 0.32,
+  dof: 0.33,
 };
 
 export class ParticleField {

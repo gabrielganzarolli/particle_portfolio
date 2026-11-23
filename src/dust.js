@@ -39,7 +39,7 @@ export function createDust(count, { fieldWidth, reducedMotion }) {
       uPixelScale: { value: 1 },
       uFocus: { value: 12 },
       uFluid: { value: null },
-      uFluidShift: { value: 0.04 },
+      uFluidShift: { value: 0.061 },
       uOpacity: { value: 1 },
       uRise: { value: fieldWidth * 0.55 },
     },

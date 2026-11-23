@@ -271,8 +271,12 @@ export async function loadHeadMesh(url) {
   return head;
 }
 
-/** The density mix surface.py used to bake; the tuning panel starts here. */
-export const HEAD_LOOK = { shadows: 0.85, floor: 0.1, face: 1.9, crown: 0.55, ears: 0.9, neck: 1 };
+/**
+ * The head's density mix, as Gabriel tuned it in the panel (2026-11-23). The
+ * mix surface.py used to bake was shadows 0.85, floor 0.1, face 1.9, crown
+ * 0.55, ears 0.9, neck 1.
+ */
+export const HEAD_LOOK = { shadows: 0.39, floor: 0.39, face: 1.5, crown: 0.85, ears: 1.2, neck: 1 };
 
 /** Mix the head's density ingredients into one weight per vertex. */
 export function mixHeadWeights(head, look) {

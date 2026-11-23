@@ -112,11 +112,14 @@ out = (vr - [0, cy, zf]) / H
 # The occluder sits a little inside the surface. The scan's normals point
 # the wrong way in places (patches around the eyes and nose), which pushed the
 # occluder out in front of the face there, so it is pulled in toward the
-# head's vertical axis instead.
-axis = np.c_[np.full(len(vr), -0.05), vr[:, 1], np.full(len(vr), -0.45)]
-to_axis = axis - vr
-to_axis /= np.linalg.norm(to_axis, axis=1, keepdims=True) + 1e-9
-occ = (vr + to_axis * 0.09 - [0, cy, zf]) / H
+# head's centre instead.
+# Toward the head's centre rather than its vertical axis: with the head
+# turned up, the undersides of the chin and nose show, and pulled in only
+# sideways the occluder sat right on them and erased their particles.
+centre = np.array([-0.05, 0.9, -0.45])
+to_c = centre - vr
+to_c /= np.linalg.norm(to_c, axis=1, keepdims=True) + 1e-9
+occ = (vr + to_c * 0.12 - [0, cy, zf]) / H
 # The head turns on the top of the spine, behind the jaw at the earlobes.
 pivot = (np.array([-0.05, 0.6, -0.45]) - [0, cy, zf]) / H
 print('verts', len(out), 'faces', len(faces), 'pivot', pivot.round(3))
