@@ -5,20 +5,26 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 // scroll without changing where any of them start. 1 = the earlier tuning.
 const PACE = 2.0;
 
-// Scroll distance over which the particle text morphs into WORK. The phrase
-// should land before the case list starts covering it.
-const TEXT_MORPH_VH = 0.6 * PACE;
-
-// The WORK -> ABOUT ME morph, triggered when the gap's top edge is this far
-// down the viewport. The particle text sits at the vertical centre, so firing
-// the instant the gap appeared ran the whole morph behind the work section.
+// Each phrase has to be fully formed, and seen alone for a moment, before the
+// section it introduces comes up from the bottom of the screen. So the end of
+// each morph is derived from where that section's title sits, not from a fixed
+// scroll distance: the morph finishes HOLD_VH of scroll before the title's top
+// reaches the bottom edge, and the phrase holds alone for that stretch.
 //
-// The WORK glyphs occupy roughly 0.34–0.66 of the viewport height, but the work
-// section's bottom 22% is a gradient fade, so the word is already legible
-// through it before the gap proper arrives. Triggering at 0.44 uses that fade
-// rather than waiting the gap out — that wait was most of the dead scroll.
+// Before this, REST -> WORK ran over a fixed 1.2 screens of scroll and was
+// only ~96% done when "Selected work" and the first case were already on
+// screen; the letters land at exactly 100%, so WORK never read as a word
+// before the list covered it.
+const HOLD_VH = 0.35;
+
+// The WORK -> ABOUT ME morph starts when the gap's top edge is this far down
+// the viewport. The WORK glyphs occupy roughly 0.34–0.66 of the viewport
+// height, but the work section's bottom 22% is a gradient fade, so the word is
+// already legible through it before the gap proper arrives.
 const ABOUT_MORPH_START_VH = 0.44;
-const ABOUT_MORPH_VH = 0.36 * PACE;
+
+// A morph never gets squeezed into less scroll than this, whatever the layout.
+const MIN_MORPH_VH = 0.3;
 
 // The hero chrome (bio, hint) is gone by the time the case list arrives.
 const CHROME_FADE_VH = 0.45 * PACE;
@@ -63,7 +69,10 @@ function observeReveals() {
 export function createScrollWork() {
   observeReveals();
 
+  const main = document.querySelector('main');
   const aboutSpace = document.querySelector('.about-space');
+  const workTitle = document.querySelector('.work-title');
+  const aboutTitle = document.querySelector('.about-title');
   const solids = Array.from(document.querySelectorAll('[data-solid]'));
   const chrome = Array.from(document.querySelectorAll('[data-fade-on-scroll]'));
 
@@ -114,13 +123,22 @@ export function createScrollWork() {
         if (top + h * from <= 0 && top + h * to >= viewH) hidden = true;
       }
 
+      // Document positions of the two section titles. offsetTop, not the
+      // bounding rect: the titles carry the reveal's 18px offset until they are
+      // shown, and the morph's end must not move when that offset goes away.
+      const mainTop = main.getBoundingClientRect().top + scrollY;
+      const enters = (el) => (el ? mainTop + el.offsetTop - vh : Infinity);
+
+      const workEnd = Math.max(enters(workTitle) - vh * HOLD_VH, vh * MIN_MORPH_VH);
+
       // Derived from the live rect rather than a hardcoded offset, so it stays
       // correct however tall the work grid ends up.
       const aboutStart = scrollY + aboutSpaceTop - vh * ABOUT_MORPH_START_VH;
+      const aboutEnd = Math.max(enters(aboutTitle) - vh * HOLD_VH, aboutStart + vh * MIN_MORPH_VH);
 
       return {
-        workProgress: clamp01(scrollY / (vh * TEXT_MORPH_VH)),
-        aboutProgress: clamp01((scrollY - aboutStart) / (vh * ABOUT_MORPH_VH)),
+        workProgress: clamp01(scrollY / workEnd),
+        aboutProgress: clamp01((scrollY - aboutStart) / (aboutEnd - aboutStart)),
         coverage,
         hidden,
       };

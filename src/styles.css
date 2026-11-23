@@ -97,17 +97,18 @@ main {
 }
 
 .hero-space {
-  /* Runway for the name -> WORK morph, and no more. It used to be 245vh, which
-     meant two and a half screens of nothing before the first case — long
-     enough to build momentum and flick straight past the list. */
-  height: 190vh;
+  /* Runway for the name -> WORK morph and a short hold on the finished word
+     before the list comes up (HOLD_VH in scrollWork.js). It used to be 245vh,
+     which was long enough to build momentum and flick straight past the list;
+     190vh left no room for WORK to finish before the list covered it. */
+  height: 205vh;
 }
 
 .about-space {
-  /* The morph has to finish before the About section starts covering the
-     canvas, so this has to grow with PACE in scrollWork.js. Minimum height is
-     (1 - (0.44 - 0.36 * PACE)) — at PACE 2.0 the morph ends around gapTop
-     -0.28, so the gap needs at least 128vh. 132vh leaves a small margin. */
+  /* Room for the WORK -> ABOUT ME morph plus the hold before the About title
+     comes up. The morph's end is derived from the title's position
+     (scrollWork.js), so changing this height changes how long the morph runs,
+     not whether it finishes. */
   height: 140vh;
 }
 
