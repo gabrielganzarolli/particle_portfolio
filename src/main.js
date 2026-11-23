@@ -173,9 +173,11 @@ async function boot() {
   // same, minus the head.
   const [, map] = await Promise.all([readyFonts(), loadHeadMesh(headMeshUrl).catch(() => null)]);
   if (map) {
-    // Sized to the screen it first opens on: taller than the view, the top of
-    // the head just under the top edge and the neck running off the bottom
-    // (narrower on a phone held upright, where the width decides).
+    // Sized to the screen it first opens on: the head itself (crown to chin)
+    // about nine tenths of the view's height and centred in it, the neck
+    // running off the bottom (narrower on a phone held upright, where the
+    // width decides). The chin and crown sit at -0.257 and 0.5 of the mesh's
+    // height (scripts/head/surface.py), so the head's middle is at 0.121.
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
     const aspect = vw / vh;
     const z = Math.max(FIELD_WIDTH / FILL / (2 * Math.tan(halfFov) * aspect), (FIELD_WIDTH * 0.25) / FILL / (2 * Math.tan(halfFov)));
@@ -183,7 +185,7 @@ async function boot() {
     const visW = visH * aspect;
     const ratio = map.ratio;
     map.height = Math.min(visH * 1.2, (visW * 0.9) / ratio);
-    map.offsetY = visH * 0.42 - map.height / 2;
+    map.offsetY = -0.121 * map.height;
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
