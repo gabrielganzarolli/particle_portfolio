@@ -170,6 +170,8 @@ function sampleRange(job, from, to) {
  * badly on sparse phrases.
  */
 export function buildTarget(phrase, opts) {
+  // A phrase can also be a portrait map (see loadImageMap).
+  if (typeof phrase !== 'string') return buildImageTarget(phrase, opts);
   const job = prepare(phrase, opts);
   sampleRange(job, 0, job.count);
   return job;
@@ -189,6 +191,9 @@ const nextIdle = () =>
  */
 export async function buildTargetInSlices(phrase, opts) {
   await nextIdle();
+  // A portrait is a small image, about 60ms to sample on a laptop: one idle
+  // slot rather than a sliced build.
+  if (typeof phrase !== 'string') return buildImageTarget(phrase, opts);
   const job = newJob(rasterize(phrase), opts);
 
   // Every stage, the prefix sum over a million pixels included, runs in slices
@@ -220,4 +225,83 @@ export function toDataTexture(positions, size) {
   tex.magFilter = THREE.NearestFilter;
   tex.needsUpdate = true;
   return tex;
+}
+
+/**
+ * Load a portrait map for buildImageTarget: an image whose red channel is
+ * particle density and whose green channel is depth toward the camera. The
+ * map for the head is made offline from a photo (cut out, contrast and edges
+ * folded into density, a rounded volume into depth), so the browser only
+ * samples it.
+ */
+export async function loadImageMap(url) {
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = url;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  return { image: ctx.getImageData(0, 0, canvas.width, canvas.height), height: 4 };
+}
+
+/**
+ * Particle destinations from a portrait map, in the same shape buildTarget
+ * returns. `map.height` is the portrait's height in world units; width follows
+ * the image. Depth lifts the face toward the camera by up to `relief`, so the
+ * pointer parallax turns the head slightly and the depth of field softens the
+ * nearest features.
+ */
+export function buildImageTarget(map, { count, relief = 0.9, strayRatio = 0.05 }) {
+  const { data, width, height } = map.image;
+  const n = width * height;
+  const cdf = new Float32Array(n);
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    acc += data[i * 4] / 255;
+    cdf[i] = acc;
+  }
+  if (acc <= 0) throw new Error('Portrait map is empty');
+
+  const worldH = map.height;
+  const worldW = (worldH * width) / height;
+  const positions = new Float32Array(count * 4);
+  const jitter = new Float32Array(count);
+  const bounds = { halfW: 0, halfH: 0 };
+
+  for (let p = 0; p < count; p++) {
+    const target = Math.random() * acc;
+    let lo = 0;
+    let hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cdf[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    const px = lo % width;
+    const py = (lo / width) | 0;
+    const x = ((px + Math.random()) / width - 0.5) * worldW;
+    const y = (0.5 - (py + Math.random()) / height) * worldH;
+    const z = (data[lo * 4 + 1] / 255 - 0.45) * relief;
+
+    const stray = Math.random() < strayRatio;
+    const spread = stray ? worldW * 0.03 : 0;
+    if (!stray) {
+      bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
+      bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
+    }
+
+    const i4 = p * 4;
+    positions[i4 + 0] = x + gaussian() * spread;
+    positions[i4 + 1] = y + gaussian() * spread;
+    positions[i4 + 2] = z + (Math.random() - 0.5) * 0.04;
+    positions[i4 + 3] = 1;
+
+    const brightness = 0.5 + Math.random() * Math.random() * 0.85;
+    jitter[p] = stray ? brightness * 0.55 : brightness;
+  }
+
+  return { positions, jitter, bounds };
 }

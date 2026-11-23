@@ -13,6 +13,7 @@ uniform vec3  uMouse;
 uniform vec3  uMouseVel;
 uniform float uMouseActive;
 uniform float uRepel;
+uniform float uRepelScale;
 uniform float uWake;
 uniform float uRadius;
 
@@ -71,8 +72,9 @@ void main() {
   vec3 d = pos - uMouse;
   d.z *= 0.35;
   float falloff = exp(-dot(d, d) / (uRadius * uRadius)) * uMouseActive;
-  force += normalize(d + 1e-5) * (uRepel * falloff);
-  force += uMouseVel * (uRepel * uWake * falloff);
+  float repel = uRepel * uRepelScale;
+  force += normalize(d + 1e-5) * (repel * falloff);
+  force += uMouseVel * (repel * uWake * falloff);
 
   // Screen-space fluid stirred by the pointer and the scroll. Sampled where the
   // particle currently sits on screen and applied in the camera's plane, so a

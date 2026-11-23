@@ -265,6 +265,7 @@ export class ParticleField {
       uFlow: { value: DEFAULTS.flow },
       uMaxSpeed: { value: DEFAULTS.maxSpeed },
       uSnap: { value: 0 },
+      uRepelScale: { value: 1 },
       uFluid: { value: fluid?.texture ?? null },
       uFluidForce: { value: fluid ? DEFAULTS.fluidForce : 0 },
       uViewProj: { value: new THREE.Matrix4() },
@@ -394,6 +395,11 @@ export class ParticleField {
 
   setPixelScale(scale) {
     this.material.uniforms.uPixelScale.value = scale;
+  }
+
+  /** Multiplies the cursor's push; the head takes a gentler one. */
+  setRepelScale(v) {
+    this.velVar.material.uniforms.uRepelScale.value = v;
   }
 
   /** 0..1: how much stiffer the springs are while a scroll morph lands. */

@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import './styles.css';
 import { ParticleField } from './ParticleField.js';
 import { Pointer } from './pointer.js';
-import { readyFonts } from './textTargets.js';
+import { readyFonts, loadImageMap } from './textTargets.js';
+import headMapUrl from './images/head/head-map.png';
 import { backgroundOf } from './palette.js';
 import { hidePreloader, showFatal } from './overlay.js';
 import { createScrollWork } from './scrollWork.js';
@@ -70,6 +71,8 @@ const REST = 0;
 const HOVER = 1;
 const WORK = 2;
 const ABOUT = 3;
+// Gabriel's head in particles, shown by clicking the name (see the click below).
+const HEAD = 4;
 // Language is settled before anything is built. The field rasterises each
 // phrase into a texture at construction, so picking the wrong set here would
 // mean rebuilding it later; reading the stored choice first avoids that
@@ -78,6 +81,10 @@ const lang = storedLang() ?? 'en';
 applyHomeLang(lang);
 attachHomeToggle(lang);
 
+// The head is the same object in both languages, so a language switch leaves it
+// in place (ParticleField keeps any phrase that is identical in both sets).
+let headMap = null;
+const phrasesFor = (l) => [...(ALL_PHRASES[l] ?? ALL_PHRASES.en), ...(headMap ? [headMap] : [])];
 let PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
 
 // The phrases scroll walks through, in order. Scroll position maps to a single
@@ -153,7 +160,22 @@ async function boot() {
   camera.position.set(0, 0, 10);
   let cameraZ = 10;
 
-  await readyFonts();
+  // The portrait map loads alongside the fonts. Without it the page is the
+  // same, minus the head.
+  const [, map] = await Promise.all([readyFonts(), loadImageMap(headMapUrl).catch(() => null)]);
+  if (map) {
+    // Sized to the screen it first opens on: about four fifths of the view's
+    // height, narrower than the view on a phone held upright.
+    const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
+    const aspect = vw / vh;
+    const z = Math.max(FIELD_WIDTH / FILL / (2 * Math.tan(halfFov) * aspect), (FIELD_WIDTH * 0.25) / FILL / (2 * Math.tan(halfFov)));
+    const visH = 2 * z * Math.tan(halfFov);
+    const visW = visH * aspect;
+    const ratio = map.image.width / map.image.height;
+    map.height = Math.min(visH * 0.78, (visW * 0.8) / ratio);
+    headMap = map;
+  }
+  PHRASES = phrasesFor(lang);
 
   const fluid = createFluid(renderer, { res: L.fluidRes, iterations: L.fluidIter });
 
@@ -263,16 +285,75 @@ async function boot() {
     );
   }
 
-  // Touch devices have no hover, so a tap on the hero toggles instead. Only
-  // while the hero is showing: a tap anywhere further down, on the case list or
-  // the about text, used to flip the phrase waiting at the top.
+  /** Is the pointer on the head? Tested against the portrait's sampled extent. */
+  function pointerOverHead() {
+    if (!headMap || !pointer.targetActive || !pointer.hasSample) return false;
+    return onHead(pointer.target);
+  }
+
+  const onHead = (p) => {
+    const b = field.boundsOf(HEAD);
+    return Math.abs(p.x) < b.halfW && Math.abs(p.y) < b.halfH;
+  };
+  const onName = (p) => {
+    const b = field.boundsOf(REST);
+    return Math.abs(p.x) < b.halfW + HOVER_MARGIN && Math.abs(p.y) < b.halfH + HOVER_MARGIN;
+  };
+
+  // Where a click lands on the plane the field lives on. Taken from the click
+  // itself: on a touch screen the pointer has already lifted and left by the
+  // time the click arrives, so the tracked pointer no longer has a position.
+  const clickRay = new THREE.Vector3();
+  const clickPoint = new THREE.Vector3();
+  function worldAt(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    clickRay
+      .set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1, 0.5)
+      .unproject(camera)
+      .sub(camera.position)
+      .normalize();
+    const t = -camera.position.z / clickRay.z;
+    return clickPoint.copy(camera.position).addScaledVector(clickRay, t);
+  }
+
+  // Clicking the name turns it into Gabriel's head; clicking the head turns it
+  // back. Only at the top of the page, where the name is the whole screen.
+  // Touch devices have no hover, so a tap anywhere else on the hero still
+  // toggles PRODUCT DESIGNER, as before.
+  let headOn = false;
+  let repelScale = 1;
   let tapped = false;
-  if (coarsePointer && !reducedMotion) {
-    window.addEventListener('click', (e) => {
-      if (window.scrollY > 4) return;
-      if (e.target.closest?.('a, button, section, footer')) return;
-      tapped = !tapped;
-    });
+  window.addEventListener('click', (e) => {
+    if (window.scrollY > 4 || chainShown > 0 || swap) return;
+    if (e.target.closest?.('a, button, section, footer')) return;
+    const at = worldAt(e.clientX, e.clientY);
+    if (headMap && (headOn ? onHead(at) : onName(at))) {
+      headOn = !headOn;
+      tapped = false;
+      if (headOn) {
+        // From whatever is on screen (the name, or PRODUCT DESIGNER mid-hover).
+        usePair(field.currentIndex === HOVER ? HOVER : REST, HEAD);
+        morphT = 0;
+      } else {
+        // Back toward the name from the head.
+        usePair(REST, HEAD);
+      }
+      if (reducedMotion) {
+        field.jumpTo(headOn ? HEAD : REST);
+        morphT = headOn ? 1 : 0;
+      }
+      return;
+    }
+    if (coarsePointer && !reducedMotion && !headOn) tapped = !tapped;
+  });
+
+  // The name and the head read as clickable: the cursor says so.
+  let cursorHint = false;
+  function updateCursor(atTop) {
+    const want = Boolean(headMap) && atTop && (headOn ? pointerOverHead() : pointerOverText());
+    if (want === cursorHint) return;
+    cursorHint = want;
+    document.body.style.cursor = want ? 'pointer' : '';
   }
 
   // Scroll morph state (see CHAIN_MS above) --------------------------------
@@ -288,7 +369,7 @@ async function boot() {
   let swap = null;
   onHomeSwitch(async (next) => {
     if (swap) return;
-    const phrases = ALL_PHRASES[next] ?? ALL_PHRASES.en;
+    const phrases = phrasesFor(next);
     swap = { phase: 'preparing' };
     const index = field.currentIndex;
     await field.preparePhrases(phrases, [index, pairA, pairB]);
@@ -438,7 +519,12 @@ async function boot() {
         if (swap.t === 1) finishSwap();
       }
     } else if (reducedMotion) {
-      field.setMorph(0);
+      if (headOn && window.scrollY > 4) {
+        headOn = false;
+        usePair(REST, HOVER);
+        field.jumpTo(REST);
+      }
+      field.setMorph(headOn ? 1 : 0);
     } else {
       // Position along CHAIN. aboutProgress only leaves 0 long after
       // workProgress has reached 1, so this stays monotonic and continuous.
@@ -464,13 +550,24 @@ async function boot() {
         usePair(CHAIN[link], CHAIN[link + 1]);
         morphT = chainShown - link;
         hovering = false;
+        // Scrolling away from the head: the particles fly from it straight
+        // into the scroll's phrase, and the name is what comes back on return.
+        headOn = false;
         transitioning = moving;
+      } else if (headOn) {
+        const was = morphT;
+        morphT = Math.min(1, morphT + rate);
+        if (morphT === 1 && was < 1) landedAt = now;
+        hovering = false;
+        transitioning = morphT < 1;
       } else if (pairB !== HOVER) {
         // Leaving the chain for hover mode. Both show REST at zero, so this
         // only has to wait out any residual blend before swapping.
         chainShown = 0;
+        const was = morphT;
         morphT = Math.max(morphT - rate, 0);
         if (morphT === 0) usePair(REST, HOVER);
+        if (morphT === 0 && was > 0) landedAt = now;
         hovering = false;
         transitioning = morphT > 0;
       } else {
@@ -483,6 +580,14 @@ async function boot() {
 
       field.setMorph(ease(morphT));
     }
+
+    updateCursor(!swap && chainShown === 0 && window.scrollY <= 4);
+
+    // The cursor rests on the head after the click that made it, and the full
+    // push opened a hole through the face. A quarter of it still stirs the
+    // particles without erasing the features.
+    repelScale += ((headOn ? 0.25 : 1) - repelScale) * Math.min(1, dt * 4);
+    field.setRepelScale(repelScale);
 
     // Stiffer springs while any phrase change lands, then the usual give.
     const settling = now - landedAt < SNAP_HOLD_MS;
@@ -514,6 +619,7 @@ async function boot() {
   }
 
   if (import.meta.env.DEV) {
+    const label = (i) => (typeof PHRASES[i] === 'string' ? PHRASES[i] : 'HEAD');
     const snapshot = () => ({
       frames,
       level,
@@ -521,8 +627,9 @@ async function boot() {
       hovering,
       morphT: +morphT.toFixed(3),
       chainShown: +chainShown.toFixed(3),
-      pair: `${PHRASES[pairA]} -> ${PHRASES[pairB]}`,
-      phrase: PHRASES[field.currentIndex],
+      pair: `${label(pairA)} -> ${label(pairB)}`,
+      phrase: label(field.currentIndex),
+      headOn,
       scrollY: window.scrollY,
     });
 
