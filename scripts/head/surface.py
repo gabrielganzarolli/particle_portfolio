@@ -13,7 +13,7 @@ occluder, so grain on the far side stays hidden), a weight per vertex (ambient o
 and a soft front light, more on the face, less on the crown and neck), how
 far each vertex turns with the head, and the pivot it turns on.
 
-  python3 surface.py LeePerrySmith.glb   # writes head.bin (HSR2)
+  python3 surface.py LeePerrySmith.glb   # writes head.bin (HSR3)
 """
 import numpy as np, sys, struct
 import trimesh, cv2
@@ -98,6 +98,8 @@ crown = smooth(2.2, 3.4, y) * (1 - face)
 ear = smooth(1.45, 1.65, np.abs(x)) * smooth(0.4, 0.8, y) * (1 - smooth(2.0, 2.3, y))
 part = 1.0 + 0.9 * face - 0.45 * crown - 0.1 * ear
 w = light * facing * neck * part
+# Neck: below the chin.
+neckm = 1 - smooth(-1.1, -0.5, y)
 
 # How far each point follows the head's turn: all of the head, then the neck
 # twisting less and less toward its base, which stays put.
@@ -119,10 +121,21 @@ occ = (vr + to_axis * 0.09 - [0, cy, zf]) / H
 pivot = (np.array([-0.05, 0.6, -0.45]) - [0, cy, zf]) / H
 print('verts', len(out), 'faces', len(faces), 'pivot', pivot.round(3))
 
-buf = struct.pack('<4sII', b'HSR2', len(out), len(faces)) + struct.pack('<3f', *pivot)
+buf = struct.pack('<4sII', b'HSR3', len(out), len(faces)) + struct.pack('<3f', *pivot)
 buf += np.round(out * 30000).astype(np.int16).tobytes() + np.round(occ * 30000).astype(np.int16).tobytes()
-buf += np.round(w / w.max() * 255).astype(np.uint8).tobytes()
-buf += np.round(turn * 255).astype(np.uint8).tobytes()
+# The density is shipped as its ingredients, so the page's tuning panel can
+# re-mix it: ambient occlusion, the frontal light, how far each point faces
+# the camera, the fade at the neck's base, and masks for the face, crown,
+# ears and neck. The page combines them as
+#   light = (1 - shadows + shadows * ao^2.2) * (0.6 + 0.4 * lam)
+#   facing = floor + (1 - floor) * nz
+#   part = 1 + (face - 1) * faceMask + (crown - 1) * crownMask + ...
+#   weight = light * facing * fade * part
+# with shadows 0.85, floor 0.1, face 1.9, crown 0.55, ears 0.9, neck 1 by
+# default, which is what this script used to bake.
+u8 = lambda a: np.round(np.clip(a, 0, 1) * 255).astype(np.uint8).tobytes()
+for ch in (ao, lam, np.clip(nr[:, 2], 0, 1), neck, face, crown, ear, neckm, turn):
+    buf += u8(ch)
 if len(buf) % 2: buf += b'\0'
 buf += faces.astype(np.uint16).tobytes()
 open('head.bin', 'wb').write(buf); print(len(buf), 'bytes')

@@ -405,6 +405,18 @@ export class ParticleField {
     this.material.uniforms.uPixelScale.value = scale;
   }
 
+  /**
+   * Rebuild phrase `index`'s destinations now, after its source changed (the
+   * head, from the tuning panel). Particles already headed there follow.
+   */
+  rebuildTarget(index) {
+    const old = this.targets[index];
+    this.targets[index] = null;
+    this.#target(index);
+    old?.dispose();
+    this.#applyTargets();
+  }
+
   /** Which phrase is the head, and the point (world units) it turns around. */
   setHead(index, pivot) {
     this.headIndex = index;
@@ -417,9 +429,14 @@ export class ParticleField {
    * hides the grain on the far side, so the head reads as a surface rather
    * than a glass shell.
    */
-  setHeadOccluder(v, faces, scale, turn, offsetY = 0) {
+  setHeadOccluder(v, faces, scale, turn, offsetY = 0, offsetX = 0) {
+    if (this.occluder) {
+      this.scene.remove(this.occluder);
+      this.occluder.geometry.dispose();
+      this.occluder.material.dispose();
+    }
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(v, (x, i) => x * scale + (i % 3 === 1 ? offsetY : 0)), 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(v, (x, i) => x * scale + (i % 3 === 1 ? offsetY : i % 3 === 0 ? offsetX : 0)), 3));
     geometry.setAttribute('aTurn', new THREE.BufferAttribute(Float32Array.from(turn, (t) => t / 255), 1));
     geometry.setIndex(new THREE.BufferAttribute(faces, 1));
     const vu = this.velVar.material.uniforms;

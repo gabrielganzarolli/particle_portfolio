@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import './styles.css';
 import { ParticleField } from './ParticleField.js';
 import { Pointer } from './pointer.js';
-import { readyFonts, loadHeadMesh } from './textTargets.js';
+import { readyFonts, loadHeadMesh, mixHeadWeights, HEAD_LOOK } from './textTargets.js';
 import headMeshUrl from './images/head/head.bin?url';
 import { backgroundOf } from './palette.js';
 import { hidePreloader, showFatal } from './overlay.js';
@@ -73,15 +73,29 @@ const WORK = 2;
 const ABOUT = 3;
 // Gabriel's head in particles, shown by clicking the name (see the click below).
 const HEAD = 4;
-// How far the head turns toward the pointer, in radians, at the screen's edge.
-const HEAD_YAW = 0.35;
-const HEAD_PITCH = 0.3;
-// A small nod once the head has formed, and a tilt as it turns.
+// A small nod once the head has formed.
 const HEAD_NOD = 0.14;
-const HEAD_ROLL = 0.25;
-// The turn's spring: about half a second to settle, with a slight overshoot.
-const HEAD_STIFF = 34;
-const HEAD_DAMP = 9.5;
+// The head, as the tuning panel (#ajuste) can change it. Size is the mesh's
+// height (head and neck) against the view's; x and y move it, in view
+// heights; brightness multiplies the particles' light while it is on screen.
+// The density mix is HEAD_LOOK's (see mixHeadWeights). Yaw and pitch are how
+// far it turns toward the pointer at the screen's edge, in radians; roll is
+// how much it tilts into the turn; stiffness and damping are the turn's
+// spring (about half a second to settle, with a slight overshoot); sway is
+// its idle movement.
+const headTune = {
+  size: 1.2,
+  x: 0,
+  y: 0,
+  brightness: 1,
+  ...HEAD_LOOK,
+  yaw: 0.35,
+  pitch: 0.3,
+  roll: 0.25,
+  stiffness: 34,
+  damping: 9.5,
+  sway: 1,
+};
 // Language is settled before anything is built. The field rasterises each
 // phrase into a texture at construction, so picking the wrong set here would
 // mean rebuilding it later; reading the stored choice first avoids that
@@ -93,6 +107,13 @@ attachHomeToggle(lang);
 // The head is the same object in both languages, so a language switch leaves it
 // in place (ParticleField keeps any phrase that is identical in both sets).
 let headMap = null;
+/** Size and place the head from headTune, against the view it opened on. */
+function sizeHead() {
+  const m = headMap;
+  m.height = Math.min(m.visH * headTune.size, ((m.visW * 0.9) / m.ratio) * (headTune.size / 1.2));
+  m.offsetY = -0.121 * m.height + headTune.y * m.visH;
+  m.offsetX = headTune.x * m.visH;
+}
 const phrasesFor = (l) => [...(ALL_PHRASES[l] ?? ALL_PHRASES.en), ...(headMap ? [headMap] : [])];
 let PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
 
@@ -181,12 +202,10 @@ async function boot() {
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
     const aspect = vw / vh;
     const z = Math.max(FIELD_WIDTH / FILL / (2 * Math.tan(halfFov) * aspect), (FIELD_WIDTH * 0.25) / FILL / (2 * Math.tan(halfFov)));
-    const visH = 2 * z * Math.tan(halfFov);
-    const visW = visH * aspect;
-    const ratio = map.ratio;
-    map.height = Math.min(visH * 1.2, (visW * 0.9) / ratio);
-    map.offsetY = -0.121 * map.height;
+    map.visH = 2 * z * Math.tan(halfFov);
+    map.visW = map.visH * aspect;
     headMap = map;
+    sizeHead();
   }
   PHRASES = phrasesFor(lang);
 
@@ -201,10 +220,15 @@ async function boot() {
     fluid,
   });
   field.scene.background = new THREE.Color(background);
-  if (headMap) {
-    field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height).add(new THREE.Vector3(0, headMap.offsetY, 0)));
-    field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height, headMap.mesh.turn, headMap.offsetY);
+  // Point the field at the head's pivot and occluder for its current size and
+  // place; with `rebuild`, resample its particles too (the tuning panel).
+  function placeHead(rebuild) {
+    const m = headMap;
+    field.setHead(HEAD, new THREE.Vector3(...m.mesh.pivot).multiplyScalar(m.height).add(new THREE.Vector3(m.offsetX, m.offsetY, 0)));
+    field.setHeadOccluder(m.occluder.v, m.occluder.faces, m.height, m.mesh.turn, m.offsetY, m.offsetX);
+    if (rebuild) field.rebuildTarget(HEAD);
   }
+  if (headMap) placeHead(false);
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
   dust.material.uniforms.uFluid.value = fluid.texture;
@@ -340,25 +364,28 @@ async function boot() {
   let headOn = false;
   let repelScale = 1;
   let tapped = false;
+  function toggleHead() {
+    headOn = !headOn;
+    tapped = false;
+    if (headOn) {
+      // From whatever is on screen (the name, or PRODUCT DESIGNER mid-hover).
+      usePair(field.currentIndex === HOVER ? HOVER : REST, HEAD);
+      morphT = 0;
+    } else {
+      // Back toward the name from the head.
+      usePair(REST, HEAD);
+    }
+    if (reducedMotion) {
+      field.jumpTo(headOn ? HEAD : REST);
+      morphT = headOn ? 1 : 0;
+    }
+  }
   window.addEventListener('click', (e) => {
     if (window.scrollY > 4 || chainShown > 0 || swap) return;
     if (e.target.closest?.('a, button, section, footer')) return;
     const at = worldAt(e.clientX, e.clientY);
     if (headMap && (headOn ? onHead(at) : onName(at))) {
-      headOn = !headOn;
-      tapped = false;
-      if (headOn) {
-        // From whatever is on screen (the name, or PRODUCT DESIGNER mid-hover).
-        usePair(field.currentIndex === HOVER ? HOVER : REST, HEAD);
-        morphT = 0;
-      } else {
-        // Back toward the name from the head.
-        usePair(REST, HEAD);
-      }
-      if (reducedMotion) {
-        field.jumpTo(headOn ? HEAD : REST);
-        morphT = headOn ? 1 : 0;
-      }
+      toggleHead();
       return;
     }
     if (coarsePointer && !reducedMotion && !headOn) tapped = !tapped;
@@ -537,8 +564,8 @@ async function boot() {
       let pitch = 0;
       if (!reducedMotion) {
         if (px !== null && !coarsePointer) {
-          yaw = ((px / vw) * 2 - 1) * HEAD_YAW;
-          pitch = ((py / vh) * 2 - 1) * HEAD_PITCH;
+          yaw = ((px / vw) * 2 - 1) * headTune.yaw;
+          pitch = ((py / vh) * 2 - 1) * headTune.pitch;
         } else {
           yaw = Math.sin(elapsed * 0.45) * 0.22;
           pitch = Math.sin(elapsed * 0.31) * 0.06;
@@ -548,19 +575,19 @@ async function boot() {
       // overshoots and settles, instead of gliding at a constant rate. Its
       // small sway and breathing keep it alive while the pointer is still.
       if (!reducedMotion) {
-        yaw += Math.sin(elapsed * 0.37) * 0.03 + Math.sin(elapsed * 0.83 + 2) * 0.012;
-        pitch += Math.sin(elapsed * 0.53 + 1) * 0.015 + Math.sin(elapsed * 1.4) * 0.006;
+        yaw += (Math.sin(elapsed * 0.37) * 0.03 + Math.sin(elapsed * 0.83 + 2) * 0.012) * headTune.sway;
+        pitch += (Math.sin(elapsed * 0.53 + 1) * 0.015 + Math.sin(elapsed * 1.4) * 0.006) * headTune.sway;
       }
       const step = Math.min(dt, 1 / 30);
-      headYawV += ((yaw - headYaw) * HEAD_STIFF - headYawV * HEAD_DAMP) * step;
-      headPitchV += ((pitch - headPitch) * HEAD_STIFF - headPitchV * HEAD_DAMP) * step;
+      headYawV += ((yaw - headYaw) * headTune.stiffness - headYawV * headTune.damping) * step;
+      headPitchV += ((pitch - headPitch) * headTune.stiffness - headPitchV * headTune.damping) * step;
       headYaw += headYawV * step;
       headPitch += headPitchV * step;
       const tn = (now - nodAt) / 1000;
       const nod = !reducedMotion && tn > 0 && tn < 2.5 ? HEAD_NOD * Math.sin(tn * Math.PI * 3) * Math.exp(-tn * 2.2) : 0;
       // Turning, a head also tilts a little toward the side it turns to, and
       // leads with the chin while it moves.
-      headEuler.set(headPitch + nod + Math.abs(headYawV) * 0.04, headYaw, -headYaw * HEAD_ROLL - headYawV * 0.05);
+      headEuler.set(headPitch + nod + Math.abs(headYawV) * 0.04, headYaw, -headYaw * headTune.roll - headYawV * 0.05);
       field.setHeadPose(headRot.setFromMatrix4(headRot4.makeRotationFromEuler(headEuler)));
       // The occluder follows the particles, which trail the pose.
       const ko = 1 - Math.exp(-dt * 5);
@@ -582,7 +609,7 @@ async function boot() {
     const formedHead = headOn && morphT === 1 && !headTurning;
     headSolid += ((formedHead ? 1 : 0) - headSolid) * Math.min(1, dt * (formedHead ? 2.5 : 12));
     field.setHeadSolid(headSolid);
-    field.setDim(coverage * MAX_DIM);
+    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 + (headTune.brightness - 1) * headBloom));
     // The head packs its light into a smaller area than the name, and the
     // full bloom haloed its outline; it takes a quarter of it. The bloom stays
     // down until particles leaving the head have landed: they fly out bunched
@@ -703,7 +730,26 @@ async function boot() {
   field.buildRemaining();
 
   // Tuning panel, only with #ajuste in the address.
-  const tuningCtx = { tune, fieldDefaults: FIELD_DEFAULTS, field, post, dust, level: () => level };
+  const tuningCtx = {
+    tune,
+    fieldDefaults: FIELD_DEFAULTS,
+    field,
+    post,
+    dust,
+    level: () => level,
+    headTune: headMap ? headTune : null,
+    // The panel changed the head: 'layout' (size, place) or 'look' (density).
+    onHead(kind) {
+      if (!headMap) return;
+      if (kind !== 'look') sizeHead();
+      if (kind !== 'layout') mixHeadWeights(headMap, headTune);
+      placeHead(true);
+    },
+    showHead(on) {
+      if (!headMap || on === headOn || window.scrollY > 4 || chainShown > 0 || swap) return;
+      toggleHead();
+    },
+  };
   applyPreset(readSavedPreset(), tuningCtx);
   if (/ajuste/.test(location.hash)) {
     import('./tuning.js').then(({ attachTuning }) => attachTuning(tuningCtx)).catch(console.warn);

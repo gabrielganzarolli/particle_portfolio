@@ -231,16 +231,19 @@ export function toDataTexture(positions, size) {
  * Load the head: a sculpted bald head made offline from a head scan
  * (scripts/head/surface.py; "Infinite, 3D Head Scan" by Lee Perry-Smith,
  * CC BY 3.0) and stored as a small binary. Vertices are normalised to a
- * height of 1 and centred; each carries a weight, the light falling on it and
- * the neck dissolving. The occluder is the same mesh pulled slightly inside,
- * for hiding the far side. The pivot is where the head turns.
+ * height of 1 and centred. Each carries the ingredients of its particle
+ * density (ambient occlusion, frontal light, how far it faces the camera, the
+ * fade at the neck's base, and masks for the face, crown, ears and neck),
+ * mixed here by mixHeadWeights so the tuning panel can change them live, and
+ * how far it follows the head's turn. The occluder is the same mesh pulled
+ * slightly inside, for hiding the far side. The pivot is where the head turns.
  */
 export async function loadHeadMesh(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Head: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x32525348) throw new Error('Head: bad header'); // 'HSR2'
+  if (view.getUint32(0, true) !== 0x33525348) throw new Error('Head: bad header'); // 'HSR3'
   const n = view.getUint32(4, true);
   const nf = view.getUint32(8, true);
   const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
@@ -249,10 +252,12 @@ export async function loadHeadMesh(url) {
   o += n * 6;
   const ov = Float32Array.from(new Int16Array(buf, o, n * 3), (x) => x / 30000);
   o += n * 6;
-  const w = new Uint8Array(buf, o, n);
-  o += n;
-  const turn = new Uint8Array(buf, o, n);
-  o += n + ((o + n) % 2);
+  const ch = {};
+  for (const name of ['ao', 'lam', 'nz', 'fade', 'face', 'crown', 'ear', 'neck', 'turn']) {
+    ch[name] = new Uint8Array(buf, o, n);
+    o += n;
+  }
+  o += o % 2;
   const faces = new Uint16Array(buf, o, nf * 3);
 
   let minX = Infinity;
@@ -261,7 +266,30 @@ export async function loadHeadMesh(url) {
     minX = Math.min(minX, v[i * 3]);
     maxX = Math.max(maxX, v[i * 3]);
   }
-  return { mesh: { v, w, turn, faces, pivot }, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
+  const head = { mesh: { v, ch, turn: ch.turn, faces, pivot, w: new Float32Array(n) }, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
+  mixHeadWeights(head, HEAD_LOOK);
+  return head;
+}
+
+/** The density mix surface.py used to bake; the tuning panel starts here. */
+export const HEAD_LOOK = { shadows: 0.85, floor: 0.1, face: 1.9, crown: 0.55, ears: 0.9, neck: 1 };
+
+/** Mix the head's density ingredients into one weight per vertex. */
+export function mixHeadWeights(head, look) {
+  const { ch, w } = head.mesh;
+  const k = 1 / 255;
+  for (let i = 0; i < w.length; i++) {
+    const ao = ch.ao[i] * k;
+    const light = (1 - look.shadows + look.shadows * ao ** 2.2) * (0.6 + 0.4 * ch.lam[i] * k);
+    const facing = look.floor + (1 - look.floor) * ch.nz[i] * k;
+    const part =
+      1 +
+      (look.face - 1) * ch.face[i] * k +
+      (look.crown - 1) * ch.crown[i] * k +
+      (look.ears - 1) * ch.ear[i] * k +
+      (look.neck - 1) * ch.neck[i] * k;
+    w[i] = Math.max(0, light * facing * ch.fade[i] * k * part);
+  }
 }
 
 /**
@@ -269,7 +297,7 @@ export async function loadHeadMesh(url) {
  * spread over its surface the way the letters' ink is: triangles drawn by
  * area times light, each particle at its own point inside one. The lit planes
  * fill in and the hollows stay dark, which is all that draws the face; the
- * particles are the names' own grain. The glasses are part of the mesh.
+ * particles are the names' own grain.
  */
 export function buildMeshTarget(head, { count, strayRatio = 0.03 }) {
   const { v, w, turn, faces } = head.mesh;
@@ -307,7 +335,7 @@ export function buildMeshTarget(head, { count, strayRatio = 0.03 }) {
     const r = Math.sqrt(Math.random());
     const r2 = Math.random();
     const wa = 1 - r, wb = r * (1 - r2), wc = r * r2;
-    const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s;
+    const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s + (head.offsetX ?? 0);
     const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s + (head.offsetY ?? 0);
     const z = (v[a + 2] * wa + v[b + 2] * wb + v[c + 2] * wc) * s;
 
