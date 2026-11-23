@@ -1,3 +1,4 @@
+"""Decimate the head, keep the weighted part, add the eyes, write head.bin (see loadHeadMesh)."""
 import numpy as np, fast_simplification, struct
 from scipy.spatial import cKDTree
 d = np.load('head3d.npz'); v, f, w = d['v'], d['f'], d['w']
@@ -8,6 +9,8 @@ keep = w2[f2].max(1) > 0.004
 f2 = f2[keep]
 used = np.unique(f2); remap = -np.ones(len(v2), int); remap[used] = np.arange(len(used))
 v2, w2, f2 = v2[used], w2[used], remap[f2]
+E = np.load('eyes.npz')
+f2 = np.concatenate([f2, E['f'] + len(v2)]); v2 = np.concatenate([v2, E['v']]); w2 = np.concatenate([w2, E['w']])
 print(len(v2), len(f2))
 # Normalise: unit height over the weighted part, centred on x and y.
 lo, hi = v2.min(0), v2.max(0)

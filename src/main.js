@@ -76,7 +76,15 @@ const HEAD = 4;
 // How far the head turns toward the pointer, in radians, at the screen's edge.
 const HEAD_YAW = 0.4;
 const HEAD_PITCH = 0.3;
-const HEAD_DIM = 0.28;
+// The head is drawn as this many dots, like a depth-camera scan. Each dot
+// carries several particles, so it is lit to about HEAD_LIGHT particles' worth
+// whatever the grid, and the bloom steps aside.
+const HEAD_DOTS = 11000;
+const HEAD_POINT = 0.024;
+const HEAD_LIGHT = 2.6;
+// A small nod once the head has formed, and a tilt as it turns.
+const HEAD_NOD = 0.14;
+const HEAD_ROLL = 0.25;
 // Language is settled before anything is built. The field rasterises each
 // phrase into a texture at construction, so picking the wrong set here would
 // mean rebuilding it later; reading the stored choice first avoids that
@@ -168,7 +176,7 @@ async function boot() {
   // same, minus the head.
   const [, map] = await Promise.all([readyFonts(), loadHeadMesh(headMeshUrl).catch(() => null)]);
   if (map) {
-    // Sized to the screen it first opens on: about seven tenths of the view's
+    // Sized to the screen it first opens on: about three quarters of the view's
     // height, narrower than the view on a phone held upright.
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
     const aspect = vw / vh;
@@ -176,7 +184,8 @@ async function boot() {
     const visH = 2 * z * Math.tan(halfFov);
     const visW = visH * aspect;
     const ratio = map.ratio;
-    map.height = Math.min(visH * 0.7, (visW * 0.8) / ratio);
+    map.height = Math.min(visH * 0.76, (visW * 0.8) / ratio);
+    map.dots = HEAD_DOTS;
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
@@ -439,6 +448,9 @@ async function boot() {
   let camX = 0;
   let headYaw = 0;
   let headGlow = 0;
+  let nodAt = -1e9;
+  let leftHeadAt = -1e9;
+  let wasHeadOn = false;
   let headPitch = 0;
   const headEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const headRot4 = new THREE.Matrix4();
@@ -525,7 +537,9 @@ async function boot() {
       const kh = 1 - Math.exp(-dt * 3);
       headYaw += (yaw - headYaw) * kh;
       headPitch += (pitch - headPitch) * kh;
-      headEuler.set(headPitch, headYaw, 0);
+      const tn = (now - nodAt) / 1000;
+      const nod = !reducedMotion && tn > 0 && tn < 2.5 ? HEAD_NOD * Math.sin(tn * Math.PI * 3) * Math.exp(-tn * 2.2) : 0;
+      headEuler.set(headPitch + nod, headYaw, -headYaw * HEAD_ROLL);
       field.setHeadPose(headRot.setFromMatrix4(headRot4.makeRotationFromEuler(headEuler)));
     }
     camera.updateMatrixWorld();
@@ -534,10 +548,17 @@ async function boot() {
     pointer.update(dt);
     field.setPointer(pointer);
 
-    // The head packs every particle into a smaller area than the name, and
-    // under the bloom its outline burned. It shows a quarter dimmer.
-    headGlow += ((headOn ? 1 : 0) - headGlow) * Math.min(1, dt * 4);
-    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - HEAD_DIM * headGlow));
+    // The dots stay dim and the bloom off until the particles leaving the head
+    // have landed: they fly out in tight bunches, which under the full light
+    // flashed white mid-flight.
+    if (wasHeadOn && !headOn) leftHeadAt = now;
+    wasHeadOn = headOn;
+    const holdHead = headOn || now - leftHeadAt < CHAIN_MS + 150;
+    headGlow += ((holdHead ? 1 : 0) - headGlow) * Math.min(1, dt * 4);
+    const headLight = Math.min(1, (HEAD_LIGHT * HEAD_DOTS) / field.count);
+    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - (1 - headLight) * headGlow));
+    field.setHeadLook(headGlow, HEAD_POINT);
+    post.setBloomScale(L.bloom * (1 - headGlow));
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     // One clock for every phrase change (CHAIN_MS).
@@ -592,7 +613,10 @@ async function boot() {
       } else if (headOn) {
         const was = morphT;
         morphT = Math.min(1, morphT + rate);
-        if (morphT === 1 && was < 1) landedAt = now;
+        if (morphT === 1 && was < 1) {
+          landedAt = now;
+          nodAt = now;
+        }
         hovering = false;
         transitioning = morphT < 1;
       } else if (pairB !== HOVER) {
@@ -618,10 +642,9 @@ async function boot() {
 
     updateCursor(!swap && chainShown === 0 && window.scrollY <= 4);
 
-    // On the head the cursor steers the turn, and the full push opened a hole
-    // through the face wherever it went. A little of it still stirs the
-    // particles without erasing the features.
-    repelScale += ((headOn ? 0.06 : 1) - repelScale) * Math.min(1, dt * 4);
+    // On the head the cursor steers the turn instead of pushing: any push
+    // opened a hole in the face wherever the cursor rested.
+    repelScale += ((headOn ? 0 : 1) - repelScale) * Math.min(1, dt * 4);
     field.setRepelScale(repelScale);
 
     // Stiffer springs while any phrase change lands, then the usual give.

@@ -321,6 +321,7 @@ export class ParticleField {
         // cover four times the area to keep the same coverage — double the
         // diameter. Without this the low-power path renders a threadbare field.
         uSize: { value: DEFAULTS.pointSize * (512 / this.size) },
+        uSizeScale: { value: 1 },
         uPixelScale: { value: 1 },
         uOpacity: { value: DEFAULTS.opacity },
         uColorScale: { value: DEFAULTS.colorScale },
@@ -410,6 +411,15 @@ export class ParticleField {
     this.headIndex = index;
     this.velVar.material.uniforms.uHeadPivot.value.copy(pivot);
     this.#applyTargets();
+  }
+
+  /**
+   * 0..1: how far the points have turned into the head's dots, `size` world
+   * units across. The letters' grain scales with the grid; the dots don't.
+   */
+  setHeadLook(t, size) {
+    const base = DEFAULTS.pointSize * (512 / this.size);
+    this.material.uniforms.uSizeScale.value = 1 + (size / base - 1) * t;
   }
 
   /** The head's turn this frame, as a rotation matrix. */

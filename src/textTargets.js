@@ -234,6 +234,8 @@ export function toDataTexture(positions, size) {
  * lit planes of the face fill in and the hollows stay dark. The pivot is the
  * point the head turns around, near where it meets the neck.
  */
+const FACE_DEPTH = 0.2; // in head heights
+
 export async function loadHeadMesh(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Head mesh: HTTP ${res.status}`);
@@ -250,6 +252,11 @@ export async function loadHeadMesh(url) {
   o += nv + ((o + nv) % 2);
   const f = new Uint16Array(buf, o, nf * 3);
   const v = Float32Array.from(q, (x) => x / 30000);
+  // Push the head back so the face, not the middle of the skull, sits on the
+  // plane the camera focuses on; in front of it the depth of field had
+  // softened and dimmed the eyes and mouth.
+  for (let i = 2; i < v.length; i += 3) v[i] -= FACE_DEPTH;
+  pivot[2] -= FACE_DEPTH;
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -264,8 +271,13 @@ export async function loadHeadMesh(url) {
  * Particle destinations on the head's surface, in the same shape buildTarget
  * returns. Triangles are drawn by area times weight, points spread evenly
  * inside each one. `head.height` is the head's height in world units.
+ *
+ * The head is drawn as `head.dots` separate dots, like a depth-camera scan,
+ * rather than as a solid of fine grain: the particles share those spots, a
+ * handful landing on each, and the field enlarges and dims them while the
+ * head is on screen.
  */
-export function buildMeshTarget(head, { count, strayRatio = 0.04 }) {
+export function buildMeshTarget(head, { count, strayRatio = 0.02 }) {
   const { v, w, f } = head.mesh;
   const s = head.height;
   const nt = f.length / 3;
@@ -288,7 +300,8 @@ export function buildMeshTarget(head, { count, strayRatio = 0.04 }) {
   const jitter = new Float32Array(count);
   const bounds = { halfW: 0, halfH: 0 };
 
-  for (let p = 0; p < count; p++) {
+  const dots = Math.min(count, head.dots ?? count);
+  for (let p = 0; p < dots; p++) {
     const target = Math.random() * acc;
     let lo = 0;
     let hi = nt - 1;
@@ -322,6 +335,13 @@ export function buildMeshTarget(head, { count, strayRatio = 0.04 }) {
 
     const brightness = 0.5 + Math.random() * Math.random() * 0.85;
     jitter[p] = stray ? brightness * 0.55 : brightness;
+  }
+  // Every other particle joins one of the dots, unevenly, so some dots carry
+  // many particles and shine and others carry few, as in a scan. (Dots were
+  // drawn in random order, so the index says nothing about where they sit.)
+  for (let p = dots; p < count; p++) {
+    const from = Math.floor(dots * Math.random() ** 1.2) * 4;
+    positions.copyWithin(p * 4, from, from + 4);
   }
 
   return { positions, jitter, bounds };

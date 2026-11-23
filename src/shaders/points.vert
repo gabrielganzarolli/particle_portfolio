@@ -3,6 +3,7 @@
 uniform sampler2D uPositions;
 uniform sampler2D uPalette;
 uniform float uSize;
+uniform float uSizeScale; // the head's dots are larger than the letters' grain
 uniform float uPixelScale; // drawingBufferHeight / (2 * tan(fov/2))
 uniform float uColorScale;
 uniform float uColorSpread;
@@ -42,6 +43,6 @@ void main() {
 
   // Narrow viewports push the camera far enough back that points go sub-pixel,
   // where drivers clamp or drop them and the field turns to faint static.
-  gl_PointSize = max(uSize * uPixelScale / depth * grow, 1.0);
+  gl_PointSize = max(uSize * uSizeScale * uPixelScale / depth * grow, 1.0);
   gl_Position = projectionMatrix * mv;
 }
