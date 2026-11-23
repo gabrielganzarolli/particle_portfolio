@@ -39,9 +39,14 @@ s = (S * np.diag(D)).sum() / ((P - mx) ** 2).sum()
 to_canon = lambda Z: s * (Z - mx) @ R + my
 to_photo = lambda Q: (Q - my) @ R.T / s + mx          # -> (x, -y, -z) in photo
 A = to_canon(P)
-face = A.copy()
+# The selfie was taken close and from below, which widens the jaw and mouth
+# and shortens the forehead. Taking the shape halfway from the canonical face
+# and mirroring it keeps his proportions without the lens's distortion; the
+# likeness comes mostly from the photo laid over it.
+SHAPE = float(sys.argv[4]) if len(sys.argv) > 4 else 0.45
+face = C + SHAPE * (A - C)
 mir = face * [-1, 1, 1]; idx = cKDTree(C).query(C * [-1, 1, 1])[1]
-face = 0.75 * face + 0.25 * mir[idx]                  # a touch of symmetry
+face = 0.5 * face + 0.5 * mir[idx]
 
 def photo_xy(Q):
     p = to_photo(Q); return p[:, 0], -p[:, 1]
@@ -90,7 +95,7 @@ half_w = np.abs(face[[127, 356], 0]).mean()
 # hair; the photo's spiky hair would otherwise stretch the skull into an egg.
 top = min(top_c[1], face[10, 1] + 5.6)
 cy = 2.8
-occ = ell((0, cy, -4.6), (half_w + 0.6, top - cy, 10.2))          # skull with hair
+occ = ell((0, cy, -4.6), (half_w + 0.2, top - cy, 10.2))          # skull with hair
 occ |= ell((0, -3.2, -4.4), (half_w - 0.6, 6.6, 6.6))               # jaw into skull
 neck_y = chin[1] - 1.5
 neck = ((X / 5.4) ** 2 + ((Z + 4.0) / 5.2) ** 2 <= 1) & (Y < 0) & (Y > neck_y - 9)
@@ -122,7 +127,16 @@ if normals[verts[:, 2] > 6, 2].mean() < 0: normals = -normals
 print('mesh', len(verts), len(faces))
 
 # Density: the photo seen from the front, on surfaces that face the camera.
-px, py = photo_xy(verts)
+# The face's shape differs from the photo's, so each vertex looks the photo
+# up where its own landmark neighbours sit in the photo (A), not where it sits:
+# eyes, nose and mouth in the picture land on the eyes, nose and mouth of the
+# mesh.
+tree = cKDTree(face)
+dd, ii = tree.query(verts, k=8)
+wgt = np.exp(-(dd / 1.2) ** 2)
+off = ((A - face)[ii] * wgt[..., None]).sum(1) / (wgt.sum(1)[:, None] + 1e-9)
+off *= np.exp(-(dd[:, 0] / 3.0) ** 2)[:, None]
+px, py = photo_xy(verts + off)
 Lv = ndi.map_coordinates(L, [py, px], order=1, cval=0)
 # Weighting by the facing (nz) keeps dots even on screen: by surface area
 # alone they piled up along the outline, where the surface turns away.
