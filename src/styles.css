@@ -214,13 +214,9 @@ main {
 
 /* Sits below the last row, sharing its rule so it reads as the end of the
    list rather than as a separate block. */
-.cases-note {
-  margin-top: 0;
-  padding: clamp(2.25rem, 5.5vh, 3.75rem) 0 0;
-  border-top: 1px solid var(--line);
-  font-size: 0.8125rem;
-  letter-spacing: 0.06em;
-  color: var(--ink-dim);
+/* The rule that closes the list, which the note below it used to draw. */
+.case:last-child {
+  border-bottom: 1px solid var(--line);
 }
 
 .case + .case {

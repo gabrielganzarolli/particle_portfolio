@@ -19,7 +19,6 @@ export const HOME_PT = {
   bio: 'Product Designer em São Paulo, hoje no maior banco da América Latina. Interesse particular em design engineering e filosofia.',
 
   selectedWork: 'Trabalhos selecionados',
-  moreSoon: 'Mais projetos em breve.',
 
   c1: 'Aquisição Uniclass pelo cartão',
   c2: 'Seleção de Prêmios',
