@@ -228,28 +228,34 @@ export function toDataTexture(positions, size) {
 }
 
 /**
- * Load the head: a bald, smooth head drawn as nodes joined by lines, like a
- * wireframe hologram, made offline (scripts/head/plexus.py) and stored as a
+ * Load the head: a sculpted bald head drawn as nodes joined by lines, like a
+ * wireframe hologram, made offline from a head scan (scripts/head/plexus.py;
+ * "Infinite, 3D Head Scan" by Lee Perry-Smith, CC BY 3.0) and stored as a
  * small binary. Nodes are normalised to a height of 1 and centred, in random
- * order; each carries a fade (the neck dissolves, the far side thins out), and
- * the lines are pairs of node indices. The pivot is where the head turns.
+ * order; each carries a weight (its light, and the neck dissolving). Lines are
+ * pairs of node indices. The occluder is the whole head, slightly shrunk, for
+ * hiding the far side. The pivot is where the head turns.
  */
 export async function loadHeadMesh(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Head: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x54454e48) throw new Error('Head: bad header'); // 'HNET'
-  const n = view.getUint32(4, true);
-  const ne = view.getUint32(8, true);
-  const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
-  let o = 24;
+  if (view.getUint32(0, true) !== 0x32544e48) throw new Error('Head: bad header'); // 'HNT2'
+  const [n, ne, on, of] = [4, 8, 12, 16].map((o) => view.getUint32(o, true));
+  const pivot = [0, 1, 2].map((i) => view.getFloat32(20 + i * 4, true));
+  let o = 32;
   const q = new Int16Array(buf, o, n * 3);
   o += n * 6;
+  const oq = new Int16Array(buf, o, on * 3);
+  o += on * 6;
   const fade = new Uint8Array(buf, o, n);
   o += n + ((o + n) % 2);
   const edges = new Uint16Array(buf, o, ne * 2);
+  o += ne * 4;
+  const faces = new Uint16Array(buf, o, of * 3);
   const v = Float32Array.from(q, (x) => x / 30000);
+  const ov = Float32Array.from(oq, (x) => x / 30000);
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -257,7 +263,7 @@ export async function loadHeadMesh(url) {
     minX = Math.min(minX, v[i * 3]);
     maxX = Math.max(maxX, v[i * 3]);
   }
-  return { points: { v, fade, pivot, n }, edges, ratio: maxX - minX, height: 4 };
+  return { points: { v, fade, pivot, n }, edges, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
 }
 
 /**

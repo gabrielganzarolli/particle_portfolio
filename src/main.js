@@ -202,6 +202,7 @@ async function boot() {
   if (headMap) {
     field.setHead(HEAD, new THREE.Vector3(...headMap.points.pivot).multiplyScalar(headMap.height));
     field.setHeadNet(headMap.edges, headMap.points.fade);
+    field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height);
   }
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });

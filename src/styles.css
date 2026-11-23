@@ -362,6 +362,18 @@ main {
   background: var(--bg);
 }
 
+/* Attribution the head model's licence asks for. */
+.foot-credit {
+  margin-top: 0.5rem;
+  opacity: 0.7;
+}
+
+.foot-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 /* Preloader — the reference's own loading state is a scatter of particles, so
    this mirrors it rather than showing a spinner. */
 .preloader {

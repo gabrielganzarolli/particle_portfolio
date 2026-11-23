@@ -492,16 +492,49 @@ export class ParticleField {
     pu.uDof.value = b.dof * (1 - t);
   }
 
+  /**
+   * The head as a solid that only writes depth: drawn before the points and
+   * lines, it hides the nodes on the far side, so the wireframe reads as the
+   * surface of a head rather than a cage. It turns with the head (setHeadPose).
+   */
+  setHeadOccluder(v, faces, scale) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(v, (x) => x * scale), 3));
+    geometry.setIndex(new THREE.BufferAttribute(faces, 1));
+    this.occluder = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide }));
+    this.occluder.renderOrder = -1;
+    this.occluder.matrixAutoUpdate = false;
+    this.occluder.visible = false;
+    this.occluder.frustumCulled = false;
+    this.scene.add(this.occluder);
+  }
+
   /** 0..1: how visible the head's lines are. */
   setHeadLines(alpha) {
     if (!this.lines) return;
     this.lineMaterial.uniforms.uOpacity.value = alpha * 0.42;
     this.lines.visible = alpha > 0.002;
+    // The far side hides only while the head holds still; in flight every
+    // particle stays visible.
+    const solid = Boolean(this.occluder) && alpha > 0.3;
+    if (this.occluder) this.occluder.visible = solid;
+    this.material.depthTest = solid;
+    this.lineMaterial.depthTest = solid;
   }
 
   /** The head's turn this frame, as a rotation matrix. */
   setHeadPose(matrix3) {
-    this.velVar.material.uniforms.uHeadRot.value.copy(matrix3);
+    const u = this.velVar.material.uniforms;
+    u.uHeadRot.value.copy(matrix3);
+    if (this.occluder) {
+      const p = u.uHeadPivot.value;
+      const m = this.occluder.matrix;
+      m.setFromMatrix3(matrix3);
+      // p + R (x - p) = R x + (p - R p)
+      const rp = p.clone().applyMatrix3(matrix3);
+      m.setPosition(p.x - rp.x, p.y - rp.y, p.z - rp.z);
+      this.occluder.matrixWorldNeedsUpdate = true;
+    }
   }
 
   /** Multiplies the cursor's push; the head takes a gentler one. */
@@ -552,6 +585,7 @@ export class ParticleField {
     this.points.geometry.dispose();
     this.lines?.geometry.dispose();
     this.lineMaterial?.dispose();
+    this.occluder?.geometry.dispose();
     this.material.dispose();
     for (const t of this.targets) t?.dispose();
     this.palette.dispose();
