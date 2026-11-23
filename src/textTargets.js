@@ -228,117 +228,65 @@ export function toDataTexture(positions, size) {
 }
 
 /**
- * Load the head: a low-poly bald head made offline (scripts/head/), stored as
- * a small binary. Vertices are normalised to a height of 1 and centred; each
- * vertex carries a weight, the shading folded into particle density, so the
- * lit planes of the face fill in and the hollows stay dark. The pivot is the
- * point the head turns around, near where it meets the neck.
+ * Load the head: a point cloud of Gabriel in the manner of a depth-camera scan,
+ * made offline from a frontal photo (scripts/head/scan.py) and stored as a
+ * small binary. Points are normalised to a height of 1, centred on the face,
+ * and placed where the photo is bright. Each carries how much it follows the
+ * head's turn: 1 on the head, 0 on the shoulders. The pivot is the point the
+ * head turns around, at the neck.
  */
-const FACE_DEPTH = 0.2; // in head heights
-
 export async function loadHeadMesh(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Head mesh: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Head: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x44414548) throw new Error('Head mesh: bad header');
-  const nv = view.getUint32(4, true);
-  const nf = view.getUint32(8, true);
+  if (view.getUint32(0, true) !== 0x53545048) throw new Error('Head: bad header'); // 'HPTS'
+  const n = view.getUint32(4, true);
   const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
-  let o = 24;
-  const q = new Int16Array(buf, o, nv * 3);
-  o += nv * 6;
-  const w = new Uint8Array(buf, o, nv);
-  o += nv + ((o + nv) % 2);
-  const f = new Uint16Array(buf, o, nf * 3);
+  const q = new Int16Array(buf, 24, n * 3);
+  const turn = new Uint8Array(buf, 24 + n * 6, n);
   const v = Float32Array.from(q, (x) => x / 30000);
-  // Push the head back so the face, not the middle of the skull, sits on the
-  // plane the camera focuses on; in front of it the depth of field had
-  // softened and dimmed the eyes and mouth.
-  for (let i = 2; i < v.length; i += 3) v[i] -= FACE_DEPTH;
-  pivot[2] -= FACE_DEPTH;
 
   let minX = Infinity;
   let maxX = -Infinity;
-  for (let i = 0; i < nv; i++) {
+  for (let i = 0; i < n; i++) {
     minX = Math.min(minX, v[i * 3]);
     maxX = Math.max(maxX, v[i * 3]);
   }
-  return { mesh: { v, w, f, pivot }, ratio: maxX - minX, height: 4 };
+  return { points: { v, turn, pivot }, ratio: maxX - minX, height: 4 };
 }
 
 /**
- * Particle destinations on the head's surface, in the same shape buildTarget
- * returns. Triangles are drawn by area times weight, points spread evenly
- * inside each one. `head.height` is the head's height in world units.
- *
- * The head is drawn as `head.dots` separate dots, like a depth-camera scan,
- * rather than as a solid of fine grain: the particles share those spots, a
- * handful landing on each, and the field enlarges and dims them while the
- * head is on screen.
+ * Particle destinations on the head, in the same shape buildTarget returns.
+ * The head is drawn as `head.dots` separate dots, like the scan it comes from:
+ * the particles share those spots, unevenly, so some dots carry many and shine
+ * and others carry few. The field enlarges and dims them while the head is on
+ * screen. The fourth component of each destination is how much it turns with
+ * the head (see simVelocity.frag).
  */
-export function buildMeshTarget(head, { count, strayRatio = 0.02 }) {
-  const { v, w, f } = head.mesh;
+export function buildMeshTarget(head, { count }) {
+  const { v, turn } = head.points;
+  const n = turn.length;
   const s = head.height;
-  const nt = f.length / 3;
-  const cdf = new Float32Array(nt);
-  let acc = 0;
-  for (let t = 0; t < nt; t++) {
-    const a = f[t * 3] * 3;
-    const b = f[t * 3 + 1] * 3;
-    const c = f[t * 3 + 2] * 3;
-    const ux = v[b] - v[a], uy = v[b + 1] - v[a + 1], uz = v[b + 2] - v[a + 2];
-    const vx = v[c] - v[a], vy = v[c + 1] - v[a + 1], vz = v[c + 2] - v[a + 2];
-    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
-    const area = Math.sqrt(cx * cx + cy * cy + cz * cz);
-    acc += area * (w[f[t * 3]] + w[f[t * 3 + 1]] + w[f[t * 3 + 2]]);
-    cdf[t] = acc;
-  }
-  if (acc <= 0) throw new Error('Head mesh is empty');
-
+  const dots = Math.min(count, head.dots ?? n, n);
   const positions = new Float32Array(count * 4);
   const jitter = new Float32Array(count);
   const bounds = { halfW: 0, halfH: 0 };
 
-  const dots = Math.min(count, head.dots ?? count);
+  // The points were drawn in random order, so the first `dots` are as good a
+  // sample as any.
   for (let p = 0; p < dots; p++) {
-    const target = Math.random() * acc;
-    let lo = 0;
-    let hi = nt - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (cdf[mid] < target) lo = mid + 1;
-      else hi = mid;
-    }
-    const a = f[lo * 3] * 3;
-    const b = f[lo * 3 + 1] * 3;
-    const c = f[lo * 3 + 2] * 3;
-    const r = Math.sqrt(Math.random());
-    const r2 = Math.random();
-    const wa = 1 - r, wb = r * (1 - r2), wc = r * r2;
-    const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s;
-    const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s;
-    const z = (v[a + 2] * wa + v[b + 2] * wb + v[c + 2] * wc) * s;
-
-    const stray = Math.random() < strayRatio;
-    const spread = stray ? s * 0.02 : 0;
-    if (!stray) {
-      bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
-      bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
-    }
-
+    const x = v[p * 3] * s;
+    const y = v[p * 3 + 1] * s;
     const i4 = p * 4;
-    positions[i4 + 0] = x + gaussian() * spread;
-    positions[i4 + 1] = y + gaussian() * spread;
-    positions[i4 + 2] = z + gaussian() * spread;
-    positions[i4 + 3] = 1;
-
-    const brightness = 0.5 + Math.random() * Math.random() * 0.85;
-    jitter[p] = stray ? brightness * 0.55 : brightness;
+    positions[i4 + 0] = x;
+    positions[i4 + 1] = y;
+    positions[i4 + 2] = v[p * 3 + 2] * s;
+    positions[i4 + 3] = turn[p] / 255;
+    bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
+    bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
+    jitter[p] = 0.5 + Math.random() * Math.random() * 0.85;
   }
-  // Every other particle joins one of the dots, unevenly, so some dots carry
-  // many particles and shine and others carry few, as in a scan. (Dots were
-  // drawn in random order, so the index says nothing about where they sit.)
   for (let p = dots; p < count; p++) {
     const from = Math.floor(dots * Math.random() ** 1.2) * 4;
     positions.copyWithin(p * 4, from, from + 4);

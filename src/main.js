@@ -74,12 +74,12 @@ const ABOUT = 3;
 // Gabriel's head in particles, shown by clicking the name (see the click below).
 const HEAD = 4;
 // How far the head turns toward the pointer, in radians, at the screen's edge.
-const HEAD_YAW = 0.4;
+const HEAD_YAW = 0.35;
 const HEAD_PITCH = 0.3;
 // The head is drawn as this many dots, like a depth-camera scan. Each dot
 // carries several particles, so it is lit to about HEAD_LIGHT particles' worth
 // whatever the grid, and the bloom steps aside.
-const HEAD_DOTS = 11000;
+const HEAD_DOTS = 14000;
 const HEAD_POINT = 0.024;
 const HEAD_LIGHT = 2.6;
 // A small nod once the head has formed, and a tilt as it turns.
@@ -176,7 +176,7 @@ async function boot() {
   // same, minus the head.
   const [, map] = await Promise.all([readyFonts(), loadHeadMesh(headMeshUrl).catch(() => null)]);
   if (map) {
-    // Sized to the screen it first opens on: about three quarters of the view's
+    // Sized to the screen it first opens on: about nine tenths of the view's
     // height, narrower than the view on a phone held upright.
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
     const aspect = vw / vh;
@@ -184,7 +184,7 @@ async function boot() {
     const visH = 2 * z * Math.tan(halfFov);
     const visW = visH * aspect;
     const ratio = map.ratio;
-    map.height = Math.min(visH * 0.76, (visW * 0.8) / ratio);
+    map.height = Math.min(visH * 0.9, (visW * 0.8) / ratio);
     map.dots = HEAD_DOTS;
     headMap = map;
   }
@@ -201,7 +201,7 @@ async function boot() {
     fluid,
   });
   field.scene.background = new THREE.Color(background);
-  if (headMap) field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height));
+  if (headMap) field.setHead(HEAD, new THREE.Vector3(...headMap.points.pivot).multiplyScalar(headMap.height));
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
   dust.material.uniforms.uFluid.value = fluid.texture;
