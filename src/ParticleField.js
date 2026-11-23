@@ -322,6 +322,8 @@ export class ParticleField {
         // diameter. Without this the low-power path renders a threadbare field.
         uSize: { value: DEFAULTS.pointSize * (512 / this.size) },
         uSizeScale: { value: 1 },
+        uTint: { value: new THREE.Color(0.35, 0.82, 1.0) },
+        uTintMix: { value: 0 },
         uPixelScale: { value: 1 },
         uOpacity: { value: DEFAULTS.opacity },
         uColorScale: { value: DEFAULTS.colorScale },
@@ -420,6 +422,64 @@ export class ParticleField {
   setHeadLook(t, size) {
     const base = DEFAULTS.pointSize * (512 / this.size);
     this.material.uniforms.uSizeScale.value = 1 + (size / base - 1) * t;
+    this.material.uniforms.uTintMix.value = t;
+  }
+
+  /**
+   * The head's lines: each joins two particles by index and reads their
+   * positions from the same texture the points do, so the lines move with the
+   * nodes. `fade` dims lines toward the neck and the far side.
+   */
+  setHeadNet(edges, fade) {
+    const n = edges.length;
+    const refs = new Float32Array(n * 2);
+    const fades = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const i = edges[k];
+      refs[k * 2] = ((i % this.size) + 0.5) / this.size;
+      refs[k * 2 + 1] = (((i / this.size) | 0) + 0.5) / this.size;
+      fades[k] = fade[i] / 255;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    geometry.setAttribute('aRef', new THREE.BufferAttribute(refs, 2));
+    geometry.setAttribute('aFade', new THREE.BufferAttribute(fades, 1));
+    this.lineMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uPositions: { value: null },
+        uColor: { value: new THREE.Color(0.35, 0.82, 1.0) },
+        uOpacity: { value: 0 },
+      },
+      vertexShader: `
+        uniform sampler2D uPositions;
+        attribute vec2 aRef;
+        attribute float aFade;
+        varying float vFade;
+        void main() {
+          vFade = aFade;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(texture2D(uPositions, aRef).xyz, 1.0);
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying float vFade;
+        void main() { gl_FragColor = vec4(uColor, uOpacity * vFade); }`,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.lines = new THREE.LineSegments(geometry, this.lineMaterial);
+    this.lines.frustumCulled = false;
+    this.lines.visible = false;
+    this.scene.add(this.lines);
+  }
+
+  /** 0..1: how visible the head's lines are. */
+  setHeadLines(alpha) {
+    if (!this.lines) return;
+    this.lineMaterial.uniforms.uOpacity.value = alpha * 0.28;
+    this.lines.visible = alpha > 0.002;
   }
 
   /** The head's turn this frame, as a rotation matrix. */
@@ -467,11 +527,14 @@ export class ParticleField {
     this.gpu.compute();
     this.material.uniforms.uPositions.value =
       this.gpu.getCurrentRenderTarget(this.posVar).texture;
+    if (this.lines) this.lineMaterial.uniforms.uPositions.value = this.material.uniforms.uPositions.value;
   }
 
   dispose() {
     this.gpu.dispose();
     this.points.geometry.dispose();
+    this.lines?.geometry.dispose();
+    this.lineMaterial?.dispose();
     this.material.dispose();
     for (const t of this.targets) t?.dispose();
     this.palette.dispose();

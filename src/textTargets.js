@@ -228,23 +228,27 @@ export function toDataTexture(positions, size) {
 }
 
 /**
- * Load the head: a point cloud of Gabriel in the manner of a depth-camera scan,
- * made offline from a frontal photo (scripts/head/scan.py) and stored as a
- * small binary. Points are normalised to a height of 1, centred on the face,
- * and placed where the photo is bright. Each carries how much it follows the
- * head's turn: 1 on the head, 0 on the shoulders. The pivot is the point the
- * head turns around, at the neck.
+ * Load the head: a bald, smooth head drawn as nodes joined by lines, like a
+ * wireframe hologram, made offline (scripts/head/plexus.py) and stored as a
+ * small binary. Nodes are normalised to a height of 1 and centred, in random
+ * order; each carries a fade (the neck dissolves, the far side thins out), and
+ * the lines are pairs of node indices. The pivot is where the head turns.
  */
 export async function loadHeadMesh(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Head: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x53545048) throw new Error('Head: bad header'); // 'HPTS'
+  if (view.getUint32(0, true) !== 0x54454e48) throw new Error('Head: bad header'); // 'HNET'
   const n = view.getUint32(4, true);
+  const ne = view.getUint32(8, true);
   const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
-  const q = new Int16Array(buf, 24, n * 3);
-  const turn = new Uint8Array(buf, 24 + n * 6, n);
+  let o = 24;
+  const q = new Int16Array(buf, o, n * 3);
+  o += n * 6;
+  const fade = new Uint8Array(buf, o, n);
+  o += n + ((o + n) % 2);
+  const edges = new Uint16Array(buf, o, ne * 2);
   const v = Float32Array.from(q, (x) => x / 30000);
 
   let minX = Infinity;
@@ -253,28 +257,24 @@ export async function loadHeadMesh(url) {
     minX = Math.min(minX, v[i * 3]);
     maxX = Math.max(maxX, v[i * 3]);
   }
-  return { points: { v, turn, pivot }, ratio: maxX - minX, height: 4 };
+  return { points: { v, fade, pivot, n }, edges, ratio: maxX - minX, height: 4 };
 }
 
 /**
  * Particle destinations on the head, in the same shape buildTarget returns.
- * The head is drawn as `head.dots` separate dots, like the scan it comes from:
- * the particles share those spots, unevenly, so some dots carry many and shine
- * and others carry few. The field enlarges and dims them while the head is on
- * screen. The fourth component of each destination is how much it turns with
- * the head (see simVelocity.frag).
+ * Particle i (i < node count) lands on node i, so the field's lines can join
+ * particles by index; every other particle joins a node too, unevenly, so
+ * some nodes carry many and shine. The field enlarges and dims them while
+ * the head is on screen.
  */
 export function buildMeshTarget(head, { count }) {
-  const { v, turn } = head.points;
-  const n = turn.length;
+  const { v, n } = head.points;
   const s = head.height;
-  const dots = Math.min(count, head.dots ?? n, n);
+  const dots = Math.min(count, n);
   const positions = new Float32Array(count * 4);
   const jitter = new Float32Array(count);
   const bounds = { halfW: 0, halfH: 0 };
 
-  // The points were drawn in random order, so the first `dots` are as good a
-  // sample as any.
   for (let p = 0; p < dots; p++) {
     const x = v[p * 3] * s;
     const y = v[p * 3 + 1] * s;
@@ -282,13 +282,13 @@ export function buildMeshTarget(head, { count }) {
     positions[i4 + 0] = x;
     positions[i4 + 1] = y;
     positions[i4 + 2] = v[p * 3 + 2] * s;
-    positions[i4 + 3] = turn[p] / 255;
+    positions[i4 + 3] = 1;
     bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
     bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
     jitter[p] = 0.5 + Math.random() * Math.random() * 0.85;
   }
   for (let p = dots; p < count; p++) {
-    const from = Math.floor(dots * Math.random() ** 1.2) * 4;
+    const from = Math.floor(dots * Math.random() ** 1.6) * 4;
     positions.copyWithin(p * 4, from, from + 4);
   }
 

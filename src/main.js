@@ -76,12 +76,11 @@ const HEAD = 4;
 // How far the head turns toward the pointer, in radians, at the screen's edge.
 const HEAD_YAW = 0.35;
 const HEAD_PITCH = 0.3;
-// The head is drawn as this many dots, like a depth-camera scan. Each dot
-// carries several particles, so it is lit to about HEAD_LIGHT particles' worth
-// whatever the grid, and the bloom steps aside.
-const HEAD_DOTS = 14000;
-const HEAD_POINT = 0.024;
-const HEAD_LIGHT = 2.6;
+// The head is drawn as nodes joined by lines. Each node carries many
+// particles, so it is lit to about HEAD_LIGHT particles' worth whatever the
+// grid, and the bloom eases off.
+const HEAD_POINT = 0.02;
+const HEAD_LIGHT = 4.5;
 // A small nod once the head has formed, and a tilt as it turns.
 const HEAD_NOD = 0.14;
 const HEAD_ROLL = 0.25;
@@ -185,7 +184,6 @@ async function boot() {
     const visW = visH * aspect;
     const ratio = map.ratio;
     map.height = Math.min(visH * 0.9, (visW * 0.8) / ratio);
-    map.dots = HEAD_DOTS;
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
@@ -201,7 +199,10 @@ async function boot() {
     fluid,
   });
   field.scene.background = new THREE.Color(background);
-  if (headMap) field.setHead(HEAD, new THREE.Vector3(...headMap.points.pivot).multiplyScalar(headMap.height));
+  if (headMap) {
+    field.setHead(HEAD, new THREE.Vector3(...headMap.points.pivot).multiplyScalar(headMap.height));
+    field.setHeadNet(headMap.edges, headMap.points.fade);
+  }
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
   dust.material.uniforms.uFluid.value = fluid.texture;
@@ -448,6 +449,7 @@ async function boot() {
   let camX = 0;
   let headYaw = 0;
   let headGlow = 0;
+  let headLines = 0;
   let nodAt = -1e9;
   let leftHeadAt = -1e9;
   let wasHeadOn = false;
@@ -548,17 +550,23 @@ async function boot() {
     pointer.update(dt);
     field.setPointer(pointer);
 
-    // The dots stay dim and the bloom off until the particles leaving the head
-    // have landed: they fly out in tight bunches, which under the full light
-    // flashed white mid-flight.
+    // The nodes dim as the head forms, and stay dim until the particles
+    // leaving the head have landed: they leave each node in a tight bunch,
+    // which under full light flashed white mid-flight.
     if (wasHeadOn && !headOn) leftHeadAt = now;
     wasHeadOn = headOn;
-    const holdHead = headOn || now - leftHeadAt < CHAIN_MS + 150;
-    headGlow += ((holdHead ? 1 : 0) - headGlow) * Math.min(1, dt * 4);
-    const headLight = Math.min(1, (HEAD_LIGHT * HEAD_DOTS) / field.count);
+    const leaving = !headOn && now - leftHeadAt < CHAIN_MS + 150;
+    const glowTarget = headOn ? morphT : leaving ? 1 : 0;
+    headGlow += (glowTarget - headGlow) * Math.min(1, dt * (headOn || leaving ? 8 : 4));
+    const nodes = headMap ? headMap.points.n : 1;
+    const headLight = Math.min(1, (HEAD_LIGHT * nodes) / field.count);
     field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - (1 - headLight) * headGlow));
     field.setHeadLook(headGlow, HEAD_POINT);
-    post.setBloomScale(L.bloom * (1 - headGlow));
+    // Lines only once the nodes have landed; they go first when the head leaves.
+    const formed = headOn && morphT === 1;
+    headLines += ((formed ? 1 : 0) - headLines) * Math.min(1, dt * (formed ? 2.5 : 12));
+    field.setHeadLines(headLines * (1 - coverage));
+    post.setBloomScale(L.bloom * (1 - 0.45 * headGlow));
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     // One clock for every phrase change (CHAIN_MS).

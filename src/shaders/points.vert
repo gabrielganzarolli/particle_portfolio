@@ -4,6 +4,8 @@ uniform sampler2D uPositions;
 uniform sampler2D uPalette;
 uniform float uSize;
 uniform float uSizeScale; // the head's dots are larger than the letters' grain
+uniform vec3  uTint;      // the head's colour, blended in by uTintMix
+uniform float uTintMix;
 uniform float uPixelScale; // drawingBufferHeight / (2 * tan(fov/2))
 uniform float uColorScale;
 uniform float uColorSpread;
@@ -27,7 +29,7 @@ void main() {
           + snoise(p.xyz * uColorScale * 2.4 + 31.7) * 0.3;
   float t = clamp(n * uColorSpread + 0.5, 0.0, 1.0);
 
-  vColor = texture2D(uPalette, vec2(t, 0.5)).rgb * aJitter;
+  vColor = mix(texture2D(uPalette, vec2(t, 0.5)).rgb, uTint, uTintMix) * aJitter;
   vSpeed = p.w;
 
   vec4 mv = modelViewMatrix * vec4(p.xyz, 1.0);
