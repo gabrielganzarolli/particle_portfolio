@@ -4,6 +4,25 @@
   --ink-dim: rgba(244, 236, 220, 0.42);
   --line: rgba(244, 236, 220, 0.14);
   --edge: clamp(1.25rem, 3.2vw, 2.75rem);
+
+  /* Motion. Every transition on the site uses these, so the same kind of
+     change moves the same way on every page. The particle field's own timing
+     (CHAIN_MS, 550ms, in main.js) sits between --dur-move and --dur-reveal.
+       micro   colour and border on hover and focus
+       move    an element travelling a short way on hover
+       reveal  text arriving as it scrolls in (opacity; travel is --dur-arrive)
+       out/in  content leaving and coming back, as in the language switch
+     Decelerating curves for anything arriving or answering the pointer, an
+     accelerating one for anything leaving. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-long: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --dur-micro: 200ms;
+  --dur-move: 320ms;
+  --dur-reveal: 700ms;
+  --dur-arrive: 620ms;
+  --dur-out: 180ms;
+  --dur-in: 320ms;
 }
 
 * {
@@ -175,8 +194,8 @@ main {
   opacity: 0;
   transform: translate3d(0, 18px, 0);
   transition:
-    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--dur-reveal) var(--ease-out),
+    transform var(--dur-arrive) var(--ease-out-long);
 }
 
 .js .reveal.is-in {
@@ -189,7 +208,7 @@ main {
 @media (prefers-reduced-motion: reduce) {
   .js .reveal {
     transform: none;
-    transition: opacity 300ms ease-out;
+    transition: opacity var(--dur-in) var(--ease-out);
   }
 }
 
@@ -223,7 +242,7 @@ main {
   letter-spacing: 0.14em;
   font-variant-numeric: tabular-nums;
   color: var(--ink-dim);
-  transition: color 220ms ease;
+  transition: color var(--dur-micro) var(--ease-out);
 }
 
 .case-title {
@@ -233,14 +252,14 @@ main {
   /* Shifts right on hover. The transition lives on this inner span so it never
      fights the row's own scroll-reveal transform, which JS writes on .case. */
   display: inline-block;
-  transition: transform 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: transform var(--dur-move) var(--ease-out);
 }
 
 .case-meta,
 .case-year {
   font-size: 0.8125rem;
   color: var(--ink-dim);
-  transition: color 220ms ease;
+  transition: color var(--dur-micro) var(--ease-out);
 }
 
 .case-year {
@@ -331,7 +350,7 @@ main {
   text-decoration: none;
   border-bottom: 1px solid var(--line);
   padding-bottom: 2px;
-  transition: border-color 250ms ease;
+  transition: border-color var(--dur-micro) var(--ease-out);
 }
 
 .about-link:hover,
@@ -357,7 +376,9 @@ main {
   background: var(--bg);
   z-index: 10;
   opacity: 1;
-  transition: opacity 700ms ease;
+  /* The cover lifting off the field: it leaves, so it accelerates away, but
+     slowly enough that the particles' gather reads as the page arriving. */
+  transition: opacity 600ms var(--ease-in);
 }
 
 .preloader.is-hidden {
@@ -442,9 +463,25 @@ main {
   text-transform: uppercase;
   color: rgba(244, 236, 220, 0.55);
   cursor: pointer;
-  transition: color 200ms ease;
+  transition: color var(--dur-micro) var(--ease-out);
 }
 .lang-toggle-fixed:hover,
 .lang-toggle-fixed:focus-visible {
   color: rgba(244, 236, 220, 0.95);
+}
+
+/* Language switch, in place (homeI18n.js): the copy fades out, changes and
+   fades back in while the particles re-form the phrase. `lang-swapping` holds
+   the transition only for the length of the switch, so it never competes with
+   the reveals the rest of the time; !important because the hero bio carries
+   its scroll fade as an inline opacity. */
+html.js.lang-swapping [data-i18n],
+html.js.lang-swapping [data-lang-toggle] {
+  transition: opacity var(--dur-in) var(--ease-out);
+}
+
+html.js.lang-swapping.lang-out [data-i18n],
+html.js.lang-swapping.lang-out [data-lang-toggle] {
+  opacity: 0 !important;
+  transition: opacity var(--dur-out) var(--ease-in);
 }

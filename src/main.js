@@ -7,7 +7,7 @@ import { readyFonts } from './textTargets.js';
 import { backgroundOf } from './palette.js';
 import { hidePreloader, showFatal } from './overlay.js';
 import { createScrollWork } from './scrollWork.js';
-import { storedLang, applyHomeLang, attachHomeToggle } from './homeI18n.js';
+import { storedLang, applyHomeLang, attachHomeToggle, onHomeSwitch } from './homeI18n.js';
 import { PHRASES as ALL_PHRASES } from './home.pt.js';
 import { LEVELS, detectLevel } from './quality.js';
 import { createFluid } from './fluid.js';
@@ -19,8 +19,6 @@ import { readSavedPreset, applyPreset } from './tuning.js';
 const FOV = 50;
 const FIELD_WIDTH = 10;
 const FILL = 0.86; // fraction of the viewport width the phrase spans
-
-const MORPH_MS = 1300;
 
 // Margin around the phrase's own letterforms, in world units — the hover box is
 // measured from the glyphs at build time, not from the raster box, which is far
@@ -36,6 +34,10 @@ const HOVER_SLACK = 0.18;
 // half-formed word. Now a morph starts once the visitor is SCROLL_COMMIT of
 // the way into it and runs at CHAIN_MS per phrase whatever the scroll does,
 // and it reverses the same way when they scroll back.
+// Every phrase change on the page runs on this one clock: the scroll morphs,
+// the hover on the name and the language switch. It used to be 1300ms for the
+// hover and scroll-tracked for the rest, so the same particles moved at three
+// different speeds depending on what set them off.
 const CHAIN_MS = 550;
 const SCROLL_COMMIT = 0.03;
 
@@ -76,7 +78,7 @@ const lang = storedLang() ?? 'en';
 applyHomeLang(lang);
 attachHomeToggle(lang);
 
-const PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
+let PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
 
 // The phrases scroll walks through, in order. Scroll position maps to a single
 // scalar over this chain: 0..1 is REST -> WORK, 1..2 is WORK -> ABOUT. Because
@@ -247,7 +249,6 @@ async function boot() {
   let hovering = false;
   let morphT = 0; // raw 0..1 ramp for hover; ease() is applied on the way to the shader
 
-  const restBounds = field.boundsOf(REST);
 
   /** Is the cursor on the word itself? Tested against its measured ink extent. */
   function pointerOverText() {
@@ -256,6 +257,7 @@ async function boot() {
     // doesn't flip the state every frame.
     const slack = HOVER_MARGIN + (hovering ? HOVER_SLACK : 0);
     const p = pointer.target;
+    const restBounds = field.boundsOf(REST);
     return (
       Math.abs(p.x) < restBounds.halfW + slack && Math.abs(p.y) < restBounds.halfH + slack
     );
@@ -277,8 +279,37 @@ async function boot() {
   let chainShown = 0; // what the field displays, 0..CHAIN_MAX
   let lastScrollY = window.scrollY;
   let scrollDir = 1;
-  let landedAt = -Infinity; // when chainShown last arrived on a phrase
+  let landedAt = -Infinity; // when the field last arrived on a phrase
   let snap = 0;
+
+  // Language switch in place (see homeI18n.js). While `swap` is set the field
+  // re-forms the phrase on screen in the new language, on the same clock and
+  // with the same landing as every other phrase change.
+  let swap = null;
+  onHomeSwitch(async (next) => {
+    if (swap) return;
+    const phrases = ALL_PHRASES[next] ?? ALL_PHRASES.en;
+    swap = { phase: 'preparing' };
+    const index = field.currentIndex;
+    await field.preparePhrases(phrases, [index, pairA, pairB]);
+    field.beginSwap(index);
+    swap = { phase: 'morphing', index, t: 0, phrases };
+  });
+
+  function finishSwap() {
+    const { index, phrases } = swap;
+    field.endSwap();
+    if (reducedMotion) field.jumpTo(index);
+    // The field now shows `index` in the new language; put the morph where
+    // that is true for the current pair, so nothing moves on the handover.
+    if (index === pairA || index === pairB) {
+      morphT = index === pairA ? 0 : 1;
+      field.setMorph(ease(morphT));
+    }
+    PHRASES = phrases;
+    landedAt = performance.now();
+    swap = null;
+  }
   const released = { work: reducedMotion, about: reducedMotion };
   if (!reducedMotion) {
     scrollWork.setGate('work', false);
@@ -350,7 +381,7 @@ async function boot() {
     // A median test let a machine sit at 45fps for good, since half its frames
     // still made 60. This steps down when more than a quarter of 150 frames
     // miss 60fps by a clear margin.
-    if (probing && frames > 30) {
+    if (probing && frames > 30 && !swap) {
       probe.push(dt);
       if (probe.length >= 150) {
         const slow = probe.filter((d) => d > 0.021).length / probe.length;
@@ -393,7 +424,20 @@ async function boot() {
     field.setDim(coverage * MAX_DIM);
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
-    if (reducedMotion) {
+    // One clock for every phrase change (CHAIN_MS).
+    const rate = dt / (CHAIN_MS / 1000);
+    let transitioning = false;
+
+    if (swap?.phase === 'morphing') {
+      if (reducedMotion) {
+        finishSwap();
+      } else {
+        swap.t = Math.min(1, swap.t + rate);
+        field.setMorph(ease(swap.t));
+        transitioning = true;
+        if (swap.t === 1) finishSwap();
+      }
+    } else if (reducedMotion) {
       field.setMorph(0);
     } else {
       // Position along CHAIN. aboutProgress only leaves 0 long after
@@ -404,19 +448,13 @@ async function boot() {
       // each particle over smoothstep(s, s + 0.45, uMorph) with s up to 0.55, so
       // the last particles only land when uMorph reaches exactly 1. An
       // asymptotic approach would leave the phrase permanently half-formed.
-      const rate = dt / (MORPH_MS / 1000);
-
       const target = chainTarget(mapped);
       const before = chainShown;
       const diff = target - chainShown;
-      chainShown += Math.sign(diff) * Math.min(Math.abs(diff), dt / (CHAIN_MS / 1000));
+      chainShown += Math.sign(diff) * Math.min(Math.abs(diff), rate);
       if (chainShown === target && before !== target) landedAt = now;
 
       const moving = chainShown !== target;
-      const settling = now - landedAt < SNAP_HOLD_MS;
-      snap += ((chainShown > 0 && (moving || settling) ? 1 : 0) - snap) * Math.min(1, dt * 5);
-      field.setSnap(snap);
-
       const formed = !moving && now - landedAt > FORMED_MS;
       if (chainShown > 1 || (formed && chainShown === 1)) release('work');
       if (chainShown === 2 && formed) release('about');
@@ -426,6 +464,7 @@ async function boot() {
         usePair(CHAIN[link], CHAIN[link + 1]);
         morphT = chainShown - link;
         hovering = false;
+        transitioning = moving;
       } else if (pairB !== HOVER) {
         // Leaving the chain for hover mode. Both show REST at zero, so this
         // only has to wait out any residual blend before swapping.
@@ -433,13 +472,22 @@ async function boot() {
         morphT = Math.max(morphT - rate, 0);
         if (morphT === 0) usePair(REST, HOVER);
         hovering = false;
+        transitioning = morphT > 0;
       } else {
         hovering = coarsePointer ? tapped : pointerOverText();
+        const was = morphT;
         morphT = THREE.MathUtils.clamp(morphT + (hovering ? rate : -rate), 0, 1);
+        if (morphT !== was && (morphT === 0 || morphT === 1)) landedAt = now;
+        transitioning = morphT > 0 && morphT < 1;
       }
 
       field.setMorph(ease(morphT));
     }
+
+    // Stiffer springs while any phrase change lands, then the usual give.
+    const settling = now - landedAt < SNAP_HOLD_MS;
+    snap += ((transitioning || settling ? 1 : 0) - snap) * Math.min(1, dt * 5);
+    field.setSnap(snap);
 
     field.update(dt, elapsed);
     dust.material.uniforms.uTime.value = elapsed;

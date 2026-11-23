@@ -126,14 +126,85 @@ export class ParticleField {
    * the slower copy is dropped when it arrives.
    */
   async buildRemaining() {
-    for (let i = 0; i < this.phrases.length; i++) {
+    const phrases = this.phrases;
+    for (let i = 0; i < phrases.length; i++) {
       if (this.targets[i]) continue;
-      const { positions, jitter, bounds } = await buildTargetInSlices(this.phrases[i], {
+      const { positions, jitter, bounds } = await buildTargetInSlices(phrases[i], {
         count: this.count,
         fieldWidth: this.fieldWidth,
       });
+      // A language switch mid-build replaces the phrase set; drop the stale one.
+      if (this.phrases !== phrases) return;
       if (!this.targets[i]) this.#store(i, positions, jitter, bounds);
     }
+  }
+
+  /**
+   * Language switch, step 1: sample the new language's versions of the
+   * phrases in `indices` (the one on screen and the two the current pair
+   * needs), in slices between frames so the page keeps animating. The rest of
+   * the set is built after the switch by buildRemaining(), or on demand if
+   * scroll asks for one first.
+   */
+  async preparePhrases(phrases, indices) {
+    const targets = new Array(phrases.length).fill(null);
+    const bounds = new Array(phrases.length).fill(null);
+    // A phrase that reads the same in both languages (the name) keeps its
+    // texture. Resampling it would give every particle a new random spot in
+    // the same word, and the whole field would shuffle sideways for nothing.
+    for (let i = 0; i < phrases.length; i++) {
+      if (phrases[i] === this.phrases[i] && this.targets[i]) {
+        targets[i] = this.targets[i];
+        bounds[i] = this.bounds[i];
+      }
+    }
+    for (const i of new Set(indices)) {
+      if (targets[i]) continue;
+      const job = await buildTargetInSlices(phrases[i], { count: this.count, fieldWidth: this.fieldWidth });
+      targets[i] = toDataTexture(job.positions, this.size);
+      bounds[i] = job.bounds;
+    }
+    this.pending = { phrases, targets, bounds };
+  }
+
+  /**
+   * Step 2: point the field from phrase `index` in the old language to the
+   * same phrase in the new one. The caller drives setMorph() from 0 to 1, as
+   * for any other transition, then calls endSwap().
+   */
+  beginSwap(index) {
+    const u = this.velVar.material.uniforms;
+    u.uTargetA.value = this.#target(index);
+    u.uTargetB.value = this.pending.targets[index];
+    this.setMorph(0);
+  }
+
+  /** Step 3: the new set becomes the field's own; the old textures go. */
+  endSwap() {
+    const { phrases, targets, bounds } = this.pending;
+    for (const t of this.targets) if (t && !targets.includes(t)) t.dispose();
+    this.phrases = phrases;
+    this.targets = targets;
+    this.bounds = bounds;
+    this.pending = null;
+    this.#applyTargets();
+    this.buildRemaining();
+  }
+
+  /**
+   * Put every particle on phrase `index` at once, at rest. Reduced motion uses
+   * this for the language switch, where the usual flight across the screen is
+   * exactly the movement the visitor asked not to see.
+   */
+  jumpTo(index) {
+    const target = this.#target(index);
+    for (const rt of this.posVar.renderTargets) this.gpu.renderTexture(target, rt);
+    if (!this.zeroTexture) {
+      this.zeroTexture = this.gpu.createTexture();
+      this.zeroTexture.image.data.fill(0);
+      this.zeroTexture.needsUpdate = true;
+    }
+    for (const rt of this.velVar.renderTargets) this.gpu.renderTexture(this.zeroTexture, rt);
   }
 
   #buildCompute(fluid) {
@@ -300,6 +371,7 @@ export class ParticleField {
 
   /** World-space half-extents of a phrase's letterforms, strays excluded. */
   boundsOf(index) {
+    this.#target(index);
     return this.bounds[index];
   }
 

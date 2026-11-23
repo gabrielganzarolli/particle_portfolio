@@ -63,27 +63,12 @@ function gaussian() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
 }
 
-function prepare(phrase, { count, fieldWidth, depth = 0.32, strayRatio = 0.14 }) {
-  const pixels = rasterize(phrase);
-  const n = RASTER_W * RASTER_H;
-
-  const cdf = new Float32Array(n);
-  let acc = 0;
-  for (let i = 0; i < n; i++) {
-    acc += pixels[i * 4 + 3] / 255;
-    cdf[i] = acc;
-  }
-
-  if (acc <= 0) {
-    // Nothing was drawn (missing glyphs). Fail visibly rather than silently
-    // emitting a NaN field that takes the whole simulation down.
-    throw new Error(`Phrase "${phrase}" rasterized to an empty mask`);
-  }
-
+function newJob(pixels, { count, fieldWidth, depth = 0.32, strayRatio = 0.14 }) {
   return {
-    n,
-    cdf,
-    acc,
+    pixels,
+    n: RASTER_W * RASTER_H,
+    cdf: new Float32Array(RASTER_W * RASTER_H),
+    acc: 0,
     count,
     fieldWidth,
     depth,
@@ -98,6 +83,32 @@ function prepare(phrase, { count, fieldWidth, depth = 0.32, strayRatio = 0.14 })
     // much larger than the letterforms.
     bounds: { halfW: 0, halfH: 0 },
   };
+}
+
+/** Prefix sum over pixel alpha, for pixels [from, to). */
+function accumulate(job, from, to) {
+  const { pixels, cdf } = job;
+  let acc = job.acc;
+  for (let i = from; i < to; i++) {
+    acc += pixels[i * 4 + 3] / 255;
+    cdf[i] = acc;
+  }
+  job.acc = acc;
+}
+
+function checkInk(job, phrase) {
+  if (job.acc <= 0) {
+    // Nothing was drawn (missing glyphs). Fail visibly rather than silently
+    // emitting a NaN field that takes the whole simulation down.
+    throw new Error(`Phrase "${phrase}" rasterized to an empty mask`);
+  }
+}
+
+function prepare(phrase, opts) {
+  const job = newJob(rasterize(phrase), opts);
+  accumulate(job, 0, job.n);
+  checkInk(job, phrase);
+  return job;
 }
 
 function sampleRange(job, from, to) {
@@ -178,18 +189,27 @@ const nextIdle = () =>
  */
 export async function buildTargetInSlices(phrase, opts) {
   await nextIdle();
-  const job = prepare(phrase, opts);
-  let p = 0;
-  while (p < job.count) {
-    const deadline = await nextIdle();
-    const start = performance.now();
-    const budget = deadline?.timeRemaining ? Math.max(deadline.timeRemaining() - 1, 4) : 8;
-    do {
-      const to = Math.min(p + 4096, job.count);
-      sampleRange(job, p, to);
-      p = to;
-    } while (p < job.count && performance.now() - start < budget);
-  }
+  const job = newJob(rasterize(phrase), opts);
+
+  // Every stage, the prefix sum over a million pixels included, runs in slices
+  // that fit the idle time the browser reports, so no frame waits on it.
+  const sliced = async (total, step, work) => {
+    let i = 0;
+    while (i < total) {
+      const deadline = await nextIdle();
+      const start = performance.now();
+      const budget = deadline?.timeRemaining ? Math.max(deadline.timeRemaining() - 1, 4) : 8;
+      do {
+        const to = Math.min(i + step, total);
+        work(i, to);
+        i = to;
+      } while (i < total && performance.now() - start < budget);
+    }
+  };
+
+  await sliced(job.n, 65536, (from, to) => accumulate(job, from, to));
+  checkInk(job, phrase);
+  await sliced(job.count, 4096, (from, to) => sampleRange(job, from, to));
   return job;
 }
 

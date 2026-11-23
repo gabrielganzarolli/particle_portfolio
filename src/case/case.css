@@ -14,6 +14,25 @@
      screenshots dominate the page and read larger than the prose they
      support. Captions share the cap so they align with the image edge. */
   --figure-max: 60rem;
+
+  /* Motion. Every transition on the site uses these, so the same kind of
+     change moves the same way on every page. The particle field's own timing
+     (CHAIN_MS, 550ms, in main.js) sits between --dur-move and --dur-reveal.
+       micro   colour and border on hover and focus
+       move    an element travelling a short way on hover
+       reveal  text arriving as it scrolls in (opacity; travel is --dur-arrive)
+       out/in  content leaving and coming back, as in the language switch
+     Decelerating curves for anything arriving or answering the pointer, an
+     accelerating one for anything leaving. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-long: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --dur-micro: 200ms;
+  --dur-move: 320ms;
+  --dur-reveal: 700ms;
+  --dur-arrive: 620ms;
+  --dur-out: 180ms;
+  --dur-in: 320ms;
 }
 
 * {
@@ -70,7 +89,7 @@ a {
   margin-block: -0.9rem;
   text-decoration: none;
   color: var(--ink-dim);
-  transition: color 200ms ease;
+  transition: color var(--dur-micro) var(--ease-out);
 }
 
 .case-nav a:hover,
@@ -102,7 +121,7 @@ a {
   text-transform: inherit;
   color: var(--ink-dim);
   cursor: pointer;
-  transition: color 200ms ease;
+  transition: color var(--dur-micro) var(--ease-out);
 }
 .lang-toggle:hover,
 .lang-toggle:focus-visible {
@@ -364,7 +383,9 @@ a {
   font-size: 0.875rem;
   letter-spacing: 0.02em;
   text-decoration: none;
-  transition: border-color 200ms ease, background-color 200ms ease;
+  transition:
+    border-color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out);
 }
 
 .contact-button:hover,
@@ -729,7 +750,7 @@ a {
    rather than resized, so the change stays on the compositor. 52/46 is the
    size the knob used to grow to. */
 .compare-handle::after {
-  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--dur-micro) var(--ease-out);
 }
 
 .compare-frame:hover .compare-handle::after {
@@ -951,7 +972,7 @@ a {
 .more-meta {
   font-size: 0.8125rem;
   color: var(--ink-dim);
-  transition: color 200ms ease;
+  transition: color var(--dur-micro) var(--ease-out);
 }
 
 .more-num {
@@ -962,7 +983,7 @@ a {
 .more-title {
   font-size: clamp(1.125rem, 2.6vw, 1.875rem);
   display: inline-block;
-  transition: transform 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: transform var(--dur-move) var(--ease-out);
 }
 
 .more-item a:hover .more-title,
@@ -1016,8 +1037,8 @@ a {
      opacity runs a little longer than the movement so the two don't land on
      the same frame. */
   transition:
-    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--dur-reveal) var(--ease-out),
+    transform var(--dur-arrive) var(--ease-out-long);
 }
 
 .js .reveal.is-in {
@@ -1028,7 +1049,7 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .js .reveal {
     transform: none;
-    transition: opacity 300ms ease-out;
+    transition: opacity var(--dur-in) var(--ease-out);
   }
 }
 
@@ -1273,7 +1294,9 @@ a {
   font-size: 0.875rem;
   letter-spacing: 0.02em;
   text-decoration: none;
-  transition: border-color 200ms ease, background-color 200ms ease;
+  transition:
+    border-color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out);
 }
 
 .proto-open:hover,
@@ -1295,5 +1318,26 @@ a {
 
   .proto-frame {
     height: min(80vh, 44rem);
+  }
+}
+
+/* Language switch (i18n.js): the case fades out, its words change, and it
+   fades back in, on the same timings as the home page's switch. */
+html.js.lang-swapping #case,
+html.js.lang-swapping [data-i18n],
+html.js.lang-swapping [data-lang-toggle] {
+  transition: opacity var(--dur-in) var(--ease-out);
+}
+
+html.js.lang-swapping.lang-out #case,
+html.js.lang-swapping.lang-out [data-i18n],
+html.js.lang-swapping.lang-out [data-lang-toggle] {
+  opacity: 0;
+  transition: opacity var(--dur-out) var(--ease-in);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .more-title {
+    transition: none;
   }
 }

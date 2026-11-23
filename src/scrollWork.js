@@ -30,44 +30,39 @@ const MIN_MORPH_VH = 0.3;
 const CHROME_FADE_VH = 0.45 * PACE;
 
 /**
- * Reveals run on IntersectionObserver: the browser works out visibility off the
- * main thread and each element is dropped once shown. They used to be read with
- * getBoundingClientRect every frame, all fifteen of them, for the life of the
- * page. The trigger line sits 8% above the bottom edge, as before.
+ * Text arrives as it crosses a line 10% above the bottom of the screen. Checked
+ * in the frame loop main.js already runs, against only the elements still
+ * waiting, so the cost falls to nothing once everything is shown. An
+ * IntersectionObserver did this for a while, but it only reports crossings it
+ * sees: a jump that carries an element from below the screen to above it in one
+ * go (the scrollbar, the End key) left it invisible above the reader.
  */
-function observeReveals(gates) {
-  const targets = Array.from(document.querySelectorAll('.reveal'));
+function createReveals(gates) {
+  const waiting = Array.from(document.querySelectorAll('.reveal'));
   // Text inside a gated section waits for its gate (see setGate below).
   const gateOf = (el) => (el.closest('.work') ? 'work' : el.closest('.about') ? 'about' : null);
-  const waiting = { work: [], about: [] };
+  const held = { work: [], about: [] };
 
-  const show = (el) => {
-    const g = gateOf(el);
-    if (g && !gates[g]) waiting[g].push(el);
-    else el.classList.add('is-in');
-  };
-
-  if (!('IntersectionObserver' in window)) {
-    targets.forEach(show);
-  } else {
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          show(entry.target);
-          io.unobserve(entry.target);
-        }
-      },
-      { rootMargin: '0px 0px -8% 0px', threshold: 0 }
-    );
-    targets.forEach((t) => io.observe(t));
-  }
-
-  return (name) => {
-    // Everything that came into view while the gate was shut, in page order,
-    // a short beat apart so the list still reads top to bottom.
-    waiting[name].forEach((el, i) => setTimeout(() => el.classList.add('is-in'), i * 70));
-    waiting[name].length = 0;
+  return {
+    /** Call once per frame, in the read phase. */
+    update(viewH) {
+      const line = viewH * 0.9;
+      for (let i = waiting.length - 1; i >= 0; i--) {
+        const el = waiting[i];
+        if (el.getBoundingClientRect().top >= line) continue;
+        waiting.splice(i, 1);
+        const g = gateOf(el);
+        if (g && !gates[g]) held[g].push(el);
+        else el.classList.add('is-in');
+      }
+    },
+    /** Everything that came into view while a gate was shut, in page order. */
+    flush(name) {
+      held[name]
+        .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+        .forEach((el, i) => setTimeout(() => el.classList.add('is-in'), i * 70));
+      held[name].length = 0;
+    },
   };
 }
 
@@ -86,7 +81,7 @@ function observeReveals(gates) {
 export function createScrollWork() {
   // Gates start open: if the particle field never starts, nothing waits.
   const gates = { work: true, about: true };
-  const flush = observeReveals(gates);
+  const reveals = createReveals(gates);
 
   const main = document.querySelector('main');
   const aboutSpace = document.querySelector('.about-space');
@@ -114,7 +109,7 @@ export function createScrollWork() {
      */
     setGate(name, open) {
       gates[name] = open;
-      if (open) flush(name);
+      if (open) reveals.flush(name);
     },
 
     /** @returns {{ workProgress:number, aboutProgress:number, coverage:number, hidden:boolean }} */
@@ -129,6 +124,7 @@ export function createScrollWork() {
       }
       const aboutSpaceTop = aboutSpace ? aboutSpace.getBoundingClientRect().top : Infinity;
       const viewH = window.innerHeight;
+      reveals.update(viewH);
 
       const chromeOpacity = 1 - clamp01(scrollY / (vh * CHROME_FADE_VH));
       if (chromeOpacity !== lastChrome) {

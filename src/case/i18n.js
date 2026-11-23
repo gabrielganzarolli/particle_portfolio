@@ -107,7 +107,30 @@ export function attachLangToggle({ onSwap } = {}) {
     onSwap?.(target);
   }
 
-  button.addEventListener('click', () => show(current === 'en' ? 'pt' : 'en'));
+  // The same fade as the home page's switch: out, change, back in.
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let busy = false;
+  button.addEventListener('click', () => {
+    const next = current === 'en' ? 'pt' : 'en';
+    if (reducedMotion) {
+      show(next);
+      return;
+    }
+    if (busy) return;
+    busy = true;
+    const root = document.documentElement;
+    root.classList.add('lang-swapping', 'lang-out');
+    setTimeout(() => {
+      show(next);
+      requestAnimationFrame(() => {
+        root.classList.remove('lang-out');
+        setTimeout(() => {
+          root.classList.remove('lang-swapping');
+          busy = false;
+        }, 320);
+      });
+    }, 180);
+  });
 
   // A returning visitor who chose Portuguese gets it without touching anything.
   const preferred = storedLang();

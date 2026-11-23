@@ -44,9 +44,36 @@ if (reducedMotion || !('IntersectionObserver' in window)) {
     },
     // Fire a little before the element reaches the bottom edge, so content is
     // already settled by the time it is comfortably in view.
-    { rootMargin: '0px 0px -12% 0px', threshold: 0.01 }
+    { rootMargin: '0px 0px -10% 0px', threshold: 0.01 }
   );
   for (const t of targets) io.observe(t);
+
+  // The observer only reports crossings it sees. A jump that carries an element
+  // from below the screen to above it in one go (dragging the scrollbar, the
+  // End key, a link further down) never crosses, and the element would stay
+  // invisible above the reader. On each scroll, anything still waiting that is
+  // already above the trigger line is shown.
+  let queued = false;
+  const catchUp = () => {
+    queued = false;
+    const line = window.innerHeight * 0.9;
+    for (const t of targets) {
+      if (t.classList.contains('is-in')) continue;
+      if (t.getBoundingClientRect().top < line) {
+        t.classList.add('is-in');
+        io.unobserve(t);
+      }
+    }
+  };
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(catchUp);
+    },
+    { passive: true }
+  );
 
   // Chrome defers IntersectionObserver callbacks while a tab is hidden, and a
   // page loaded in a background tab would otherwise sit at opacity 0 with no
