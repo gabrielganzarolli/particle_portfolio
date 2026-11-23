@@ -25,6 +25,14 @@ uniform float uFlow;
 uniform float uMaxSpeed;
 uniform float uSnap;
 
+// The head turns toward the pointer. Whichever end of the morph is the head
+// (uHeadA, uHeadB) has its destinations rotated about the pivot, so the
+// particles follow the turn on their springs, a beat behind.
+uniform mat3 uHeadRot;
+uniform vec3 uHeadPivot;
+uniform float uHeadA;
+uniform float uHeadB;
+
 uniform sampler2D uFluid;
 uniform float uFluidForce;
 uniform mat4 uViewProj;
@@ -51,7 +59,11 @@ void main() {
   float stagger = hash12(uv * 511.0) * 0.55;
   float m = smoothstep(stagger, stagger + 0.45, uMorph);
 
-  vec3 goal = mix(texture2D(uTargetA, uv).xyz, texture2D(uTargetB, uv).xyz, m);
+  vec3 ta = texture2D(uTargetA, uv).xyz;
+  vec3 tb = texture2D(uTargetB, uv).xyz;
+  ta = mix(ta, uHeadPivot + uHeadRot * (ta - uHeadPivot), uHeadA);
+  tb = mix(tb, uHeadPivot + uHeadRot * (tb - uHeadPivot), uHeadB);
+  vec3 goal = mix(ta, tb, m);
 
   // Peaks at the midpoint of a transition and is zero while a phrase is held.
   float energy = sin(PI * clamp(uMorph, 0.0, 1.0));

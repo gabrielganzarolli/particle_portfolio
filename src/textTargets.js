@@ -170,8 +170,8 @@ function sampleRange(job, from, to) {
  * badly on sparse phrases.
  */
 export function buildTarget(phrase, opts) {
-  // A phrase can also be a portrait map (see loadImageMap).
-  if (typeof phrase !== 'string') return buildImageTarget(phrase, opts);
+  // A phrase can also be the head (see loadHeadMesh).
+  if (typeof phrase !== 'string') return buildMeshTarget(phrase, opts);
   const job = prepare(phrase, opts);
   sampleRange(job, 0, job.count);
   return job;
@@ -191,9 +191,9 @@ const nextIdle = () =>
  */
 export async function buildTargetInSlices(phrase, opts) {
   await nextIdle();
-  // A portrait is a small image, about 60ms to sample on a laptop: one idle
-  // slot rather than a sliced build.
-  if (typeof phrase !== 'string') return buildImageTarget(phrase, opts);
+  // The head samples a small mesh, a few tens of milliseconds on a laptop:
+  // one idle slot rather than a sliced build.
+  if (typeof phrase !== 'string') return buildMeshTarget(phrase, opts);
   const job = newJob(rasterize(phrase), opts);
 
   // Every stage, the prefix sum over a million pixels included, runs in slices
@@ -228,45 +228,62 @@ export function toDataTexture(positions, size) {
 }
 
 /**
- * Load a portrait map for buildImageTarget: an image whose red channel is
- * particle density and whose green channel is depth toward the camera. The
- * map for the head is made offline from a photo (cut out, contrast and edges
- * folded into density, a rounded volume into depth), so the browser only
- * samples it.
+ * Load the head: a low-poly bald head made offline (scripts/head/), stored as
+ * a small binary. Vertices are normalised to a height of 1 and centred; each
+ * vertex carries a weight, the shading folded into particle density, so the
+ * lit planes of the face fill in and the hollows stay dark. The pivot is the
+ * point the head turns around, near where it meets the neck.
  */
-export async function loadImageMap(url) {
-  const img = new Image();
-  img.decoding = 'async';
-  img.src = url;
-  await img.decode();
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0);
-  return { image: ctx.getImageData(0, 0, canvas.width, canvas.height), height: 4 };
+export async function loadHeadMesh(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Head mesh: HTTP ${res.status}`);
+  const buf = await res.arrayBuffer();
+  const view = new DataView(buf);
+  if (view.getUint32(0, true) !== 0x44414548) throw new Error('Head mesh: bad header');
+  const nv = view.getUint32(4, true);
+  const nf = view.getUint32(8, true);
+  const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
+  let o = 24;
+  const q = new Int16Array(buf, o, nv * 3);
+  o += nv * 6;
+  const w = new Uint8Array(buf, o, nv);
+  o += nv + ((o + nv) % 2);
+  const f = new Uint16Array(buf, o, nf * 3);
+  const v = Float32Array.from(q, (x) => x / 30000);
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (let i = 0; i < nv; i++) {
+    minX = Math.min(minX, v[i * 3]);
+    maxX = Math.max(maxX, v[i * 3]);
+  }
+  return { mesh: { v, w, f, pivot }, ratio: maxX - minX, height: 4 };
 }
 
 /**
- * Particle destinations from a portrait map, in the same shape buildTarget
- * returns. `map.height` is the portrait's height in world units; width follows
- * the image. Depth lifts the face toward the camera by up to `relief`, so the
- * pointer parallax turns the head slightly and the depth of field softens the
- * nearest features.
+ * Particle destinations on the head's surface, in the same shape buildTarget
+ * returns. Triangles are drawn by area times weight, points spread evenly
+ * inside each one. `head.height` is the head's height in world units.
  */
-export function buildImageTarget(map, { count, relief = 0.9, strayRatio = 0.05 }) {
-  const { data, width, height } = map.image;
-  const n = width * height;
-  const cdf = new Float32Array(n);
+export function buildMeshTarget(head, { count, strayRatio = 0.04 }) {
+  const { v, w, f } = head.mesh;
+  const s = head.height;
+  const nt = f.length / 3;
+  const cdf = new Float32Array(nt);
   let acc = 0;
-  for (let i = 0; i < n; i++) {
-    acc += data[i * 4] / 255;
-    cdf[i] = acc;
+  for (let t = 0; t < nt; t++) {
+    const a = f[t * 3] * 3;
+    const b = f[t * 3 + 1] * 3;
+    const c = f[t * 3 + 2] * 3;
+    const ux = v[b] - v[a], uy = v[b + 1] - v[a + 1], uz = v[b + 2] - v[a + 2];
+    const vx = v[c] - v[a], vy = v[c + 1] - v[a + 1], vz = v[c + 2] - v[a + 2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    const area = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    acc += area * (w[f[t * 3]] + w[f[t * 3 + 1]] + w[f[t * 3 + 2]]);
+    cdf[t] = acc;
   }
-  if (acc <= 0) throw new Error('Portrait map is empty');
+  if (acc <= 0) throw new Error('Head mesh is empty');
 
-  const worldH = map.height;
-  const worldW = (worldH * width) / height;
   const positions = new Float32Array(count * 4);
   const jitter = new Float32Array(count);
   const bounds = { halfW: 0, halfH: 0 };
@@ -274,20 +291,24 @@ export function buildImageTarget(map, { count, relief = 0.9, strayRatio = 0.05 }
   for (let p = 0; p < count; p++) {
     const target = Math.random() * acc;
     let lo = 0;
-    let hi = n - 1;
+    let hi = nt - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
       if (cdf[mid] < target) lo = mid + 1;
       else hi = mid;
     }
-    const px = lo % width;
-    const py = (lo / width) | 0;
-    const x = ((px + Math.random()) / width - 0.5) * worldW;
-    const y = (0.5 - (py + Math.random()) / height) * worldH;
-    const z = (data[lo * 4 + 1] / 255 - 0.45) * relief;
+    const a = f[lo * 3] * 3;
+    const b = f[lo * 3 + 1] * 3;
+    const c = f[lo * 3 + 2] * 3;
+    const r = Math.sqrt(Math.random());
+    const r2 = Math.random();
+    const wa = 1 - r, wb = r * (1 - r2), wc = r * r2;
+    const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s;
+    const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s;
+    const z = (v[a + 2] * wa + v[b + 2] * wb + v[c + 2] * wc) * s;
 
     const stray = Math.random() < strayRatio;
-    const spread = stray ? worldW * 0.03 : 0;
+    const spread = stray ? s * 0.02 : 0;
     if (!stray) {
       bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
       bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
@@ -296,7 +317,7 @@ export function buildImageTarget(map, { count, relief = 0.9, strayRatio = 0.05 }
     const i4 = p * 4;
     positions[i4 + 0] = x + gaussian() * spread;
     positions[i4 + 1] = y + gaussian() * spread;
-    positions[i4 + 2] = z + (Math.random() - 0.5) * 0.04;
+    positions[i4 + 2] = z + gaussian() * spread;
     positions[i4 + 3] = 1;
 
     const brightness = 0.5 + Math.random() * Math.random() * 0.85;

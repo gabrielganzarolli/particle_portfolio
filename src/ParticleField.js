@@ -83,6 +83,7 @@ export class ParticleField {
     this.morph = 0;
     this.indexA = 0;
     this.indexB = 0;
+    this.headIndex = -1;
     this.#applyTargets();
   }
 
@@ -176,6 +177,7 @@ export class ParticleField {
     const u = this.velVar.material.uniforms;
     u.uTargetA.value = this.#target(index);
     u.uTargetB.value = this.pending.targets[index];
+    u.uHeadA.value = u.uHeadB.value = index === this.headIndex ? 1 : 0;
     this.setMorph(0);
   }
 
@@ -266,6 +268,10 @@ export class ParticleField {
       uMaxSpeed: { value: DEFAULTS.maxSpeed },
       uSnap: { value: 0 },
       uRepelScale: { value: 1 },
+      uHeadRot: { value: new THREE.Matrix3() },
+      uHeadPivot: { value: new THREE.Vector3() },
+      uHeadA: { value: 0 },
+      uHeadB: { value: 0 },
       uFluid: { value: fluid?.texture ?? null },
       uFluidForce: { value: fluid ? DEFAULTS.fluidForce : 0 },
       uViewProj: { value: new THREE.Matrix4() },
@@ -340,6 +346,8 @@ export class ParticleField {
     const u = this.velVar.material.uniforms;
     u.uTargetA.value = this.#target(this.indexA);
     u.uTargetB.value = this.#target(this.indexB);
+    u.uHeadA.value = this.indexA === this.headIndex ? 1 : 0;
+    u.uHeadB.value = this.indexB === this.headIndex ? 1 : 0;
   }
 
   /**
@@ -395,6 +403,18 @@ export class ParticleField {
 
   setPixelScale(scale) {
     this.material.uniforms.uPixelScale.value = scale;
+  }
+
+  /** Which phrase is the head, and the point (world units) it turns around. */
+  setHead(index, pivot) {
+    this.headIndex = index;
+    this.velVar.material.uniforms.uHeadPivot.value.copy(pivot);
+    this.#applyTargets();
+  }
+
+  /** The head's turn this frame, as a rotation matrix. */
+  setHeadPose(matrix3) {
+    this.velVar.material.uniforms.uHeadRot.value.copy(matrix3);
   }
 
   /** Multiplies the cursor's push; the head takes a gentler one. */

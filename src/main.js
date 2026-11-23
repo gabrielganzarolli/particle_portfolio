@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import './styles.css';
 import { ParticleField } from './ParticleField.js';
 import { Pointer } from './pointer.js';
-import { readyFonts, loadImageMap } from './textTargets.js';
-import headMapUrl from './images/head/head-map.png';
+import { readyFonts, loadHeadMesh } from './textTargets.js';
+import headMeshUrl from './images/head/head.bin?url';
 import { backgroundOf } from './palette.js';
 import { hidePreloader, showFatal } from './overlay.js';
 import { createScrollWork } from './scrollWork.js';
@@ -73,6 +73,10 @@ const WORK = 2;
 const ABOUT = 3;
 // Gabriel's head in particles, shown by clicking the name (see the click below).
 const HEAD = 4;
+// How far the head turns toward the pointer, in radians, at the screen's edge.
+const HEAD_YAW = 0.4;
+const HEAD_PITCH = 0.3;
+const HEAD_DIM = 0.28;
 // Language is settled before anything is built. The field rasterises each
 // phrase into a texture at construction, so picking the wrong set here would
 // mean rebuilding it later; reading the stored choice first avoids that
@@ -160,19 +164,19 @@ async function boot() {
   camera.position.set(0, 0, 10);
   let cameraZ = 10;
 
-  // The portrait map loads alongside the fonts. Without it the page is the
+  // The head loads alongside the fonts. Without it the page is the
   // same, minus the head.
-  const [, map] = await Promise.all([readyFonts(), loadImageMap(headMapUrl).catch(() => null)]);
+  const [, map] = await Promise.all([readyFonts(), loadHeadMesh(headMeshUrl).catch(() => null)]);
   if (map) {
-    // Sized to the screen it first opens on: about four fifths of the view's
+    // Sized to the screen it first opens on: about seven tenths of the view's
     // height, narrower than the view on a phone held upright.
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
     const aspect = vw / vh;
     const z = Math.max(FIELD_WIDTH / FILL / (2 * Math.tan(halfFov) * aspect), (FIELD_WIDTH * 0.25) / FILL / (2 * Math.tan(halfFov)));
     const visH = 2 * z * Math.tan(halfFov);
     const visW = visH * aspect;
-    const ratio = map.image.width / map.image.height;
-    map.height = Math.min(visH * 0.78, (visW * 0.8) / ratio);
+    const ratio = map.ratio;
+    map.height = Math.min(visH * 0.7, (visW * 0.8) / ratio);
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
@@ -188,6 +192,7 @@ async function boot() {
     fluid,
   });
   field.scene.background = new THREE.Color(background);
+  if (headMap) field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height));
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
   dust.material.uniforms.uFluid.value = fluid.texture;
@@ -285,7 +290,7 @@ async function boot() {
     );
   }
 
-  /** Is the pointer on the head? Tested against the portrait's sampled extent. */
+  /** Is the pointer on the head? Tested against its sampled extent. */
   function pointerOverHead() {
     if (!headMap || !pointer.targetActive || !pointer.hasSample) return false;
     return onHead(pointer.target);
@@ -432,6 +437,12 @@ async function boot() {
   let elapsed = 0;
   let frames = 0;
   let camX = 0;
+  let headYaw = 0;
+  let headGlow = 0;
+  let headPitch = 0;
+  const headEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+  const headRot4 = new THREE.Matrix4();
+  const headRot = new THREE.Matrix3();
   let camY = 0;
   let paused = false;
 
@@ -496,13 +507,37 @@ async function boot() {
     }
     camera.position.set(camX * tune.parallaxX, camY * tune.parallaxY, cameraZ);
     camera.lookAt(0, 0, 0);
+
+    // The head looks toward the pointer. On a touch screen, with no pointer to
+    // follow, it sways slowly on its own; under reduced motion it holds still.
+    if (headMap) {
+      let yaw = 0;
+      let pitch = 0;
+      if (!reducedMotion) {
+        if (px !== null && !coarsePointer) {
+          yaw = ((px / vw) * 2 - 1) * HEAD_YAW;
+          pitch = ((py / vh) * 2 - 1) * HEAD_PITCH;
+        } else {
+          yaw = Math.sin(elapsed * 0.45) * 0.22;
+          pitch = Math.sin(elapsed * 0.31) * 0.06;
+        }
+      }
+      const kh = 1 - Math.exp(-dt * 3);
+      headYaw += (yaw - headYaw) * kh;
+      headPitch += (pitch - headPitch) * kh;
+      headEuler.set(headPitch, headYaw, 0);
+      field.setHeadPose(headRot.setFromMatrix4(headRot4.makeRotationFromEuler(headEuler)));
+    }
     camera.updateMatrixWorld();
     field.setCamera(camera);
 
     pointer.update(dt);
     field.setPointer(pointer);
 
-    field.setDim(coverage * MAX_DIM);
+    // The head packs every particle into a smaller area than the name, and
+    // under the bloom its outline burned. It shows a quarter dimmer.
+    headGlow += ((headOn ? 1 : 0) - headGlow) * Math.min(1, dt * 4);
+    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - HEAD_DIM * headGlow));
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     // One clock for every phrase change (CHAIN_MS).
@@ -583,10 +618,10 @@ async function boot() {
 
     updateCursor(!swap && chainShown === 0 && window.scrollY <= 4);
 
-    // The cursor rests on the head after the click that made it, and the full
-    // push opened a hole through the face. A quarter of it still stirs the
+    // On the head the cursor steers the turn, and the full push opened a hole
+    // through the face wherever it went. A little of it still stirs the
     // particles without erasing the features.
-    repelScale += ((headOn ? 0.25 : 1) - repelScale) * Math.min(1, dt * 4);
+    repelScale += ((headOn ? 0.06 : 1) - repelScale) * Math.min(1, dt * 4);
     field.setRepelScale(repelScale);
 
     // Stiffer springs while any phrase change lands, then the usual give.
