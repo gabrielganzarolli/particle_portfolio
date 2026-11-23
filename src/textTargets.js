@@ -263,12 +263,13 @@ export async function loadHeadMesh(url) {
 /**
  * Particle destinations on the head, in the same shape buildTarget returns.
  * Particle i (i < node count) lands on node i, so the field's lines can join
- * particles by index; every other particle joins a node too, unevenly, so
- * some nodes carry many and shine. The field enlarges and dims them while
- * the head is on screen.
+ * particles by index. Every other particle joins a node in proportion to the
+ * node's weight (its light, baked offline), so lit nodes carry many particles
+ * and shine while nodes in shadow and down the neck stay faint. The field
+ * enlarges and dims them while the head is on screen.
  */
 export function buildMeshTarget(head, { count }) {
-  const { v, n } = head.points;
+  const { v, n, fade } = head.points;
   const s = head.height;
   const dots = Math.min(count, n);
   const positions = new Float32Array(count * 4);
@@ -287,9 +288,23 @@ export function buildMeshTarget(head, { count }) {
     bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
     jitter[p] = 0.5 + Math.random() * Math.random() * 0.85;
   }
+  const cdf = new Float32Array(dots);
+  let acc = 0;
+  for (let i = 0; i < dots; i++) {
+    const w = fade[i] / 255;
+    acc += w * w;
+    cdf[i] = acc;
+  }
   for (let p = dots; p < count; p++) {
-    const from = Math.floor(dots * Math.random() ** 1.6) * 4;
-    positions.copyWithin(p * 4, from, from + 4);
+    const target = Math.random() * acc;
+    let lo = 0;
+    let hi = dots - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cdf[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    positions.copyWithin(p * 4, lo * 4, lo * 4 + 4);
   }
 
   return { positions, jitter, bounds };

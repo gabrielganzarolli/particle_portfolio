@@ -322,7 +322,7 @@ export class ParticleField {
         // diameter. Without this the low-power path renders a threadbare field.
         uSize: { value: DEFAULTS.pointSize * (512 / this.size) },
         uSizeScale: { value: 1 },
-        uTint: { value: new THREE.Color(0.35, 0.82, 1.0) },
+        uTint: { value: new THREE.Color(0.25, 0.75, 1.0) },
         uTintMix: { value: 0 },
         uPixelScale: { value: 1 },
         uOpacity: { value: DEFAULTS.opacity },
@@ -447,7 +447,7 @@ export class ParticleField {
     this.lineMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uPositions: { value: null },
-        uColor: { value: new THREE.Color(0.35, 0.82, 1.0) },
+        uColor: { value: new THREE.Color(0.25, 0.75, 1.0) },
         uOpacity: { value: 0 },
       },
       vertexShader: `
@@ -475,10 +475,27 @@ export class ParticleField {
     this.scene.add(this.lines);
   }
 
+  /**
+   * 0..1: hold the particles still for the head. Turbulence, the fluid and
+   * the depth of field all soften points, which the letters can take and a
+   * wireframe can't: the nodes would swim off the lines that join them.
+   */
+  setHeadCalm(t) {
+    const vu = this.velVar.material.uniforms;
+    const pu = this.material.uniforms;
+    if (t < 0.001 || !this.calmBase) {
+      this.calmBase = { turb: vu.uTurbulence.value, fluid: vu.uFluidForce.value, dof: pu.uDof.value };
+    }
+    const b = this.calmBase;
+    vu.uTurbulence.value = b.turb * (1 - 0.95 * t);
+    vu.uFluidForce.value = b.fluid * (1 - t);
+    pu.uDof.value = b.dof * (1 - t);
+  }
+
   /** 0..1: how visible the head's lines are. */
   setHeadLines(alpha) {
     if (!this.lines) return;
-    this.lineMaterial.uniforms.uOpacity.value = alpha * 0.28;
+    this.lineMaterial.uniforms.uOpacity.value = alpha * 0.42;
     this.lines.visible = alpha > 0.002;
   }
 

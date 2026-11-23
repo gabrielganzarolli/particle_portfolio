@@ -80,7 +80,7 @@ const HEAD_PITCH = 0.3;
 // particles, so it is lit to about HEAD_LIGHT particles' worth whatever the
 // grid, and the bloom eases off.
 const HEAD_POINT = 0.02;
-const HEAD_LIGHT = 4.5;
+const HEAD_LIGHT = 6;
 // A small nod once the head has formed, and a tilt as it turns.
 const HEAD_NOD = 0.14;
 const HEAD_ROLL = 0.25;
@@ -566,7 +566,8 @@ async function boot() {
     const formed = headOn && morphT === 1;
     headLines += ((formed ? 1 : 0) - headLines) * Math.min(1, dt * (formed ? 2.5 : 12));
     field.setHeadLines(headLines * (1 - coverage));
-    post.setBloomScale(L.bloom * (1 - 0.45 * headGlow));
+    field.setHeadCalm(headLines);
+    post.setBloomScale(L.bloom * (1 - 0.6 * headGlow));
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     // One clock for every phrase change (CHAIN_MS).

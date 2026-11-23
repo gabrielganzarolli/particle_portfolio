@@ -20,7 +20,7 @@ C = np.load('canon_v.npy'); F = np.load('canon_f.npy')
 TARGET = int(sys.argv[1]) if len(sys.argv) > 1 else 3200
 face = C.copy()
 
-VX = 0.18
+VX = 0.15
 xs = np.arange(-11, 11, VX); ys = np.arange(-20, 16, VX); zs = np.arange(-16, 10, VX)
 X, Y, Z = np.meshgrid(xs, ys, zs, indexing='ij')
 hf = np.full((len(xs), len(ys)), -np.inf)
@@ -50,11 +50,24 @@ occ &= ~(inface & (Z > facehf - 0.6))
 # Sharp inside the face, so it keeps its eyelids, nose and lips; soft toward
 # its edge and over the skull, so the seam between them melts away.
 from scipy.ndimage import binary_erosion
-occ |= (Z <= facehf) & (Z >= -7.0)
+from matplotlib.path import Path
+faceocc = (Z <= facehf) & (Z >= -7.0)
+# Eyes: open the lids along each eye's outline and set an eyeball just behind
+# them, so the eyes read as sockets with lids rather than a smooth patch.
+EYES = [[33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246],
+        [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466]]
+GX2, GY2 = np.meshgrid(xs, ys, indexing='ij')
+for ring in EYES:
+    pts = face[ring]; c = pts.mean(0)
+    grow = (pts[:, :2] - c[:2]) * 1.08 + c[:2]
+    almond = Path(grow).contains_points(np.c_[GX2.ravel(), GY2.ravel()]).reshape(GX2.shape)[:, :, None]
+    faceocc &= ~(almond & (Z > c[2] - 0.9))
+    occ |= ell((c[0], c[1], c[2] - 0.35 - 1.25), (1.25, 1.25, 1.25))
+occ |= faceocc
 core = binary_erosion(inface[:, :, 0], iterations=int(2.2 / VX))
 wsharp = gaussian_filter(core.astype(np.float32), 1.0 / VX)[:, :, None]
 o = occ.astype(np.float32)
-vol = wsharp * gaussian_filter(o, 1.1) + (1 - wsharp) * gaussian_filter(o, 2.6)
+vol = wsharp * gaussian_filter(o, 0.8) + (1 - wsharp) * gaussian_filter(o, 2.2)
 verts, faces, normals, _ = marching_cubes(vol, 0.5, spacing=(VX, VX, VX))
 verts += [xs[0], ys[0], zs[0]]
 
@@ -67,7 +80,7 @@ n2 /= np.linalg.norm(n2, axis=1, keepdims=True) + 1e-9
 if n2[v2[:, 2] > 6, 2].mean() < 0: n2 = -n2
 
 # Keep what faces the camera, and the neck down to where it fades.
-keep = (n2[:, 2] > -0.2) & (v2[:, 1] > -14.0)
+keep = (n2[:, 2] > -0.2) & (v2[:, 1] > -11.8)
 idx = -np.ones(len(v2), int); idx[keep] = np.arange(keep.sum())
 v3, n3 = v2[keep], n2[keep]
 edges = set()
@@ -76,7 +89,12 @@ for t in f2:
         if keep[a] and keep[b]:
             i, j = sorted((idx[a], idx[b])); edges.add((i, j))
 edges = np.array(sorted(edges), dtype=np.uint16)
-fade = np.clip((v3[:, 1] + 14.0) / 5.0, 0, 1) ** 1.5 * np.clip((n3[:, 2] + 0.2) / 0.45, 0, 1)
+fade = np.clip((v3[:, 1] + 11.8) / 4.0, 0, 1) ** 2.2 * np.clip((n3[:, 2] + 0.2) / 0.45, 0, 1)
+# Light from the front, a little left and above: lit planes get bright nodes
+# and lines, hollows and the far side stay dim, as in the reference.
+Lk = np.array([-0.45, 0.35, 0.82]); Lk /= np.linalg.norm(Lk)
+shade = 0.18 + 0.82 * np.clip(n3 @ Lk, 0, 1) ** 1.3
+fade = fade * shade
 
 # Unit height over the kept part, centred, the face front near z = 0.
 lo, hi = v3.min(0), v3.max(0); H = hi[1] - lo[1]; cy = (lo[1] + hi[1]) / 2
