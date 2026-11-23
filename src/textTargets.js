@@ -228,34 +228,30 @@ export function toDataTexture(positions, size) {
 }
 
 /**
- * Load the head: a sculpted bald head drawn as nodes joined by lines, like a
- * wireframe hologram, made offline from a head scan (scripts/head/plexus.py;
- * "Infinite, 3D Head Scan" by Lee Perry-Smith, CC BY 3.0) and stored as a
- * small binary. Nodes are normalised to a height of 1 and centred, in random
- * order; each carries a weight (its light, and the neck dissolving). Lines are
- * pairs of node indices. The occluder is the whole head, slightly shrunk, for
- * hiding the far side. The pivot is where the head turns.
+ * Load the head: a sculpted bald head made offline from a head scan
+ * (scripts/head/surface.py; "Infinite, 3D Head Scan" by Lee Perry-Smith,
+ * CC BY 3.0) and stored as a small binary. Vertices are normalised to a
+ * height of 1 and centred; each carries a weight, the light falling on it and
+ * the neck dissolving. The occluder is the same mesh pulled slightly inside,
+ * for hiding the far side. The pivot is where the head turns.
  */
 export async function loadHeadMesh(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Head: HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
   const view = new DataView(buf);
-  if (view.getUint32(0, true) !== 0x32544e48) throw new Error('Head: bad header'); // 'HNT2'
-  const [n, ne, on, of] = [4, 8, 12, 16].map((o) => view.getUint32(o, true));
-  const pivot = [0, 1, 2].map((i) => view.getFloat32(20 + i * 4, true));
-  let o = 32;
-  const q = new Int16Array(buf, o, n * 3);
+  if (view.getUint32(0, true) !== 0x46525348) throw new Error('Head: bad header'); // 'HSRF'
+  const n = view.getUint32(4, true);
+  const nf = view.getUint32(8, true);
+  const pivot = [0, 1, 2].map((i) => view.getFloat32(12 + i * 4, true));
+  let o = 24;
+  const v = Float32Array.from(new Int16Array(buf, o, n * 3), (x) => x / 30000);
   o += n * 6;
-  const oq = new Int16Array(buf, o, on * 3);
-  o += on * 6;
-  const fade = new Uint8Array(buf, o, n);
+  const ov = Float32Array.from(new Int16Array(buf, o, n * 3), (x) => x / 30000);
+  o += n * 6;
+  const w = new Uint8Array(buf, o, n);
   o += n + ((o + n) % 2);
-  const edges = new Uint16Array(buf, o, ne * 2);
-  o += ne * 4;
-  const faces = new Uint16Array(buf, o, of * 3);
-  const v = Float32Array.from(q, (x) => x / 30000);
-  const ov = Float32Array.from(oq, (x) => x / 30000);
+  const faces = new Uint16Array(buf, o, nf * 3);
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -263,55 +259,85 @@ export async function loadHeadMesh(url) {
     minX = Math.min(minX, v[i * 3]);
     maxX = Math.max(maxX, v[i * 3]);
   }
-  return { points: { v, fade, pivot, n }, edges, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
+  return { mesh: { v, w, faces, pivot }, occluder: { v: ov, faces }, ratio: maxX - minX, height: 4 };
 }
 
 /**
  * Particle destinations on the head, in the same shape buildTarget returns.
- * Particle i (i < node count) lands on node i, so the field's lines can join
- * particles by index. Every other particle joins a node in proportion to the
- * node's weight (its light, baked offline), so lit nodes carry many particles
- * and shine while nodes in shadow and down the neck stay faint. The field
- * enlarges and dims them while the head is on screen.
+ * The head is drawn as `head.dots` separate dots, like a photo turned to
+ * dots: each dot sits at a point on the surface drawn by area times light,
+ * and the particles share the dots, more of them on lit ones, so those shine.
+ * Each dot has its own size, kept in the destination's fourth component for
+ * the render pass (points.vert).
  */
 export function buildMeshTarget(head, { count }) {
-  const { v, n, fade } = head.points;
+  const { v, w, faces } = head.mesh;
   const s = head.height;
-  const dots = Math.min(count, n);
+  const nt = faces.length / 3;
+  const cdf = new Float32Array(nt);
+  let acc = 0;
+  for (let t = 0; t < nt; t++) {
+    const a = faces[t * 3] * 3;
+    const b = faces[t * 3 + 1] * 3;
+    const c = faces[t * 3 + 2] * 3;
+    const ux = v[b] - v[a], uy = v[b + 1] - v[a + 1], uz = v[b + 2] - v[a + 2];
+    const vx = v[c] - v[a], vy = v[c + 1] - v[a + 1], vz = v[c + 2] - v[a + 2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    acc += Math.sqrt(cx * cx + cy * cy + cz * cz) * (w[faces[t * 3]] + w[faces[t * 3 + 1]] + w[faces[t * 3 + 2]]);
+    cdf[t] = acc;
+  }
+  if (acc <= 0) throw new Error('Head mesh is empty');
+
+  const dots = Math.min(count, head.dots ?? count);
   const positions = new Float32Array(count * 4);
   const jitter = new Float32Array(count);
+  const lit = new Float32Array(dots);
   const bounds = { halfW: 0, halfH: 0 };
-
   for (let p = 0; p < dots; p++) {
-    const x = v[p * 3] * s;
-    const y = v[p * 3 + 1] * s;
-    const i4 = p * 4;
-    positions[i4 + 0] = x;
-    positions[i4 + 1] = y;
-    positions[i4 + 2] = v[p * 3 + 2] * s;
-    positions[i4 + 3] = 1;
-    bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
-    bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
-    jitter[p] = 0.5 + Math.random() * Math.random() * 0.85;
-  }
-  const cdf = new Float32Array(dots);
-  let acc = 0;
-  for (let i = 0; i < dots; i++) {
-    const w = fade[i] / 255;
-    acc += w * w;
-    cdf[i] = acc;
-  }
-  for (let p = dots; p < count; p++) {
     const target = Math.random() * acc;
     let lo = 0;
-    let hi = dots - 1;
+    let hi = nt - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
       if (cdf[mid] < target) lo = mid + 1;
       else hi = mid;
     }
+    const ia = faces[lo * 3], ib = faces[lo * 3 + 1], ic = faces[lo * 3 + 2];
+    const a = ia * 3, b = ib * 3, c = ic * 3;
+    const r = Math.sqrt(Math.random());
+    const r2 = Math.random();
+    const wa = 1 - r, wb = r * (1 - r2), wc = r * r2;
+    const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s;
+    const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s;
+    const z = (v[a + 2] * wa + v[b + 2] * wb + v[c + 2] * wc) * s;
+    lit[p] = (w[ia] * wa + w[ib] * wb + w[ic] * wc) / 255;
+    bounds.halfW = Math.max(bounds.halfW, Math.abs(x));
+    bounds.halfH = Math.max(bounds.halfH, Math.abs(y));
+    const i4 = p * 4;
+    positions[i4 + 0] = x;
+    positions[i4 + 1] = y;
+    positions[i4 + 2] = z;
+    // Sizes vary a lot, small dots outnumbering big ones; lit dots run larger.
+    positions[i4 + 3] = (0.45 + 1.6 * Math.random() ** 2.2) * (0.65 + 0.35 * Math.sqrt(lit[p]));
+    jitter[p] = 0.5 + Math.random() * Math.random() * 0.85;
+  }
+  // Every other particle joins a dot, in proportion to its light.
+  const dcdf = new Float32Array(dots);
+  let dacc = 0;
+  for (let i = 0; i < dots; i++) {
+    dacc += 0.4 + lit[i];
+    dcdf[i] = dacc;
+  }
+  for (let p = dots; p < count; p++) {
+    const target = Math.random() * dacc;
+    let lo = 0;
+    let hi = dots - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (dcdf[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
     positions.copyWithin(p * 4, lo * 4, lo * 4 + 4);
   }
-
   return { positions, jitter, bounds };
 }

@@ -3,9 +3,11 @@
 uniform sampler2D uPositions;
 uniform sampler2D uPalette;
 uniform float uSize;
-uniform float uSizeScale; // the head's dots are larger than the letters' grain
-uniform vec3  uTint;      // the head's colour, blended in by uTintMix
-uniform float uTintMix;
+// The head is drawn as dots of varied size: each particle reads its dot's
+// size from the head's destinations (.w), blended in by uHeadMix.
+uniform sampler2D uHeadTarget;
+uniform float uHeadMix;
+uniform float uHeadSize;
 uniform float uPixelScale; // drawingBufferHeight / (2 * tan(fov/2))
 uniform float uColorScale;
 uniform float uColorSpread;
@@ -29,7 +31,7 @@ void main() {
           + snoise(p.xyz * uColorScale * 2.4 + 31.7) * 0.3;
   float t = clamp(n * uColorSpread + 0.5, 0.0, 1.0);
 
-  vColor = mix(texture2D(uPalette, vec2(t, 0.5)).rgb, uTint, uTintMix) * aJitter;
+  vColor = texture2D(uPalette, vec2(t, 0.5)).rgb * aJitter;
   vSpeed = p.w;
 
   vec4 mv = modelViewMatrix * vec4(p.xyz, 1.0);
@@ -45,6 +47,7 @@ void main() {
 
   // Narrow viewports push the camera far enough back that points go sub-pixel,
   // where drivers clamp or drop them and the field turns to faint static.
-  gl_PointSize = max(uSize * uSizeScale * uPixelScale / depth * grow, 1.0);
+  float headSize = uHeadMix > 0.0 ? uHeadSize * texture2D(uHeadTarget, aRef).w : 1.0;
+  gl_PointSize = max(uSize * mix(1.0, headSize, uHeadMix) * uPixelScale / depth * grow, 1.0);
   gl_Position = projectionMatrix * mv;
 }

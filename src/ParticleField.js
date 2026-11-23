@@ -321,10 +321,10 @@ export class ParticleField {
         // cover four times the area to keep the same coverage — double the
         // diameter. Without this the low-power path renders a threadbare field.
         uSize: { value: DEFAULTS.pointSize * (512 / this.size) },
-        uSizeScale: { value: 1 },
-        uTint: { value: new THREE.Color(0.25, 0.75, 1.0) },
-        uTintMix: { value: 0 },
         uPixelScale: { value: 1 },
+        uHeadTarget: { value: null },
+        uHeadMix: { value: 0 },
+        uHeadSize: { value: 1 },
         uOpacity: { value: DEFAULTS.opacity },
         uColorScale: { value: DEFAULTS.colorScale },
         uColorSpread: { value: DEFAULTS.colorSpread },
@@ -416,86 +416,9 @@ export class ParticleField {
   }
 
   /**
-   * 0..1: how far the points have turned into the head's dots, `size` world
-   * units across. The letters' grain scales with the grid; the dots don't.
-   */
-  setHeadLook(t, size) {
-    const base = DEFAULTS.pointSize * (512 / this.size);
-    this.material.uniforms.uSizeScale.value = 1 + (size / base - 1) * t;
-    this.material.uniforms.uTintMix.value = t;
-  }
-
-  /**
-   * The head's lines: each joins two particles by index and reads their
-   * positions from the same texture the points do, so the lines move with the
-   * nodes. `fade` dims lines toward the neck and the far side.
-   */
-  setHeadNet(edges, fade) {
-    const n = edges.length;
-    const refs = new Float32Array(n * 2);
-    const fades = new Float32Array(n);
-    for (let k = 0; k < n; k++) {
-      const i = edges[k];
-      refs[k * 2] = ((i % this.size) + 0.5) / this.size;
-      refs[k * 2 + 1] = (((i / this.size) | 0) + 0.5) / this.size;
-      fades[k] = fade[i] / 255;
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    geometry.setAttribute('aRef', new THREE.BufferAttribute(refs, 2));
-    geometry.setAttribute('aFade', new THREE.BufferAttribute(fades, 1));
-    this.lineMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        uPositions: { value: null },
-        uColor: { value: new THREE.Color(0.25, 0.75, 1.0) },
-        uOpacity: { value: 0 },
-      },
-      vertexShader: `
-        uniform sampler2D uPositions;
-        attribute vec2 aRef;
-        attribute float aFade;
-        varying float vFade;
-        void main() {
-          vFade = aFade;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(texture2D(uPositions, aRef).xyz, 1.0);
-        }`,
-      fragmentShader: `
-        uniform vec3 uColor;
-        uniform float uOpacity;
-        varying float vFade;
-        void main() { gl_FragColor = vec4(uColor, uOpacity * vFade); }`,
-      transparent: true,
-      depthWrite: false,
-      depthTest: false,
-      blending: THREE.AdditiveBlending,
-    });
-    this.lines = new THREE.LineSegments(geometry, this.lineMaterial);
-    this.lines.frustumCulled = false;
-    this.lines.visible = false;
-    this.scene.add(this.lines);
-  }
-
-  /**
-   * 0..1: hold the particles still for the head. Turbulence, the fluid and
-   * the depth of field all soften points, which the letters can take and a
-   * wireframe can't: the nodes would swim off the lines that join them.
-   */
-  setHeadCalm(t) {
-    const vu = this.velVar.material.uniforms;
-    const pu = this.material.uniforms;
-    if (t < 0.001 || !this.calmBase) {
-      this.calmBase = { turb: vu.uTurbulence.value, fluid: vu.uFluidForce.value, dof: pu.uDof.value };
-    }
-    const b = this.calmBase;
-    vu.uTurbulence.value = b.turb * (1 - 0.95 * t);
-    vu.uFluidForce.value = b.fluid * (1 - t);
-    pu.uDof.value = b.dof * (1 - t);
-  }
-
-  /**
-   * The head as a solid that only writes depth: drawn before the points and
-   * lines, it hides the nodes on the far side, so the wireframe reads as the
-   * surface of a head rather than a cage. It turns with the head (setHeadPose).
+   * The head as a solid that only writes depth: drawn before the points, it
+   * hides the grain on the far side, so the head reads as a surface rather
+   * than a glass shell. It turns with the head (setHeadPose).
    */
   setHeadOccluder(v, faces, scale) {
     const geometry = new THREE.BufferGeometry();
@@ -509,17 +432,26 @@ export class ParticleField {
     this.scene.add(this.occluder);
   }
 
-  /** 0..1: how visible the head's lines are. */
-  setHeadLines(alpha) {
-    if (!this.lines) return;
-    this.lineMaterial.uniforms.uOpacity.value = alpha * 0.42;
-    this.lines.visible = alpha > 0.002;
-    // The far side hides only while the head holds still; in flight every
-    // particle stays visible.
-    const solid = Boolean(this.occluder) && alpha > 0.3;
+  /**
+   * 0..1: how far the points have turned into the head's dots, whose mean
+   * size is `size` world units. The letters' grain scales with the grid; the
+   * dots don't.
+   */
+  setHeadLook(t, size) {
+    const u = this.material.uniforms;
+    if (t > 0 && this.headIndex >= 0) u.uHeadTarget.value = this.#target(this.headIndex);
+    u.uHeadMix.value = u.uHeadTarget.value ? t : 0;
+    u.uHeadSize.value = size / (DEFAULTS.pointSize * (512 / this.size));
+  }
+
+  /**
+   * 0..1: how far the head is a solid. Above a third, the occluder writes depth
+   * and the points test against it, so grain on the far side stays hidden.
+   */
+  setHeadSolid(t) {
+    const solid = Boolean(this.occluder) && t > 0.3;
     if (this.occluder) this.occluder.visible = solid;
     this.material.depthTest = solid;
-    this.lineMaterial.depthTest = solid;
   }
 
   /** The head's turn this frame, as a rotation matrix. */
@@ -577,14 +509,11 @@ export class ParticleField {
     this.gpu.compute();
     this.material.uniforms.uPositions.value =
       this.gpu.getCurrentRenderTarget(this.posVar).texture;
-    if (this.lines) this.lineMaterial.uniforms.uPositions.value = this.material.uniforms.uPositions.value;
   }
 
   dispose() {
     this.gpu.dispose();
     this.points.geometry.dispose();
-    this.lines?.geometry.dispose();
-    this.lineMaterial?.dispose();
     this.occluder?.geometry.dispose();
     this.material.dispose();
     for (const t of this.targets) t?.dispose();

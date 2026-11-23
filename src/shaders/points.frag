@@ -1,4 +1,5 @@
 uniform float uOpacity;
+uniform float uHeadMix;
 
 varying vec3  vColor;
 varying float vSpeed;
@@ -11,6 +12,8 @@ void main() {
   if (d > 0.5) discard;
   float a = smoothstep(0.5, 0.05, d);
   a *= a;
+  // The head's dots are discs with a soft edge, like printed dots.
+  a = mix(a, smoothstep(0.5, 0.36, d), uHeadMix);
 
   // Moving particles spark, so a transition visibly flares.
   vec3 col = vColor * (1.0 + clamp(vSpeed, 0.0, 4.0) * 0.42);

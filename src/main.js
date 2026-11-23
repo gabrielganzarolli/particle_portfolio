@@ -73,14 +73,15 @@ const WORK = 2;
 const ABOUT = 3;
 // Gabriel's head in particles, shown by clicking the name (see the click below).
 const HEAD = 4;
+// The head is drawn as this many dots of varied size (mean HEAD_POINT world
+// units). Each dot carries many particles, so the field is dimmed to about
+// HEAD_LIGHT particles' worth per dot, and the bloom steps back.
+const HEAD_DOTS = 16000;
+const HEAD_POINT = 0.021;
+const HEAD_LIGHT = 1.1;
 // How far the head turns toward the pointer, in radians, at the screen's edge.
 const HEAD_YAW = 0.35;
 const HEAD_PITCH = 0.3;
-// The head is drawn as nodes joined by lines. Each node carries many
-// particles, so it is lit to about HEAD_LIGHT particles' worth whatever the
-// grid, and the bloom eases off.
-const HEAD_POINT = 0.02;
-const HEAD_LIGHT = 6;
 // A small nod once the head has formed, and a tilt as it turns.
 const HEAD_NOD = 0.14;
 const HEAD_ROLL = 0.25;
@@ -184,6 +185,7 @@ async function boot() {
     const visW = visH * aspect;
     const ratio = map.ratio;
     map.height = Math.min(visH * 0.9, (visW * 0.8) / ratio);
+    map.dots = HEAD_DOTS;
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
@@ -200,8 +202,7 @@ async function boot() {
   });
   field.scene.background = new THREE.Color(background);
   if (headMap) {
-    field.setHead(HEAD, new THREE.Vector3(...headMap.points.pivot).multiplyScalar(headMap.height));
-    field.setHeadNet(headMap.edges, headMap.points.fade);
+    field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height));
     field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height);
   }
 
@@ -449,11 +450,11 @@ async function boot() {
   let frames = 0;
   let camX = 0;
   let headYaw = 0;
-  let headGlow = 0;
-  let headLines = 0;
-  let nodAt = -1e9;
+  let headSolid = 0;
+  let headLook = 0;
   let leftHeadAt = -1e9;
   let wasHeadOn = false;
+  let nodAt = -1e9;
   let headPitch = 0;
   const headEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const headRot4 = new THREE.Matrix4();
@@ -551,24 +552,22 @@ async function boot() {
     pointer.update(dt);
     field.setPointer(pointer);
 
-    // The nodes dim as the head forms, and stay dim until the particles
-    // leaving the head have landed: they leave each node in a tight bunch,
-    // which under full light flashed white mid-flight.
+    // The far side of the head hides once it has formed, and shows again as
+    // soon as it starts to leave, so no particle vanishes mid-flight.
+    const formedHead = headOn && morphT === 1;
+    headSolid += ((formedHead ? 1 : 0) - headSolid) * Math.min(1, dt * (formedHead ? 2.5 : 12));
+    field.setHeadSolid(headSolid);
+    // The dots stay small and dim until the particles leaving the head have
+    // landed: they fly out in tight bunches, which at full light flashed.
     if (wasHeadOn && !headOn) leftHeadAt = now;
     wasHeadOn = headOn;
     const leaving = !headOn && now - leftHeadAt < CHAIN_MS + 150;
-    const glowTarget = headOn ? morphT : leaving ? 1 : 0;
-    headGlow += (glowTarget - headGlow) * Math.min(1, dt * (headOn || leaving ? 8 : 4));
-    const nodes = headMap ? headMap.points.n : 1;
-    const headLight = Math.min(1, (HEAD_LIGHT * nodes) / field.count);
-    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - (1 - headLight) * headGlow));
-    field.setHeadLook(headGlow, HEAD_POINT);
-    // Lines only once the nodes have landed; they go first when the head leaves.
-    const formed = headOn && morphT === 1;
-    headLines += ((formed ? 1 : 0) - headLines) * Math.min(1, dt * (formed ? 2.5 : 12));
-    field.setHeadLines(headLines * (1 - coverage));
-    field.setHeadCalm(headLines);
-    post.setBloomScale(L.bloom * (1 - 0.6 * headGlow));
+    const lookTarget = headOn ? morphT : leaving ? 1 : 0;
+    headLook += (lookTarget - headLook) * Math.min(1, dt * (headOn || leaving ? 8 : 4));
+    field.setHeadLook(headLook, HEAD_POINT);
+    const headLight = Math.min(1, (HEAD_LIGHT * HEAD_DOTS) / field.count);
+    field.setDim(1 - (1 - coverage * MAX_DIM) * (1 - (1 - headLight) * headLook));
+    post.setBloomScale(L.bloom * (1 - headLook));
     dust.material.uniforms.uOpacity.value = 1 - coverage * MAX_DIM;
 
     // One clock for every phrase change (CHAIN_MS).
