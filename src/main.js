@@ -173,15 +173,17 @@ async function boot() {
   // same, minus the head.
   const [, map] = await Promise.all([readyFonts(), loadHeadMesh(headMeshUrl).catch(() => null)]);
   if (map) {
-    // Sized to the screen it first opens on: about nine tenths of the view's
-    // height, narrower than the view on a phone held upright.
+    // Sized to the screen it first opens on: taller than the view, the top of
+    // the head just under the top edge and the neck running off the bottom
+    // (narrower on a phone held upright, where the width decides).
     const halfFov = THREE.MathUtils.degToRad(FOV) / 2;
     const aspect = vw / vh;
     const z = Math.max(FIELD_WIDTH / FILL / (2 * Math.tan(halfFov) * aspect), (FIELD_WIDTH * 0.25) / FILL / (2 * Math.tan(halfFov)));
     const visH = 2 * z * Math.tan(halfFov);
     const visW = visH * aspect;
     const ratio = map.ratio;
-    map.height = Math.min(visH * 0.9, (visW * 0.8) / ratio);
+    map.height = Math.min(visH * 1.2, (visW * 0.9) / ratio);
+    map.offsetY = visH * 0.42 - map.height / 2;
     headMap = map;
   }
   PHRASES = phrasesFor(lang);
@@ -198,8 +200,8 @@ async function boot() {
   });
   field.scene.background = new THREE.Color(background);
   if (headMap) {
-    field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height));
-    field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height, headMap.mesh.turn);
+    field.setHead(HEAD, new THREE.Vector3(...headMap.mesh.pivot).multiplyScalar(headMap.height).add(new THREE.Vector3(0, headMap.offsetY, 0)));
+    field.setHeadOccluder(headMap.occluder.v, headMap.occluder.faces, headMap.height, headMap.mesh.turn, headMap.offsetY);
   }
 
   const dust = createDust(L.dust, { fieldWidth: FIELD_WIDTH, reducedMotion });
