@@ -1,4 +1,4 @@
-import { CASES } from './cases.js';
+import { PUBLISHED_CASES } from './cases.js';
 
 /**
  * Case markup as a string, with no DOM involved.
@@ -41,7 +41,7 @@ let confidential = false;
 // built from. It defaults to the English data the module imports; the build
 // hands over the translated set when it renders a Portuguese page. Without
 // this the Portuguese page lists its sibling cases under English titles.
-let allCases = CASES;
+let allCases = PUBLISHED_CASES;
 
 /** Figure classes, plus the confidentiality marker when the case carries one. */
 const fig = (base) => (confidential ? `${base} is-confidential` : base);
@@ -569,10 +569,10 @@ function more(current) {
  * is passed as `c` — the caller hands over the English or the Portuguese entry
  * and the two must agree, which build-cases.mjs checks before getting here.
  */
-export function renderCaseHtml(c, resolve, lang = 'en', all = CASES) {
+export function renderCaseHtml(c, resolve, lang = 'en', all = PUBLISHED_CASES) {
   ui = UI[lang] ?? UI.en;
   confidential = Boolean(c.confidential);
-  allCases = all;
+  allCases = all.filter((x) => !x.hidden);
 
   // Page order is fixed by the brief; images sit between sections rather than
   // inside them, so they run the full width of the container.

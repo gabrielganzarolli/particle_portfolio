@@ -5,6 +5,8 @@
  *
  * Structure of a case:
  *   slug        URL segment; must match the filename in /work
+ *   hidden      true keeps the case off the site (no page, not in any list);
+ *               the content stays here so it can come back by deleting the flag
  *   index       the "01" shown in the list and hero
  *   title       project name
  *   headline    one-line statement of what the work achieved
@@ -160,6 +162,7 @@ export const CASES = [
   //                    as an honest gap. Supply the three numbers and uncomment.
   {
     slug: 'minhas-vantagens-console',
+    hidden: true,
     index: '04',
     title: 'Minhas Vantagens console',
     headline: 'The manager who had to ask the client',
@@ -272,6 +275,7 @@ export const CASES = [
   //
   {
     slug: 'retiree-hub',
+    hidden: true,
     // Social/search description. 120-160 chars, drawn from this page's own
     // content rather than boilerplate.
     description:
@@ -393,6 +397,7 @@ export const CASES = [
     // Slug stays atm-accessibility: it is the published URL, and both the
     // canonical and og:url are built from it.
     slug: 'atm-accessibility',
+    hidden: true,
     // Social/search description. 120-160 chars, drawn from this page's own
     // content rather than boilerplate.
     description:
@@ -886,3 +891,6 @@ export const CASES = [
 ];
 
 export const bySlug = (slug) => CASES.find((c) => c.slug === slug);
+
+/** The cases on the site: everything not marked hidden. */
+export const PUBLISHED_CASES = CASES.filter((c) => !c.hidden);

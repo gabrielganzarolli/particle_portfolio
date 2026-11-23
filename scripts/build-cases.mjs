@@ -14,7 +14,7 @@ import { readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve as resolvePath, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CASES } from '../src/case/cases.js';
+import { PUBLISHED_CASES as CASES } from '../src/case/cases.js';
 import { CASES_PT } from '../src/case/cases.pt.js';
 import { applyTranslation, translationIssues, caseIssues } from '../src/case/merge.js';
 import { renderCaseHtml } from '../src/case/renderHtml.js';
