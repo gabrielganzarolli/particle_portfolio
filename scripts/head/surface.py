@@ -20,13 +20,7 @@ import trimesh, cv2
 
 s = trimesh.load(sys.argv[1] if len(sys.argv) > 1 else 'LeePerrySmith.glb', force='mesh')
 s.merge_vertices(merge_tex=True, merge_norm=True)
-v, f = s.vertices.astype(np.float64), s.faces
-# The face pulled partway toward Gabriel's proportions (warp.py).
-import os
-if os.path.exists('warp.npy'):
-    v = v + np.load('warp.npy')
-    s = trimesh.Trimesh(v, f, process=False)
-n = s.vertex_normals
+v, f, n = s.vertices.astype(np.float64), s.faces, s.vertex_normals
 
 # The scan has inner surfaces behind the eyes, nostrils and mouth (a second
 # shell), which doubled the grain there. Keep only faces seen from outside,
@@ -46,11 +40,8 @@ def visible_faces(v, f, views=13, res=1400):
             seen[np.unique(img[img >= 0])] = True
     return seen
 
-NECK_CUT = -2.2                      # scan units: the chin is near y = -0.7
-# The whole bust, shoulders and the top of the chest included: the page sets
-# its base just below the bottom edge of the screen, so the cut never shows.
-BOTTOM = v[:, 1].min()
-region = v[:, 1] > BOTTOM + 0.02
+NECK_CUT, NECK_FADE = -2.2, -0.8     # scan units: the chin is near y = -0.7
+region = (v[:, 1] > NECK_CUT) & ((v[:, 1] > -0.9) | (np.abs(v[:, 0]) < 1.9))
 outer = visible_faces(v, f)
 print('outer faces', outer.sum(), 'of', len(f))
 fsel = f[region[f].all(1) & outer]
@@ -81,7 +72,7 @@ def ambient_occlusion(mesh, pts, nrm, rays=48, reach=0.9):
         open_ += ~near
     return open_ / rays
 import os
-cache = f'ao-{len(vr)}-{abs(hash(vr.round(4).tobytes())) % 10**8}.npy'
+cache = f'ao-{len(vr)}.npy'
 if os.path.exists(cache):
     ao = np.load(cache)
 else:
@@ -94,19 +85,18 @@ light = (0.15 + 0.85 * ao ** 2.2) * (0.6 + 0.4 * lam)
 # facing (nz) makes dots on screen follow the light, as in a photo; a floor
 # keeps the sides from going empty when the head turns.
 facing = 0.1 + 0.9 * np.clip(nr[:, 2], 0, 1)
-neck = np.clip((vr[:, 1] - BOTTOM) / 0.35, 0, 1)    # only the very base thins out
+neck = np.clip((vr[:, 1] - NECK_CUT) / (NECK_FADE - NECK_CUT), 0, 1) ** 2
 def smooth(e0, e1, x):
     t = np.clip((x - e0) / (e1 - e0), 0, 1)
     return t * t * (3 - 2 * t)
 # Density by part of the head: the face carries the most particles, the
-# crown and the back of the skull fewer, the ears in between, and the
-# shoulders and chest fewest.
+# crown and the back of the skull fewer, the ears in between, and the neck
+# thins out toward its base.
 x, y, z = vr[:, 0], vr[:, 1], vr[:, 2]
 face = smooth(0.9, 1.6, z) * smooth(-1.1, -0.6, y) * (1 - smooth(2.3, 2.8, y)) * (1 - smooth(1.15, 1.45, np.abs(x + 0.05)))
 crown = smooth(2.2, 3.4, y) * (1 - face)
 ear = smooth(1.45, 1.65, np.abs(x)) * smooth(0.4, 0.8, y) * (1 - smooth(2.0, 2.3, y))
-torso = 1 - smooth(-2.4, -1.4, y)
-part = (1.0 + 0.9 * face - 0.45 * crown - 0.1 * ear) * (1 - 0.6 * torso)
+part = 1.0 + 0.9 * face - 0.45 * crown - 0.1 * ear
 w = light * facing * neck * part
 
 # How far each point follows the head's turn: all of the head, then the neck

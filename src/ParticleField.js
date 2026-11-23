@@ -417,9 +417,9 @@ export class ParticleField {
    * hides the grain on the far side, so the head reads as a surface rather
    * than a glass shell.
    */
-  setHeadOccluder(v, faces, scale, turn, offsetY = 0) {
+  setHeadOccluder(v, faces, scale, turn) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(v, (x, i) => x * scale + (i % 3 === 1 ? offsetY : 0)), 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(v, (x) => x * scale), 3));
     geometry.setAttribute('aTurn', new THREE.BufferAttribute(Float32Array.from(turn, (t) => t / 255), 1));
     geometry.setIndex(new THREE.BufferAttribute(faces, 1));
     const vu = this.velVar.material.uniforms;
