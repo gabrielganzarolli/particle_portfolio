@@ -308,7 +308,7 @@ export function buildMeshTarget(head, { count, strayRatio = 0.03 }) {
     const r2 = Math.random();
     const wa = 1 - r, wb = r * (1 - r2), wc = r * r2;
     const x = (v[a] * wa + v[b] * wb + v[c] * wc) * s;
-    const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s;
+    const y = (v[a + 1] * wa + v[b + 1] * wb + v[c + 1] * wc) * s + (head.offsetY ?? 0);
     const z = (v[a + 2] * wa + v[b + 2] * wb + v[c + 2] * wc) * s;
 
     const stray = Math.random() < strayRatio;
