@@ -552,6 +552,8 @@ export const CASES = [
   //                    test. The caption says only that both were tested.
   {
     slug: 'uniclass-card-first-acquisition',
+    // Itaú work under NDA: every figure sits behind the frosted pane.
+    confidential: true,
     description:
       'Raising account-opening conversion at Itaú Uniclass by leading with the credit card people came for, and keeping customers a premium decline would have lost.',
     index: '02',
