@@ -100,6 +100,9 @@ nome ──clique──▶ cabeça ──clique na cabeça──▶ JOGO ──b
 - *(Escolha minha)* Para sair no celular há um botão "×" no mesmo estilo do
   botão de idioma que já existe. É o único elemento que não é partícula.
 - Quem tem movimento reduzido não vê o jogo: a cabeça funciona como hoje.
+- *(Escolha minha)* Durante a explosão e a formação do tempo (~1,2 s mais o
+  tempo da formação) o clique é ignorado. Ele só vale depois que o tempo
+  terminou de se formar, para o jogador não reiniciar sem ver a nota.
 
 ### O mundo
 
@@ -154,7 +157,36 @@ para ajustar vendo o resultado:
 - O texto da nota é montado enquanto a nave explode, em fatias entre os
   quadros (`buildTargetInSlices`), para não travar. Usa o idioma da página.
 
+### Referência visual
+
+Gabriel mostrou uma captura de um jogo de naves no hiperespaço. A imagem não
+vai para o repositório (é de terceiros); o que vale dela está aqui.
+
+- **Câmera:** baixa e atrás da nave, levemente acima. A nave ocupa o terço
+  inferior, de costas, com cerca de um quarto da altura da tela.
+- **Ponto de fuga** no centro, um pouco acima da nave, com um núcleo muito
+  brilhante.
+- **Riscos de velocidade:** linhas finas e longas, radiais a partir do ponto de
+  fuga. Os mais próximos da borda são mais longos e mais brilhantes, e os
+  próximos do centro são curtos e fracos. Há poucos riscos grossos e muitos
+  finos, e entre eles ficam pontos soltos, que são as estrelas.
+- **Anel translúcido** em volta da nave, como uma bolha, e luz forte nos
+  motores sobre o casco escuro.
+- Da referência **não** se copia: o azul, as franjas de cor nas pontas dos
+  riscos e o painel de informações. O site fica em branco frio.
+
+Em partículas: cada risco é uma fileira de pontos cuja distância entre pontos e
+cujo comprimento crescem com a velocidade e com a distância ao centro. As
+estrelas são pontos isolados com a mesma regra de movimento.
+
 ### Qualidade e desempenho
+
+**Meta de desempenho: pendente da resposta de Gabriel.** Proposta, a confirmar:
+60 quadros por segundo no nível 3 em computador, e no mínimo 30 estáveis nos
+níveis 1 e 2 num celular intermediário. Se uma máquina não alcança isso, o
+nível cai **entre partidas**, nunca no meio de uma. O que se corta primeiro: o
+bloom (que o nível 1 já dispensa), depois os pontos por risco e as estrelas.
+A forma da nave e dos meteoritos é o que se preserva por último.
 
 - O número de lugares de meteoritos, de partículas por objeto e de pontos por
   risco **escala com o nível de qualidade**. No nível 1 sobram só 65 mil.
@@ -200,3 +232,5 @@ para ajustar vendo o resultado:
 5. Branco frio, sem tom azul e sem franjas de cor.
 6. Corredor, e não voo livre.
 7. Os números iniciais de partículas, meteoritos e dificuldade.
+8. Cliques são ignorados até o tempo terminar de se formar.
+9. Se a máquina é lenta, o nível cai entre partidas, nunca durante uma.
