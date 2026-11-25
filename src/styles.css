@@ -498,8 +498,12 @@ main {
     visibility 0s linear var(--dur-out);
 }
 
+/* scrollbar-gutter keeps the space of the classic scrollbar that overflow:
+   hidden removes, so the fixed overlay and the "×" do not shift sideways by
+   its width. Only while the game runs: the hero's layout is untouched. */
 html.game-on {
   overflow: hidden;
+  scrollbar-gutter: stable;
 }
 
 /* Only html.game-on changes the overlay's opacity, so this runs only for the

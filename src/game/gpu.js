@@ -23,6 +23,20 @@ const VELOCITY_SHADER = `${simplex}\n${curl}\n${game}\n${simVelocity}`;
 const POSITION_SHADER = `${game}\n${gamePositionFrag(heroPosition, gamePosition)}`;
 const POINTS_VERT = `${simplex}\n${game}\n${gamePointsVert(heroPointsVert, gamePoints)}`;
 
+// Without the bloom (level 1) nothing spreads the brightest points' light and
+// there are 25k particles instead of 70k, so the field reads dim and the
+// flame as separate dots. With the bloom off the game's points are drawn this
+// much larger and brighter (display space, before the curve to linear light);
+// in between by a share of it (level 2's bloom is 0.75 -> 1.175). Judged on
+// the look check's captures: at 1.7 level 1's lit share (2.5%) is level 2's
+// and its near-white share (0.2%) level 3's.
+const NO_BLOOM_LIFT = 1.7;
+
+/** The game's size and brightness lift (uGameLift) for a bloom strength 0..1. */
+export function gameLift(bloom) {
+  return 1 + (NO_BLOOM_LIFT - 1) * (1 - Math.min(1, Math.max(0, bloom)));
+}
+
 /**
  * Build and compile the game's three programs for `field`. Every uniform the
  * hero's materials have is shared by reference (the existing setters keep
@@ -47,7 +61,13 @@ export async function buildGamePrograms(field) {
 
   const hero = field.material;
   const points = new THREE.ShaderMaterial({
-    uniforms: { ...hero.uniforms, uGame: gameLook, ...gameUniforms },
+    uniforms: {
+      ...hero.uniforms,
+      uGame: gameLook,
+      ...gameUniforms,
+      uPixelRatio: { value: renderer.getPixelRatio() },
+      uGameLift: { value: 1 },
+    },
     vertexShader: POINTS_VERT,
     fragmentShader: pointsFrag,
     transparent: hero.transparent,
@@ -55,6 +75,10 @@ export async function buildGamePrograms(field) {
     depthTest: hero.depthTest,
     blending: hero.blending,
   });
+  // The pixel ratio follows the renderer (a resize or a quality step changes it).
+  points.onBeforeRender = (r) => {
+    points.uniforms.uPixelRatio.value = r.getPixelRatio();
+  };
 
   // Compile now, off the frames: the sim programs as they run (into a float
   // render target, on a full-screen quad), the points as the field draws them

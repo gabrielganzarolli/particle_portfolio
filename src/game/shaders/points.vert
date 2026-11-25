@@ -8,23 +8,30 @@
 // At uGame <= 0.001 the program runs exactly the hero's main().
 
 uniform float uGame;       // 0: the hero's look, 1: the game's; blends between
+uniform float uOpacity;    // the hero's base opacity (points.frag multiplies it in)
+uniform float uPixelRatio; // device pixels per CSS pixel (src/game/gpu.js sets it)
+uniform float uGameLift;   // size and brightness lift while the bloom is off (src/game/gpu.js)
 
 // The game's look, ported from the CPU prototype's vertex shader and evalGoal
 // (docs/superpowers/specs/2026-11-24-particle-ship-game-prototype.html).
 // Brightness is per role; sizes are in world units, like uSize.
 #define GAME_DOF 0.011
+// Smallest point, in CSS pixels (times uPixelRatio), as in the prototype.
 #define GAME_MIN_PX 1.15
 // The prototype wrote each point's light straight to the canvas, so its
 // numbers are display values; here the field renders in linear light and is
 // encoded on output, which lifts faint light a lot. Each point's prototype
 // intensity (GAME_ALPHA * brightness * comp / grow^2) is therefore taken to
-// linear with GAME_GAMMA and divided by the base opacity the fragment shader
-// multiplies back in. Without it, the thousands of faint, far streak dots
-// piled up into a grey haze over the vanishing point. The prototype also drew
+// linear with GAME_GAMMA and divided by the base opacity (uOpacity) the
+// fragment shader multiplies back in. Without it, the thousands of faint, far
+// streak dots piled up into a grey haze over the vanishing point. The prototype also drew
 // a second, larger and fainter pass for glow; the site's bloom does that here.
 #define GAME_ALPHA 0.8
 #define GAME_GAMMA 1.8
-#define GAME_OPACITY 0.52
+// Depth band over which meteors fade in, far end to full: the prototype's
+// values. Streaks use [-112, -85]; meteors deliberately end at -88, not -85.
+#define GAME_METEOR_FADE_FAR -112.0
+#define GAME_METEOR_FADE_FULL -88.0
 
 // Per-role brightness and point size of particle `idx` at world position `p`.
 // Brightness 0 means the particle is not drawn.
@@ -51,7 +58,7 @@ vec2 gameLook(float idx, vec3 p) {
   }
   if (idx < uGameEnds.w) {
     float w = gameLocal(idx).w;
-    return vec2(1.7 * w * smoothstep(-112.0, -88.0, p.z) * near, 0.02);
+    return vec2(1.7 * w * smoothstep(GAME_METEOR_FADE_FAR, GAME_METEOR_FADE_FULL, p.z) * near, 0.02);
   }
   int n = int(idx) - int(uGameEnds.w);
   int j = n / int(GAME_K);
@@ -96,13 +103,15 @@ void gameMain(vec4 p) {
   // corridor read as soft glows that sharpen on the way in.
   float defocus = abs(depth - uFocus) * mix(uDof, GAME_DOF, uGame);
   float grow = 1.0 + min(defocus, 3.0) * 1.1;
-  float truePx = mix(uSize, look.y, uGame) * uPixelScale / depth * grow;
-  float px = max(truePx, mix(1.0, GAME_MIN_PX, uGame));
-  // Points held up at the minimum size give back only half their extra area
-  // in brightness (comp, not comp squared). Full compensation made far
-  // meteors and streak tails vanish.
+  float truePx = mix(uSize, look.y * uGameLift, uGame) * uPixelScale / depth * grow;
+  float px = max(truePx, mix(1.0, GAME_MIN_PX * uPixelRatio, uGame));
+  // A point held up at the minimum size is dimmed by comp, the ratio of its
+  // true to its drawn diameter, not by the ratio of the areas (comp squared):
+  // full compensation made far meteors and streak tails vanish. comp scales
+  // the prototype's display-space intensity, so after the curve to linear
+  // light below its effect is comp^GAME_GAMMA, as the prototype looked.
   float comp = truePx / px;
-  float game = pow(GAME_ALPHA * look.x * comp / (grow * grow), GAME_GAMMA) / GAME_OPACITY;
+  float game = pow(GAME_ALPHA * uGameLift * look.x * comp / (grow * grow), GAME_GAMMA) / max(uOpacity, 0.01);
 
   // Alpha stays within 1; what is left goes into the color, which the
   // fragment shader caps.

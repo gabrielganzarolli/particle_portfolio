@@ -14,7 +14,8 @@ import { gameCamera, blendPose, stepBlend, HERO_FOV } from './camera.js';
 import { createPhases, PHASE, ENTER_S, EXIT_S } from './phases.js';
 import { formatTime } from './text.js';
 import { createRng } from './rng.js';
-import { buildGamePrograms } from './gpu.js';
+import { buildGamePrograms, gameLift } from './gpu.js';
+import { LEVELS } from '../quality.js';
 
 // Seconds of the score morph once its pair is set, then seconds the click
 // waits after it for the text to settle. The morph's end is not the text's:
@@ -112,6 +113,7 @@ export function createGame(ctx) {
 
   function installShapes() {
     const level = ctx.level();
+    field.gamePrograms.points.uniforms.uGameLift.value = gameLift(LEVELS[level].bloom);
     let s = shapes.get(level);
     if (!s) {
       const budget = gameBudget(level);

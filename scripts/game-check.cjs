@@ -1,7 +1,8 @@
 // Browser checks for the game inside the particle field.
 //
 //   node scripts/game-check.cjs positions
-//   node scripts/game-check.cjs look       (captures in shots/look-nivelN.png)
+//   node scripts/game-check.cjs look       (captures in shots/look-nivelN.png;
+//                                           LEVELS=1,3 limits the levels)
 //   node scripts/game-check.cjs flow       (part 1: the controller on its own;
 //                                           part 2: the game inside the live hero;
 //                                           part 3: edge cases, captures in
@@ -201,9 +202,11 @@ async function lookInPage() {
   field.setGame(g, g + 1);
   field.setGameBudget(budget, local);
   // What the controller does on start: the game's programs replace the hero's.
-  const { buildGamePrograms } = await import('/src/game/gpu.js');
+  const { buildGamePrograms, gameLift } = await import('/src/game/gpu.js');
   await field.loadGameShaders(buildGamePrograms);
   field.useGameShaders(true);
+  // As installShapes() in the controller: the lift for this level's bloom.
+  field.gamePrograms.points.uniforms.uGameLift.value = gameLift(LEVELS[level].bloom);
   field.setPair(0, g);
   field.setMorph(1);
   field.setGameLook(1);
@@ -266,11 +269,13 @@ async function lookInPage() {
   };
 }
 
+const WHITE_CAP = 0.005;
+
 async function look() {
   const fs = require('fs');
   const path = require('path');
   let failed = false;
-  for (const level of [1, 2, 3]) {
+  for (const level of (process.env.LEVELS || '1,2,3').split(',').map(Number)) {
     const { browser, page, errors } = await openSite(`#nivel${level}`);
     try {
       const r = await page.evaluate(lookInPage);
@@ -278,10 +283,13 @@ async function look() {
       fs.mkdirSync('shots', { recursive: true });
       fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
       const pct = (v) => `${(v * 100).toFixed(2)}%`;
-      const ok = r.level === level && r.lit >= 0.002 && r.lit <= 0.12;
+      // Near-white cap: measured 0.20% (level 1), 0.08% (2), 0.21% (3) with
+      // the final values; a blown-out field (the flames and the ship merging
+      // into white) goes well past it.
+      const ok = r.level === level && r.lit >= 0.002 && r.lit <= 0.12 && r.white <= WHITE_CAP;
       console.log(
         `${ok ? 'PASS' : 'FAIL'} level ${r.level}: ${r.active} active, t ${r.t.toFixed(2)} s, ` +
-          `non-dark ${pct(r.lit)} (within [0.20%, 12%]), white ${pct(r.white)}, ${file}`
+          `non-dark ${pct(r.lit)} (within [0.20%, 12%]), white ${pct(r.white)} (<= ${pct(WHITE_CAP)}), ${file}`
       );
       if (!ok) failed = true;
     } catch (err) {

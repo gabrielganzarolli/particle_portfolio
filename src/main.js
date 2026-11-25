@@ -906,7 +906,8 @@ async function boot() {
       placeHead(true);
     },
     showHead(on) {
-      if (!headMap || on === headOn || window.scrollY > 4 || chainShown > 0 || swap) return;
+      // The game drives the field while it runs; the head waits for the exit.
+      if (!headMap || game?.active || on === headOn || window.scrollY > 4 || chainShown > 0 || swap) return;
       toggleHead();
     },
   };
