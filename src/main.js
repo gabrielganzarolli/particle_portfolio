@@ -436,6 +436,8 @@ async function boot() {
   // (focusing one would scroll the locked page under the game).
   const pageParts = [document.querySelector('main'), document.querySelector('.overlay')].filter(Boolean);
   let focusBefore = null; // what had the keyboard focus when the game entered
+  // Bumped by Esc: a start still loading the game module is dropped.
+  let startToken = 0;
 
   /** Can a game start from phrase `from` right now? */
   function canStartFrom(from) {
@@ -445,6 +447,8 @@ async function boot() {
 
   function startGame(from) {
     if (!canStartFrom(from)) return;
+    const token = ++startToken;
+    const wanted = () => token === startToken && canStartFrom(from);
     gameLoad ??= import('./game/index.js').then(({ createGame }) => {
       game = createGame({
         field,
@@ -466,7 +470,7 @@ async function boot() {
       (g) => {
         // The visitor may have moved on while the module (and, on the first
         // start, the game's programs) loaded.
-        if (!g.active && canStartFrom(from)) g.start(from, () => canStartFrom(from)).catch((err) => console.warn(err));
+        if (!g.active && wanted()) g.start(from, wanted).catch((err) => console.warn(err));
       },
       (err) => {
         gameLoad = null;
@@ -538,7 +542,10 @@ async function boot() {
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && game?.active) game.requestExit();
+    if (e.key !== 'Escape') return;
+    startToken++; // drops a start still loading the module
+    // While starting, requestExit cancels the start (the hero was never left).
+    if (game?.active || game?.starting) game.requestExit();
   });
   exitButton?.addEventListener('click', () => game?.requestExit());
 

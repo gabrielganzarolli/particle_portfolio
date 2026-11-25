@@ -72,6 +72,7 @@ export function createGame(ctx) {
   let blend = 0; // camera and look: 0 = hero, 1 = chase
   let run = 0; // bumped on every new run and on exit; stale async work checks it
   let starting = false; // start() is waiting for the game's programs
+  let abortStart = false; // Esc or "×" while starting: do not begin the run
   let runEnded = false;
   let scorePhrase = null; // promise from field.setPhrase(SCORE, ...)
   // True once the player has seen the score: SCORE_SETTLE_S after its morph
@@ -166,6 +167,11 @@ export function createGame(ctx) {
     // while the ship explodes; DYING's end pairs it in.
     phases.die();
     field.pulseBurst();
+    // The game entered with the focus on the "×" (main.js). From here on
+    // Enter and Space mean "play again", which they cannot while the "×"
+    // holds the focus (they would press it), so it lets go; Tab reaches it
+    // again and Esc still exits.
+    if (document.activeElement?.closest?.('[data-game-exit]')) document.activeElement.blur();
     scoreFormed = false;
     scorePhrase = field.setPhrase(SCORE, formatTime(world.t, ctx.lang()));
     scorePhrase.catch((err) => console.warn(err));
@@ -196,12 +202,27 @@ export function createGame(ctx) {
     });
   }
 
-  function onScoreClick(e) {
-    if (e.button !== undefined && e.button !== 0) return;
-    if (e.target?.closest?.('[data-game-exit]')) return; // the "×" exits instead
+  // The one gate for a restart, by click or by key.
+  function tryRestart() {
     if (!phases.canRestart() || !scoreFormed) return;
     phases.begin();
     beginRun(SCORE);
+  }
+
+  function onScoreClick(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target?.closest?.('[data-game-exit]')) return; // the "×" exits instead
+    tryRestart();
+  }
+
+  // Enter or Space: play again, through the click's gate. Not when the focus
+  // is on the "×" (there they press it: exit) or on any other control.
+  function onScoreKey(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target?.closest?.('a, button, input, textarea, select, [contenteditable], [tabindex]')) return;
+    e.preventDefault(); // Space would scroll, Enter could activate something
+    if (!e.repeat) tryRestart();
   }
 
   function finishExit() {
@@ -211,6 +232,7 @@ export function createGame(ctx) {
     controls?.dispose();
     controls = null;
     window.removeEventListener('pointerdown', onScoreClick);
+    window.removeEventListener('keydown', onScoreKey);
     world = null;
     // The hero's own programs are back before the hero takes over.
     field.useGameShaders(false);
@@ -275,6 +297,10 @@ export function createGame(ctx) {
     get phase() {
       return phases.phase;
     },
+    /** True while start() waits for the game's programs. */
+    get starting() {
+      return starting;
+    },
 
     /**
      * Start from phrase index `from` (the head, or REST for #jogo). The first
@@ -285,11 +311,14 @@ export function createGame(ctx) {
     async start(from, canStart = () => true) {
       if (phases.phase !== PHASE.IDLE || starting) return;
       starting = true;
+      abortStart = false;
       try {
         await field.loadGameShaders(buildGamePrograms);
       } finally {
         starting = false;
       }
+      // Esc or "×" while the programs compiled: the hero was never left.
+      if (abortStart) return;
       if (phases.phase !== PHASE.IDLE || !canStart()) return;
       field.useGameShaders(true);
       phases.begin();
@@ -297,6 +326,7 @@ export function createGame(ctx) {
       beginRun(from);
       controls = attachControls(window);
       window.addEventListener('pointerdown', onScoreClick);
+      window.addEventListener('keydown', onScoreKey);
       hooks.onEnter();
     },
 
@@ -320,6 +350,10 @@ export function createGame(ctx) {
 
     /** Esc or "×". Safe to call in any phase, any number of times. */
     requestExit() {
+      if (starting) {
+        abortStart = true;
+        return;
+      }
       const before = phases.phase;
       phases.exit();
       if (phases.phase !== PHASE.EXIT || before === PHASE.EXIT) return;
