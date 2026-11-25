@@ -2,7 +2,8 @@
 //
 //   node scripts/game-check.cjs positions
 //   node scripts/game-check.cjs look       (captures in shots/look-nivelN.png)
-//   node scripts/game-check.cjs flow       (part 1: the controller on its own)
+//   node scripts/game-check.cjs flow       (part 1: the controller on its own;
+//                                           part 2: the game inside the live hero)
 //
 // Needs the dev server (`npm run dev -- --port 5199`) and the globally
 // installed Playwright. The site's own animation loop is stopped and the check
@@ -15,9 +16,9 @@ const mode = process.argv[2];
 
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
-async function openSite(hash = '') {
+async function openSite(hash = '', options = {}) {
   const browser = await chromium.launch({ args: LAUNCH_ARGS });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, ...options });
   const errors = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
@@ -279,8 +280,8 @@ async function look() {
 }
 
 // Runs in the page. Part 1 of the flow check: the controller on its own,
-// built by hand from window.__pf (main.js does not wire it yet). The site's
-// loop is stopped and the check drives game.update + field.update itself at a
+// built by hand from window.__pf (not the one main.js creates on a click).
+// The site's loop is stopped and the check drives game.update + field.update itself at a
 // fixed dt, yielding to the event loop between frames so the score phrase can
 // build in slices. Records every phase change and every hook call.
 async function flowInPage() {
@@ -289,8 +290,9 @@ async function flowInPage() {
 
   const { createGame } = await import('/src/game/index.js');
 
+  // main.js marks the game's phrases at boot; use those indices.
   const REST = 0;
-  const GAME = field.phrases.length;
+  const GAME = field.gameIndex >= 0 ? field.gameIndex : field.phrases.length;
   const SCORE = GAME + 1;
   field.setGame(GAME, SCORE);
 
@@ -494,7 +496,219 @@ async function flowInPage() {
   return out;
 }
 
+// Part 2 helpers. The site's own loop keeps running: these drive the page
+// the way a visitor does (mouse, wheel, keyboard) and wait on its state.
+const HEAD = 4;
+const WAIT = { timeout: 180000, polling: 100 };
+
+// Records every value window.__pf.game.phase takes ('none' before the game
+// module has loaded), sampled once per animation frame.
+function recordPhases(page) {
+  return page.evaluate(() => {
+    window.__phaseLog = [];
+    const tick = () => {
+      const g = window.__pf.game;
+      const p = g ? g.phase : 'none';
+      const log = window.__phaseLog;
+      if (log[log.length - 1] !== p) log.push(p);
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+// Screen point (CSS px) of a world point on the field's plane, from the
+// head's measured bounds: its centre, or just beyond its right edge.
+function headScreenPoint(page, where) {
+  return page.evaluate(
+    ({ where, HEAD }) => {
+      const { field, camera } = window.__pf;
+      const b = field.boundsOf(HEAD);
+      const v = camera.position.clone().set(where === 'outside' ? b.halfW + 0.6 : 0, where === 'outside' ? 0 : b.halfH * 0.2, 0);
+      v.project(camera);
+      const rect = document.getElementById('scene').getBoundingClientRect();
+      return {
+        x: rect.left + ((v.x + 1) / 2) * rect.width,
+        y: rect.top + ((1 - v.y) / 2) * rect.height,
+        halfW: b.halfW,
+        halfH: b.halfH,
+      };
+    },
+    { where, HEAD }
+  );
+}
+
+const headFormed = () => {
+  const s = window.__pf.state();
+  return s.headOn && s.morphT === 1;
+};
+// Back on the name, at rest, the head off. `hover`: also on the hero's resting
+// pair REST -> HOVER (reduced motion keeps REST -> HEAD after the head).
+const onNameAtRest = (hover) => {
+  const { field, state } = window.__pf;
+  const s = state();
+  return !s.headOn && s.morphT === 0 && field.indexA === 0 && field.currentIndex === 0 && (!hover || field.indexB === 1);
+};
+
+async function formHead(page, report, label) {
+  await page.mouse.click(640, 400); // the name, at the centre of the hero
+  const ok = await page.waitForFunction(headFormed, null, WAIT).then(() => true, () => false);
+  report(ok, `${label}: click on the name -> head formed`);
+  return ok;
+}
+
+async function flowPart2() {
+  let failed = false;
+  const report = (ok, text) => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${text}`);
+    if (!ok) failed = true;
+  };
+  const finish = async ({ browser, errors }, label) => {
+    if (errors.length) report(false, `${label}: console errors:\n  ${errors.join('\n  ')}`);
+    else report(true, `${label}: no console errors`);
+    await browser.close();
+  };
+
+  // (a) Click the formed head: the game enters and plays, the page locks, Esc
+  // brings the name back. Then (b), on the same page: a click outside the
+  // formed head returns to the name and starts nothing.
+  {
+    const site = await openSite();
+    const { page } = site;
+    try {
+      console.log(`part 2 level ${(await page.evaluate(() => window.__pf.state().level))}`);
+      await recordPhases(page);
+      if (await formHead(page, report, '(a)')) {
+        const pt = await headScreenPoint(page, 'centre');
+        await page.mouse.click(pt.x, pt.y);
+        const played = await page
+          .waitForFunction(() => window.__pf.game?.phase === 'play', null, WAIT)
+          .then(() => true, () => false);
+        const log = await page.evaluate(() => window.__phaseLog.slice());
+        const iEnter = log.indexOf('enter');
+        report(played && iEnter >= 0 && log.indexOf('play') > iEnter, `(a) click on the head (${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}) -> phases ${log.join(' > ')}`);
+
+        const dom = await page.evaluate(() => {
+          const b = document.querySelector('[data-game-exit]');
+          const cs = b && getComputedStyle(b);
+          return {
+            gameOn: document.documentElement.classList.contains('game-on'),
+            exit: b ? { hidden: b.hidden, visibility: cs.visibility, label: b.getAttribute('aria-label') } : null,
+            lang: getComputedStyle(document.querySelector('[data-lang-toggle]')).visibility,
+          };
+        });
+        report(dom.gameOn, `(a) html.game-on ${dom.gameOn}`);
+        report(!!dom.exit && !dom.exit.hidden && dom.exit.visibility === 'visible' && dom.exit.label === 'Back to the name',
+          `(a) exit button ${JSON.stringify(dom.exit)}`);
+        report(dom.lang === 'hidden', `(a) language toggle visibility ${dom.lang} (hidden)`);
+
+        const y0 = await page.evaluate(() => window.scrollY);
+        await page.mouse.wheel(0, 900);
+        await page.waitForTimeout(600);
+        const y1 = await page.evaluate(() => window.scrollY);
+        report(y0 === y1, `(a) wheel during the game: scrollY ${y0} -> ${y1} (unchanged)`);
+
+        await page.evaluate(() => (window.__phaseLog = [window.__pf.game.phase]));
+        await page.keyboard.press('Escape');
+        const idle = await page
+          .waitForFunction(() => window.__pf.game.phase === 'idle', null, WAIT)
+          .then(() => true, () => false);
+        const exitLog = await page.evaluate(() => window.__phaseLog.slice());
+        report(idle && exitLog.slice(-2).join() === 'exit,idle', `(a) Esc -> phases ${exitLog.join(' > ')}`);
+
+        const back = await page.waitForFunction(onNameAtRest, true, WAIT).then(() => true, () => false);
+        const after = await page.evaluate(() => {
+          const { camera, dust, field, state } = window.__pf;
+          return {
+            gameOn: document.documentElement.classList.contains('game-on'),
+            fov: camera.fov,
+            dust: dust.visible,
+            pair: `${field.indexA} -> ${field.indexB}`,
+            morph: state().morphT,
+            exitVisibility: getComputedStyle(document.querySelector('[data-game-exit]')).visibility,
+          };
+        });
+        report(back && !after.gameOn && after.fov === 50 && after.dust && after.exitVisibility === 'hidden',
+          `(a) after the exit: ${JSON.stringify(after)} (name, no game-on, fov 50, dust on, exit hidden)`);
+      }
+
+      // (b)
+      if (await formHead(page, report, '(b)')) {
+        const pt = await headScreenPoint(page, 'outside');
+        const inView = pt.x > 10 && pt.x < 1270;
+        await page.mouse.click(pt.x, pt.y);
+        // The name spans most of the width, so that point can be over it:
+        // move off it, or the hover would turn it into PRODUCT DESIGNER.
+        await page.mouse.move(20, 780);
+        const back = await page.waitForFunction(onNameAtRest, true, WAIT).then(() => true, () => false);
+        await page.waitForTimeout(800);
+        const phase = await page.evaluate(() => window.__pf.game?.phase ?? 'none');
+        report(inView && back && phase === 'idle',
+          `(b) click outside the head (${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}; head half-width ${pt.halfW.toFixed(2)}) -> name ${back}, game ${phase}`);
+      }
+    } catch (err) {
+      report(false, `(a/b) ${err.message.split('\n')[0]}`);
+    }
+    await finish(site, '(a/b)');
+  }
+
+  // (c) Reduced motion, with #jogo in the address: no game from the address,
+  // and a click on the head returns to the name.
+  {
+    const site = await openSite('#jogo', { reducedMotion: 'reduce' });
+    const { page } = site;
+    try {
+      await page.waitForFunction(() => window.__pf.state().frames > 30, null, WAIT);
+      const early = await page.evaluate(() => ({ game: window.__pf.game?.phase ?? 'none', gameOn: document.documentElement.classList.contains('game-on') }));
+      report(early.game === 'none' && !early.gameOn, `(c) reduced motion + #jogo: game ${early.game}, game-on ${early.gameOn}`);
+      if (await formHead(page, report, '(c)')) {
+        const pt = await headScreenPoint(page, 'centre');
+        await page.mouse.click(pt.x, pt.y);
+        const back = await page.waitForFunction(onNameAtRest, false, WAIT).then(() => true, () => false);
+        await page.waitForTimeout(1000);
+        const r = await page.evaluate(() => ({ game: window.__pf.game?.phase ?? 'none', gameOn: document.documentElement.classList.contains('game-on') }));
+        report(back && r.game === 'none' && !r.gameOn, `(c) reduced motion, click on the head -> name ${back}, game ${r.game}, game-on ${r.gameOn}`);
+      }
+    } catch (err) {
+      report(false, `(c) ${err.message.split('\n')[0]}`);
+    }
+    await finish(site, '(c)');
+  }
+
+  // (d) #jogo starts the game from the name; Esc returns to it (the phrase
+  // pair is forced back even though the hero's pair cache already says
+  // REST -> HOVER).
+  {
+    const site = await openSite('#jogo');
+    const { page } = site;
+    try {
+      const played = await page
+        .waitForFunction(() => window.__pf.game?.phase === 'play', null, WAIT)
+        .then(() => true, () => false);
+      const pair = await page.evaluate(() => {
+        const { field } = window.__pf;
+        return { a: field.indexA, bIsGame: field.phrases[field.indexB]?.game === true };
+      });
+      report(played && pair.a === 0 && pair.bIsGame, `(d) #jogo -> play ${played}, pair ${JSON.stringify(pair)} (REST -> GAME)`);
+      await page.keyboard.press('Escape');
+      const back = await page.waitForFunction(onNameAtRest, true, WAIT).then(() => true, () => false);
+      const r = await page.evaluate(() => ({ phase: window.__pf.game.phase, gameOn: document.documentElement.classList.contains('game-on') }));
+      report(back && r.phase === 'idle' && !r.gameOn, `(d) Esc -> name ${back}, phase ${r.phase}, game-on ${r.gameOn}`);
+    } catch (err) {
+      report(false, `(d) ${err.message.split('\n')[0]}`);
+    }
+    await finish(site, '(d)');
+  }
+  return failed;
+}
+
 async function flow() {
+  const failed1 = await flowPart1();
+  const failed2 = await flowPart2();
+  return failed1 || failed2;
+}
+
+async function flowPart1() {
   const { browser, page, errors } = await openSite();
   let failed = false;
   try {
@@ -520,7 +734,7 @@ async function flow() {
   return failed;
 }
 
-const checks = { positions, look, flow };
+const checks = { positions, look, flow, flow2: flowPart2 };
 
 (async () => {
   const run = checks[mode];

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import './styles.css';
-import { ParticleField } from './ParticleField.js';
+import { ParticleField, GAME_PHRASE } from './ParticleField.js';
 import { Pointer } from './pointer.js';
 import { readyFonts, loadHeadMesh, mixHeadWeights, HEAD_LOOK } from './textTargets.js';
 import headMeshUrl from './images/head/head.bin?url';
@@ -16,6 +16,8 @@ import { createPost } from './post.js';
 import { createDust } from './dust.js';
 import { FIELD_DEFAULTS } from './ParticleField.js';
 import { readSavedPreset, applyPreset } from './tuning.js';
+import { clickAction } from './game/clickRules.js';
+import { exitLabel } from './game/text.js';
 
 const FOV = 50;
 const FIELD_WIDTH = 10;
@@ -115,7 +117,11 @@ function sizeHead() {
   m.offsetY = -0.121 * m.height + headTune.y * m.visH;
   m.offsetX = headTune.x * m.visH;
 }
-const phrasesFor = (l) => [...(ALL_PHRASES[l] ?? ALL_PHRASES.en), ...(headMap ? [headMap] : [])];
+// After the head come the game's two virtual phrases: the game itself and the
+// space its score text is built into (src/game). Both are the same in either
+// language, so a language switch keeps their destinations.
+const SCORE_PLACEHOLDER = '0,0 s';
+const phrasesFor = (l) => [...(ALL_PHRASES[l] ?? ALL_PHRASES.en), ...(headMap ? [headMap] : []), GAME_PHRASE, SCORE_PLACEHOLDER];
 let PHRASES = ALL_PHRASES[lang] ?? ALL_PHRASES.en;
 
 // The phrases scroll walks through, in order. Scroll position maps to a single
@@ -160,7 +166,7 @@ async function boot() {
   // top. A link to a section (#work from a case page) still lands on it: the
   // browser applies the hash after this runs.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  if (!location.hash || /^#(nivel|ajuste)/.test(location.hash)) window.scrollTo(0, 0);
+  if (!location.hash || /^#(nivel|ajuste|jogo)/.test(location.hash)) window.scrollTo(0, 0);
 
   const canvas = document.getElementById('scene');
   const background = backgroundOf('white');
@@ -209,6 +215,9 @@ async function boot() {
     sizeHead();
   }
   PHRASES = phrasesFor(lang);
+  // The game's phrase indices, after the head when there is one.
+  const GAME = (ALL_PHRASES[lang] ?? ALL_PHRASES.en).length + (headMap ? 1 : 0);
+  const SCORE = GAME + 1;
 
   const fluid = createFluid(renderer, { res: L.fluidRes, iterations: L.fluidIter });
 
@@ -221,6 +230,8 @@ async function boot() {
     fluid,
   });
   field.scene.background = new THREE.Color(background);
+  // The field was built with both game phrases already; this only marks them.
+  field.setGame(GAME, SCORE);
   // Point the field at the head's pivot and occluder for its current size and
   // place; with `rebuild`, resample its particles too (the tuning panel).
   function placeHead(rebuild) {
@@ -276,9 +287,13 @@ async function boot() {
     cameraZ = Math.max(byWidth, byHeight);
     camera.position.z = cameraZ;
     camera.updateProjectionMatrix();
+    applyPixelScale();
+  }
 
-    // gl_PointSize is in device pixels; convert world-space size to pixels.
-    const pixelScale = renderer.domElement.height / (2 * Math.tan(halfFov));
+  // gl_PointSize is in device pixels; convert world-space size to pixels. From
+  // the camera's current fov, which the game widens while it runs.
+  function applyPixelScale() {
+    const pixelScale = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     field.setPixelScale(pixelScale);
     dust.material.uniforms.uPixelScale.value = pixelScale;
   }
@@ -382,15 +397,119 @@ async function boot() {
     }
   }
   window.addEventListener('click', (e) => {
+    // The game handles its own clicks.
+    if (game?.active) return;
     if (window.scrollY > 4 || chainShown > 0 || swap) return;
     if (e.target.closest?.('a, button, section, footer')) return;
     const at = worldAt(e.clientX, e.clientY);
-    if (headMap && (headOn ? onHead(at) : onName(at))) {
+    const action = headMap
+      ? clickAction({
+          headOn,
+          headFormed: headOn && morphT === 1,
+          onHead: onHead(at),
+          onName: onName(at),
+          reducedMotion,
+          gameActive: false,
+        })
+      : 'none';
+    if (action === 'toggle') {
       toggleHead();
+      return;
+    }
+    if (action === 'startGame') {
+      startGame(HEAD);
       return;
     }
     if (coarsePointer && !reducedMotion && !headOn) tapped = !tapped;
   });
+
+  // The game (src/game), loaded on the first click that starts it. Visitors
+  // who never click the head never download it.
+  let game = null;
+  let gameLoad = null;
+  let curLang = lang;
+  const exitButton = document.querySelector('[data-game-exit]');
+
+  /** Can a game start from phrase `from` right now? */
+  function canStartFrom(from) {
+    if (reducedMotion || swap || chainShown > 0 || window.scrollY > 4) return false;
+    return from === HEAD ? headOn && morphT === 1 : !headOn;
+  }
+
+  function startGame(from) {
+    if (!canStartFrom(from)) return;
+    gameLoad ??= import('./game/index.js').then(({ createGame }) => {
+      game = createGame({
+        field,
+        camera,
+        renderer,
+        indices: { REST, GAME, SCORE },
+        level: () => level,
+        lang: () => curLang,
+        heroPose: () => ({ px: camera.position.x, py: camera.position.y, pz: camera.position.z }),
+        hooks: { onEnter: onGameEnter, onExited: onGameExited, onRunEnd: onGameRunEnd },
+      });
+      // From here on CSS alone shows it, while html.game-on is set.
+      if (exitButton) exitButton.hidden = false;
+      return game;
+    });
+    gameLoad
+      .then((g) => {
+        // The visitor may have moved on while the module loaded.
+        if (!g.active && canStartFrom(from)) g.start(from);
+      })
+      .catch((err) => {
+        gameLoad = null;
+        console.warn(err);
+      });
+  }
+
+  function onGameEnter() {
+    document.documentElement.classList.add('game-on');
+    exitButton?.setAttribute('aria-label', exitLabel(curLang));
+    document.body.style.cursor = '';
+    cursorHint = false;
+    dust.visible = false;
+    probing = false;
+    field.setHeadSolid(0);
+    field.setDim(0);
+    field.setSnap(0);
+    field.setRepelScale(0);
+    post.setBloomScale(L.bloom);
+  }
+
+  function onGameExited() {
+    document.documentElement.classList.remove('game-on');
+    dust.visible = true;
+    camera.fov = FOV;
+    camera.updateProjectionMatrix();
+    applyPixelScale();
+    // Back on the name. Set the pair directly: usePair's cache may already
+    // say REST -> HOVER (a game started from the name) while the field is on
+    // the game's own pair.
+    field.setPair(REST, HOVER);
+    pairA = REST;
+    pairB = HOVER;
+    field.setMorph(0);
+    headOn = false;
+    morphT = 0;
+    chainShown = 0;
+    tapped = false;
+    headSolid = 0;
+    // The bloom was already at full strength for the game; the name keeps it.
+    wasHeadOn = false;
+    headBloom = 0;
+  }
+
+  // A run that ran slow steps the quality down; the next run's budget follows.
+  function onGameRunEnd({ slow }) {
+    if (slow && level > 1) stepDown();
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && game?.active) game.requestExit();
+  });
+  exitButton?.addEventListener('click', () => game?.requestExit());
 
   // The name and the head read as clickable: the cursor says so.
   let cursorHint = false;
@@ -413,7 +532,9 @@ async function boot() {
   // with the same landing as every other phrase change.
   let swap = null;
   onHomeSwitch(async (next) => {
-    if (swap) return;
+    // The toggle is hidden during the game; the field's phrases stay put.
+    if (swap || game?.active) return;
+    curLang = next;
     const phrases = phrasesFor(next);
     swap = { phase: 'preparing' };
     const index = field.currentIndex;
@@ -512,6 +633,20 @@ async function boot() {
     if (paused) {
       // Forget the pointer's travel while hidden, or the first frame back would
       // push the whole distance moved meanwhile into the fluid at once.
+      lastPx = px;
+      lastPy = py;
+      return;
+    }
+
+    // While the game runs it drives the field and the camera; the hero's own
+    // per-frame logic waits.
+    if (game?.active) {
+      elapsed += dt;
+      frames++;
+      game.update(dt, now);
+      field.update(dt, elapsed);
+      post.render(dt, elapsed);
+      // As while paused: the pointer's travel during the game is not a stir.
       lastPx = px;
       lastPy = py;
       return;
@@ -765,8 +900,14 @@ async function boot() {
     import('./tuning.js').then(({ attachTuning }) => attachTuning(tuningCtx)).catch(console.warn);
   }
 
+  // #jogo in the address starts the game from the name, after the first frame.
+  if (/jogo/.test(location.hash) && !reducedMotion) {
+    requestAnimationFrame(() => requestAnimationFrame(() => startGame(REST)));
+  }
+
   if (import.meta.env.DEV) {
-    const label = (i) => (typeof PHRASES[i] === 'string' ? PHRASES[i] : 'HEAD');
+    const label = (i) =>
+      typeof PHRASES[i] === 'string' ? PHRASES[i] : i === GAME ? 'GAME' : i === HEAD ? 'HEAD' : String(i);
     const snapshot = () => ({
       frames,
       level,
@@ -780,7 +921,19 @@ async function boot() {
       scrollY: window.scrollY,
     });
 
-    window.__pf = { renderer, camera, field, pointer, fluid, post, dust, state: snapshot };
+    window.__pf = {
+      renderer,
+      camera,
+      field,
+      pointer,
+      fluid,
+      post,
+      dust,
+      state: snapshot,
+      get game() {
+        return game;
+      },
+    };
   }
 }
 
