@@ -403,6 +403,9 @@ async function flowInPage() {
   slowGame.start(REST);
   let clock = 0;
   for (let f = 0; f < 400 && slowGame.phase !== 'dying'; f++) {
+    // Meteors near the ship are moved out of the corridor, so only kill() ends
+    // this run and it always has its 150+ samples.
+    for (const m of slowGame.debug.world.meteors) if (m.z > -20) m.x = 100;
     if (slowGame.phase === 'play' && f > 300) slowGame.debug.kill();
     clock += slowGame.phase === 'play' ? 30 : DT * 1000;
     slowGame.update(DT, clock);
@@ -412,6 +415,82 @@ async function flowInPage() {
   slowGame.requestExit();
   for (let f = 0; f < 200 && slowGame.active; f++) slowGame.update(DT, (clock += DT * 1000));
   note(!slowGame.active && slowCalls.length === 1, `slow run exited, onRunEnd ${slowCalls.length} time(s) (1)`);
+
+  // The restart waits for the score to form, not only for SCORE_RESTART_S.
+  // A third game whose field.setPhrase is held back (then made to fail).
+  const gated = createGame({
+    field, camera, renderer,
+    indices: { REST, GAME, SCORE },
+    level: () => state().level,
+    lang: () => 'en',
+    heroPose: () => ({ px: 0, py: 0, pz: heroZ }),
+    hooks: { onEnter() {}, onExited() {}, onRunEnd() {} },
+  });
+  const gFrame = () => {
+    now += DT * 1000;
+    elapsed += DT;
+    gated.update(DT, now);
+    field.update(DT, elapsed);
+  };
+  const gRun = async (done, max) => {
+    for (let f = 0; f < max && !done(); f++) {
+      gFrame();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return done();
+  };
+  const realSetPhrase = field.setPhrase;
+  const restartAfter = Math.ceil((1.7 + 0.05) / DT); // SCORE_RESTART_S + 0.05 s
+  try {
+    // (1) setPhrase resolves only when released, long after SCORE began.
+    let release;
+    const held = new Promise((r) => (release = r));
+    field.setPhrase = async function (i, text) {
+      await held;
+      return realSetPhrase.call(this, i, text);
+    };
+    gated.start(REST);
+    await gRun(() => gated.phase === 'play', 200);
+    await gRun(() => false, 10);
+    gated.debug.kill();
+    await gRun(() => gated.phase === 'score', 200);
+    await gRun(() => false, restartAfter);
+    click();
+    gFrame();
+    note(gated.phase === 'score' && field.indexB !== SCORE,
+      `slow score text: click ${restartAfter} frames into score -> ${gated.phase} (ignored), pair ${field.indexA} -> ${field.indexB}`);
+    release();
+    await gRun(() => field.indexB === SCORE && field.morph === 1, 400);
+    note(field.indexB === SCORE && field.morph === 1 && gated.debug.scoreFormed, `slow score text formed: pair ${field.indexA} -> ${field.indexB}, morph ${field.morph}, scoreFormed ${gated.debug.scoreFormed}, phase ${gated.phase}`);
+    click();
+    gFrame();
+    note(gated.phase === 'enter', `click once the score formed -> ${gated.phase}`);
+
+    // (2) setPhrase fails: SCORE is never paired, and a click still restarts.
+    field.setPhrase = () => Promise.reject(new Error('flow check: setPhrase rejected on purpose'));
+    await gRun(() => gated.phase === 'play', 200);
+    await gRun(() => false, 10);
+    gated.debug.kill();
+    let pairedScore = false;
+    await gRun(() => {
+      if (field.indexB === SCORE) pairedScore = true;
+      return gated.phase === 'score';
+    }, 200);
+    for (let f = 0; f < restartAfter; f++) {
+      gFrame();
+      if (field.indexB === SCORE) pairedScore = true;
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    click();
+    gFrame();
+    note(gated.phase === 'enter' && !pairedScore,
+      `failed score text: SCORE paired ${pairedScore} (false), click after 1.7 s -> ${gated.phase}`);
+    gated.requestExit();
+    await gRun(() => gated.phase === 'idle', 200);
+    note(gated.phase === 'idle', `gated run exited -> ${gated.phase}`);
+  } finally {
+    delete field.setPhrase; // back to the prototype method
+  }
   return out;
 }
 

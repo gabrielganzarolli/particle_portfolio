@@ -66,21 +66,37 @@ export function createGame(ctx) {
   let run = 0; // bumped on every new run and on exit; stale async work checks it
   let runEnded = false;
   let scorePhrase = null; // promise from field.setPhrase(SCORE, ...)
+  // True once the player has seen the score: its morph reached 1 (or the text
+  // failed to build, so there is nothing to wait for). Gates the restart click
+  // together with phases.canRestart(), which only knows about time in SCORE.
+  let scoreFormed = false;
   let probe = { frames: 0, samples: 0, slow: 0, last: null };
 
   // A 0 -> 1 ramp of the field's morph, eased on the way to the shader.
-  const morph = { t: 1, dur: 1, running: false };
-  const startMorph = (dur) => {
+  // `onDone` runs once, on the frame the ramp reaches 1; starting another
+  // ramp drops it.
+  const morph = { t: 1, dur: 1, running: false, onDone: null };
+  const startMorph = (dur, onDone = null) => {
     morph.t = 0;
     morph.dur = dur;
     morph.running = true;
+    morph.onDone = onDone;
     field.setMorph(0);
   };
   const stepMorph = (dt) => {
     if (!morph.running) return;
-    morph.t = Math.min(1, morph.t + dt / morph.dur);
-    if (morph.t === 1) morph.running = false;
+    morph.t = morph.t + dt / morph.dur;
+    // Snap the last sliver: summed float steps can stop just short of 1 while
+    // ease() already rounds to 1, and onDone must fire on the frame the field
+    // shows the end of the morph.
+    if (morph.t > 1 - 1e-6) morph.t = 1;
     field.setMorph(ease(morph.t));
+    if (morph.t === 1) {
+      morph.running = false;
+      const done = morph.onDone;
+      morph.onDone = null;
+      done?.();
+    }
   };
 
   // ------------------------------------------------------------- runs
@@ -101,6 +117,7 @@ export function createGame(ctx) {
     run++;
     runEnded = false;
     scorePhrase = null;
+    scoreFormed = false;
     probe = { frames: 0, samples: 0, slow: 0, last: null };
     installShapes();
     world = createWorld(createRng(newSeed()));
@@ -134,6 +151,7 @@ export function createGame(ctx) {
     // while the ship explodes; DYING's end pairs it in.
     phases.die();
     field.pulseBurst();
+    scoreFormed = false;
     scorePhrase = field.setPhrase(SCORE, formatTime(world.t, ctx.lang()));
     scorePhrase.catch((err) => console.warn(err));
     endRun();
@@ -141,20 +159,29 @@ export function createGame(ctx) {
 
   async function formScore() {
     const mine = run;
+    let built = true;
     try {
       await scorePhrase;
     } catch {
-      // The old text stays; pairing still shows something rather than nothing.
+      built = false;
     }
     if (mine !== run || phases.phase !== PHASE.SCORE) return;
+    if (!built) {
+      // The SCORE index would still hold an older run's time: never pair it.
+      // Let a click restart instead of leaving the player stuck.
+      scoreFormed = true;
+      return;
+    }
     field.setPair(GAME, SCORE);
-    startMorph(SCORE_FORM_S);
+    startMorph(SCORE_FORM_S, () => {
+      if (mine === run) scoreFormed = true;
+    });
   }
 
   function onScoreClick(e) {
     if (e.button !== undefined && e.button !== 0) return;
     if (e.target?.closest?.('[data-game-exit]')) return; // the "×" exits instead
-    if (!phases.canRestart()) return;
+    if (!phases.canRestart() || !scoreFormed) return;
     phases.begin();
     beginRun(SCORE);
   }
@@ -267,6 +294,9 @@ export function createGame(ctx) {
       },
       get world() {
         return world;
+      },
+      get scoreFormed() {
+        return scoreFormed;
       },
     };
   }
