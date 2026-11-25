@@ -1,6 +1,6 @@
 # Jogo da nave em partículas — design
 
-2026-11-24. Status: rascunho para aprovação.
+2026-11-24. Status: aguardando aprovação final de Gabriel.
 
 ## Intenção
 
@@ -181,7 +181,7 @@ estrelas são pontos isolados com a mesma regra de movimento.
 
 ### Qualidade e desempenho
 
-**Meta de desempenho: pendente da resposta de Gabriel.** Proposta, a confirmar:
+**Meta de desempenho (confirmada por Gabriel):**
 60 quadros por segundo no nível 3 em computador, e no mínimo 30 estáveis nos
 níveis 1 e 2 num celular intermediário. Se uma máquina não alcança isso, o
 nível cai **entre partidas**, nunca no meio de uma. O que se corta primeiro: o
