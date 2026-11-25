@@ -3,7 +3,11 @@
 // the camera, so meteor z increases over time.
 import { SLOTS } from './budget.js';
 
-export const CORRIDOR = { halfW: 3.2, halfH: 1.7 };
+// The widest corridor (every landscape screen). The one in use is
+// world.corridor, which the controller sets from the screen's proportion each
+// frame (corridorFor in camera.js): the ship's clamp and the meteor spawns
+// follow it.
+export const CORRIDOR = Object.freeze({ halfW: 3.2, halfH: 1.7 });
 export const LOOP = 120;
 
 const MAX_DT = 0.05;
@@ -24,24 +28,29 @@ export function speedTarget(t) {
   return Math.min(14 + 0.45 * t, 38);
 }
 
-function spawn(world, rng, slot, initial) {
+// Places meteor `slot` at the far end. 45% aim at the ship (kept inside the
+// corridor, so they arrive where the player can see them); the rest scatter
+// across the corridor and a margin beyond it.
+export function spawnMeteor(world, rng, slot, initial) {
   const m = world.meteors[slot];
+  const { halfW, halfH } = world.corridor;
   m.z = initial ? -(55 + slot * 11 + rng() * 6) : -(112 + rng() * 22);
   const aim = rng() < 0.45;
   m.x = aim
-    ? world.ship.x + (rng() - 0.5) * 1.8
-    : (rng() * 2 - 1) * (CORRIDOR.halfW + 1.4);
+    ? clamp(world.ship.x + (rng() - 0.5) * 1.8, -halfW, halfW)
+    : (rng() * 2 - 1) * (halfW + 1.4);
   m.y = aim
-    ? world.ship.y + (rng() - 0.5) * 1.4
-    : (rng() * 2 - 1) * (CORRIDOR.halfH + 0.8);
+    ? clamp(world.ship.y + (rng() - 0.5) * 1.4, -halfH, halfH)
+    : (rng() * 2 - 1) * (halfH + 0.8);
   m.R = 0.5 + rng() * 0.95;
   m.spin = (rng() - 0.5) * 1.3;
   m.angle = rng() * Math.PI * 2;
   m.prevZ = m.z;
 }
 
-export function createWorld(rng) {
+export function createWorld(rng, corridor = CORRIDOR) {
   const world = {
+    corridor: { halfW: corridor.halfW, halfH: corridor.halfH },
     t: 0,
     speed: 4,
     distance: 0,
@@ -52,7 +61,7 @@ export function createWorld(rng) {
   Object.defineProperty(world, 'rng', { value: rng, enumerable: false });
   for (let s = 0; s < SLOTS; s++) {
     world.meteors.push({ x: 0, y: 0, z: 0, R: 1, spin: 0, angle: 0, prevZ: 0 });
-    spawn(world, rng, s, true);
+    spawnMeteor(world, rng, s, true);
   }
   return world;
 }
@@ -92,8 +101,9 @@ export function stepWorld(world, dt, target, opts = {}) {
   if (world.alive) {
     world.t += dt;
     world.speed += (speedTarget(world.t) - world.speed) * Math.min(1, dt * 1.4);
-    const tx = clamp(target.x, -CORRIDOR.halfW, CORRIDOR.halfW);
-    const ty = clamp(target.y, -CORRIDOR.halfH, CORRIDOR.halfH);
+    const { halfW, halfH } = world.corridor;
+    const tx = clamp(target.x, -halfW, halfW);
+    const ty = clamp(target.y, -halfH, halfH);
     ship.vx += (-SPRING_K * (ship.x - tx) - SPRING_C * ship.vx) * dt;
     ship.vy += (-SPRING_K * (ship.y - ty) - SPRING_C * ship.vy) * dt;
     ship.x += ship.vx * dt;
@@ -110,7 +120,7 @@ export function stepWorld(world, dt, target, opts = {}) {
     m.z += world.speed * dt;
     m.angle += m.spin * dt;
     if (world.alive && collide && world.t > GRACE && sweptHit(ship, m)) world.alive = false;
-    if (m.z > 9) spawn(world, world.rng, s, false);
+    if (m.z > 9) spawnMeteor(world, world.rng, s, false);
   }
 }
 

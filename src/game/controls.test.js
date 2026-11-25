@@ -50,6 +50,26 @@ test('active keyboard ignores the pointer until it moves again', () => {
   near(s.ty, 0);
 });
 
+test('the corridor passed in bounds the pointer and the keys', () => {
+  const corridor = { halfW: 2.2, halfH: 1.7 };
+  const s = { tx: 0, ty: 0 };
+  steerTarget(s, { kx: 0, ky: 0, pointer: { x: 1, y: 0 } }, 1 / 60, corridor);
+  near(s.tx, 2.2);
+  steerTarget(s, { kx: 0, ky: 0, pointer: { x: -0.5, y: 0 } }, 1 / 60, corridor);
+  near(s.tx, -1.1);
+  for (let i = 0; i < 100; i++) steerTarget(s, { kx: 1, ky: 0, pointer: null }, 0.1, corridor);
+  near(s.tx, 2.2);
+});
+
+test('a corridor that shrinks re-clamps a held target without input', () => {
+  const s = { tx: 0, ty: 0 };
+  steerTarget(s, { kx: 0, ky: 0, pointer: { x: 1, y: 1 } }, 1 / 60);
+  near(s.tx, CORRIDOR.halfW);
+  steerTarget(s, none, 1 / 60, { halfW: 1.5, halfH: 1 });
+  near(s.tx, 1.5);
+  near(s.ty, 1);
+});
+
 test('no pointer and no keys leaves the target where it is', () => {
   const s = { tx: 0, ty: 0 };
   steerTarget(s, none, 0.5);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRng } from './rng.js';
 import { SLOTS } from './budget.js';
 import {
-  CORRIDOR, LOOP, speedTarget, createWorld, stepWorld, shipSpheres, sweptHit, gameUniforms,
+  CORRIDOR, LOOP, speedTarget, createWorld, stepWorld, shipSpheres, sweptHit, gameUniforms, spawnMeteor,
 } from './world.js';
 
 const fresh = () => createWorld(createRng(1234));
@@ -54,6 +54,71 @@ test('ship target is clamped to the corridor', () => {
   for (let i = 0; i < 240; i++) { parkMeteors(w); stepWorld(w, 1 / 60, { x: 99, y: -99 }); }
   assert.ok(w.ship.x <= 3.2 && w.ship.x > 3);
   assert.ok(w.ship.y >= -1.7 && w.ship.y < -1.5);
+});
+
+test('world.corridor starts as the corridor given, the desktop one by default', () => {
+  assert.deepEqual(fresh().corridor, CORRIDOR);
+  const w = createWorld(createRng(1), { halfW: 2, halfH: 1.7 });
+  assert.deepEqual(w.corridor, { halfW: 2, halfH: 1.7 });
+  for (const m of w.meteors) assert.ok(Math.abs(m.x) <= 2 + 1.4 && Math.abs(m.y) <= 1.7 + 0.8);
+});
+
+test('ship target is clamped to world.corridor', () => {
+  const w = fresh();
+  w.corridor = { halfW: 1.5, halfH: 1 };
+  for (let i = 0; i < 240; i++) { parkMeteors(w); stepWorld(w, 1 / 60, { x: 99, y: -99 }); }
+  assert.ok(w.ship.x <= 1.5 && w.ship.x > 1.4);
+  assert.ok(w.ship.y >= -1 && w.ship.y < -0.9);
+});
+
+test('a corridor that shrinks mid-run moves the ship back smoothly', () => {
+  const w = fresh();
+  for (let i = 0; i < 240; i++) { parkMeteors(w); stepWorld(w, 1 / 60, { x: 99, y: 0 }); }
+  assert.ok(w.ship.x > 3.1);
+  w.corridor = { halfW: 2, halfH: 1.7 };
+  let maxStep = 0, last = w.ship.x;
+  for (let i = 0; i < 240; i++) {
+    parkMeteors(w);
+    stepWorld(w, 1 / 60, { x: 99, y: 0 });
+    maxStep = Math.max(maxStep, Math.abs(w.ship.x - last));
+    last = w.ship.x;
+  }
+  assert.ok(Math.abs(w.ship.x - 2) < 0.05, `x ${w.ship.x}`);
+  assert.ok(maxStep < 0.15, `largest step ${maxStep}`); // the spring, no teleport
+});
+
+// rng scripted for one spawnMeteor call: z, aim?, x, y, R, spin, angle.
+const script = (values) => {
+  let i = 0;
+  return () => values[i++ % values.length];
+};
+
+test('spawn ranges follow world.corridor', () => {
+  const w = fresh();
+  w.corridor = { halfW: 2, halfH: 1 };
+  w.ship.x = 0; w.ship.y = 0;
+  // Not aimed (0.9 >= 0.45), x and y at the ends of their ranges.
+  spawnMeteor(w, script([0, 0.9, 1, 1, 0, 0, 0]), 0, false);
+  assert.ok(Math.abs(w.meteors[0].x - 3.4) < 1e-9 && Math.abs(w.meteors[0].y - 1.8) < 1e-9);
+  spawnMeteor(w, script([0, 0.9, 0, 0, 0, 0, 0]), 0, false);
+  assert.ok(Math.abs(w.meteors[0].x + 3.4) < 1e-9 && Math.abs(w.meteors[0].y + 1.8) < 1e-9);
+  const rng = createRng(99);
+  for (let i = 0; i < 2000; i++) {
+    spawnMeteor(w, rng, 1, false);
+    const m = w.meteors[1];
+    assert.ok(Math.abs(m.x) <= 3.4 && Math.abs(m.y) <= 1.8);
+  }
+});
+
+test('meteors aimed at the ship stay inside world.corridor', () => {
+  const w = fresh();
+  w.corridor = { halfW: 2, halfH: 1 };
+  w.ship.x = 2; w.ship.y = 1; // at the corner
+  spawnMeteor(w, script([0, 0.1, 1, 1, 0, 0, 0]), 0, false); // aimed, +0.9 / +0.7
+  assert.equal(w.meteors[0].x, 2);
+  assert.equal(w.meteors[0].y, 1);
+  spawnMeteor(w, script([0, 0.1, 0, 0, 0, 0, 0]), 0, false); // aimed, -0.9 / -0.7
+  assert.ok(Math.abs(w.meteors[0].x - 1.1) < 1e-9 && Math.abs(w.meteors[0].y - 0.3) < 1e-9);
 });
 
 test('no collisions in the first 2.2 s', () => {

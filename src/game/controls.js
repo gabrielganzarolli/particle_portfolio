@@ -14,22 +14,29 @@ const KEY_MAP = {
 
 const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v));
 
-// Moves state.tx/ty. Keys move the target; the pointer sets it directly.
-// After keyboard use the pointer is ignored until it changes position again.
-// Bookkeeping lives on `state` (_kbd, _px, _py).
-export function steerTarget(state, input, dt) {
+// Moves state.tx/ty within `corridor` (world.corridor; the screen's width
+// sets it). Keys move the target; the pointer sets it directly, the screen's
+// full width spanning the corridor's. After keyboard use the pointer is
+// ignored until it changes position again. Bookkeeping lives on `state`
+// (_kbd, _px, _py).
+export function steerTarget(state, input, dt, corridor = CORRIDOR) {
   const { kx, ky, pointer } = input;
+  const { halfW, halfH } = corridor;
+  // A corridor that shrank (a resize) pulls a held target in; the ship's
+  // spring carries the ship after it.
+  state.tx = clamp(state.tx, halfW);
+  state.ty = clamp(state.ty, halfH);
   const keyed = kx !== 0 || ky !== 0;
   const moved = !!pointer && (pointer.x !== state._px || pointer.y !== state._py);
   if (pointer) { state._px = pointer.x; state._py = pointer.y; }
   if (keyed) {
     state._kbd = true;
-    state.tx = clamp(state.tx + kx * SPEED_X * dt, CORRIDOR.halfW);
-    state.ty = clamp(state.ty + ky * SPEED_Y * dt, CORRIDOR.halfH);
+    state.tx = clamp(state.tx + kx * SPEED_X * dt, halfW);
+    state.ty = clamp(state.ty + ky * SPEED_Y * dt, halfH);
   } else if (pointer && (moved || !state._kbd)) {
     state._kbd = false;
-    state.tx = clamp(pointer.x * CORRIDOR.halfW, CORRIDOR.halfW);
-    state.ty = clamp(pointer.y * CORRIDOR.halfH, CORRIDOR.halfH);
+    state.tx = clamp(pointer.x * halfW, halfW);
+    state.ty = clamp(pointer.y * halfH, halfH);
   }
 }
 

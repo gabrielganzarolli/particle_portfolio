@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { gameCamera, blendPose, stepBlend, HERO_FOV } from './camera.js';
+import * as THREE from 'three';
+import { gameCamera, blendPose, stepBlend, HERO_FOV, corridorFor, MIN_HALF_W, EDGE_NDC } from './camera.js';
+import { CORRIDOR } from './world.js';
 
 const near = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 
@@ -39,4 +41,64 @@ test('stepBlend rises toward 1 and never exceeds it', () => {
 
 test('stepBlend falls to under 0.001 after 10 s', () => {
   assert.ok(stepBlend(1, 0, 10) < 0.001);
+});
+
+// The ship's centre in NDC, projected by three.js from the chase camera pose.
+function shipNdc(ship, speed, aspect) {
+  const c = gameCamera(ship, speed);
+  const cam = new THREE.PerspectiveCamera(c.fov, aspect, 0.1, 500);
+  cam.position.set(c.px, c.py, c.pz);
+  cam.lookAt(c.tx, c.ty, c.tz);
+  cam.updateMatrixWorld();
+  return new THREE.Vector3(ship.x, ship.y, 0).project(cam);
+}
+const fovAt = (speed) => gameCamera({ x: 0, y: 0 }, speed).fov;
+
+test('corridorFor: 16:9, 16:10, 4:3 and ultra-wide keep the desktop corridor', () => {
+  for (const aspect of [16 / 9, 16 / 10, 4 / 3, 21 / 9, 32 / 9]) {
+    for (const speed of [4, 14, 38]) assert.deepEqual(corridorFor(aspect, fovAt(speed)), CORRIDOR);
+  }
+});
+
+test('corridorFor: portrait phone narrows the width, keeps the height', () => {
+  const aspect = 390 / 844;
+  const c = corridorFor(aspect, fovAt(14));
+  assert.ok(c.halfW < CORRIDOR.halfW && c.halfW > 2, `halfW ${c.halfW}`);
+  assert.equal(c.halfH, CORRIDOR.halfH);
+});
+
+test('corridorFor: at the corridor edge the ship centre stays within EDGE_NDC', () => {
+  assert.equal(EDGE_NDC, 0.85);
+  for (const aspect of [390 / 844, 360 / 800, 0.5, 0.6, 0.75, 1, 16 / 9]) {
+    for (const speed of [4, 14, 26, 38]) {
+      const c = corridorFor(aspect, fovAt(speed));
+      for (const sx of [-1, 1]) for (const sy of [-1, 0, 1]) {
+        const v = shipNdc({ x: sx * c.halfW, y: sy * c.halfH }, speed, aspect);
+        assert.ok(Math.abs(v.x) <= EDGE_NDC + 0.005, `aspect ${aspect} speed ${speed}: ndc x ${v.x}`);
+        assert.ok(Math.abs(v.y) <= EDGE_NDC + 0.005, `aspect ${aspect} speed ${speed}: ndc y ${v.y}`);
+      }
+    }
+  }
+});
+
+test('corridorFor: where the width is cut, the edge sits at EDGE_NDC (not overly narrow)', () => {
+  const aspect = 390 / 844;
+  const c = corridorFor(aspect, fovAt(14));
+  const v = shipNdc({ x: c.halfW, y: 0 }, 14, aspect);
+  assert.ok(Math.abs(v.x - EDGE_NDC) < 0.01, `ndc x ${v.x}`);
+});
+
+test('corridorFor: a tiny aspect stops at the playable minimum', () => {
+  assert.equal(MIN_HALF_W, 1);
+  assert.equal(corridorFor(0.1, fovAt(14)).halfW, MIN_HALF_W);
+  assert.equal(corridorFor(0.01, fovAt(38)).halfW, MIN_HALF_W);
+});
+
+test('corridorFor: width never shrinks as the screen widens', () => {
+  let last = 0;
+  for (let a = 0.05; a < 3; a += 0.01) {
+    const w = corridorFor(a, fovAt(14)).halfW;
+    assert.ok(w >= last - 1e-12);
+    last = w;
+  }
 });

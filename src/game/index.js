@@ -10,7 +10,7 @@ import { gameBudget } from './budget.js';
 import { buildGameLocal } from './shapes.js';
 import { createWorld, stepWorld, gameUniforms } from './world.js';
 import { steerTarget, attachControls } from './controls.js';
-import { gameCamera, blendPose, stepBlend, HERO_FOV } from './camera.js';
+import { gameCamera, blendPose, stepBlend, HERO_FOV, corridorFor } from './camera.js';
 import { createPhases, PHASE, ENTER_S, EXIT_S } from './phases.js';
 import { formatTime } from './text.js';
 import { createRng } from './rng.js';
@@ -132,7 +132,9 @@ export function createGame(ctx) {
     settle = -1;
     probe = { frames: 0, samples: 0, slow: 0, last: null };
     installShapes();
-    world = createWorld(createRng(newSeed()));
+    // The first meteors spawn in the narrowest chase view (speed 0); each
+    // frame then sets the corridor for the current speed and screen.
+    world = createWorld(createRng(newSeed()), corridorFor(camera.aspect, gameCamera({ x: 0, y: 0 }, 0).fov));
     steer.tx = steer.ty = 0;
     field.setGameState(gameUniforms(world));
     field.setSnap(0);
@@ -225,8 +227,12 @@ export function createGame(ctx) {
 
   function stepWorldFrame(dt) {
     const p = phases.phase;
+    // The corridor follows the screen's proportion (a resize changes it), as
+    // seen through the chase camera's field of view at this speed, not the
+    // blended camera's: that is the view the ship is flown in.
+    world.corridor = corridorFor(camera.aspect, gameCamera(world.ship, world.speed).fov);
     if (p === PHASE.ENTER || p === PHASE.PLAY) {
-      steerTarget(steer, controls.read(), dt);
+      steerTarget(steer, controls.read(), dt, world.corridor);
     }
     stepWorld(world, dt, { x: steer.tx, y: steer.ty }, { collide: p !== PHASE.EXIT });
     field.setGameState(gameUniforms(world));
