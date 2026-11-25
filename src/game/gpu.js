@@ -8,14 +8,20 @@ import * as THREE from 'three';
 import simplex from '../shaders/lib/simplex3d.glsl?raw';
 import curl from '../shaders/lib/curl.glsl?raw';
 import pointsFrag from '../shaders/points.frag?raw';
+import heroPosition from '../shaders/simPosition.frag?raw';
+import heroPointsVert from '../shaders/points.vert?raw';
 import game from './shaders/game.glsl?raw';
 import simVelocity from './shaders/simVelocity.frag?raw';
-import simPosition from './shaders/simPosition.frag?raw';
-import pointsVert from './shaders/points.vert?raw';
+import gamePosition from './shaders/simPosition.frag?raw';
+import gamePoints from './shaders/points.vert?raw';
+import { gamePointsVert, gamePositionFrag } from './shaderSource.js';
 
+// The position and points variants are built from the hero's own shader text
+// (src/game/shaderSource.js); the velocity variant is a full copy that
+// npm test holds to the hero's (shaderSource.test.js).
 const VELOCITY_SHADER = `${simplex}\n${curl}\n${game}\n${simVelocity}`;
-const POSITION_SHADER = `${game}\n${simPosition}`;
-const POINTS_VERT = `${simplex}\n${game}\n${pointsVert}`;
+const POSITION_SHADER = `${game}\n${gamePositionFrag(heroPosition, gamePosition)}`;
+const POINTS_VERT = `${simplex}\n${game}\n${gamePointsVert(heroPointsVert, gamePoints)}`;
 
 /**
  * Build and compile the game's three programs for `field`. Every uniform the

@@ -1,6 +1,11 @@
-// The game's variant of src/shaders/simVelocity.frag: the hero's code plus the game's.
-// Compiled lazily at the first game start (src/game/gpu.js) and only bound
-// while a game runs; the hero itself never runs this program.
+// The game's variant of src/shaders/simVelocity.frag: the hero's code plus the
+// game's, compiled lazily at the first game start (src/game/gpu.js) and only
+// bound while a game runs; the hero itself never runs this program.
+//
+// MIRROR: this file carries every code line of src/shaders/simVelocity.frag,
+// in order, except the few it deliberately replaces (VELOCITY_REPLACED in
+// src/game/shaderSource.js). `npm test` (src/game/shaderSource.test.js) fails
+// on any drift: change a hero line, then make the same change here.
 
 // texturePosition and textureVelocity samplers are injected by
 // GPUComputationRenderer from the declared variable dependencies — do not

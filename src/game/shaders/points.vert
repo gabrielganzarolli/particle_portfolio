@@ -1,25 +1,13 @@
-// The game's variant of src/shaders/points.vert: the hero's code plus the game's.
-// Compiled lazily at the first game start (src/game/gpu.js) and only bound
-// while a game runs; the hero itself never runs this program.
+// The game's part of the points vertex program. src/game/shaderSource.js
+// builds the full program from the hero's own src/shaders/points.vert, read as
+// it is, with its main() renamed heroMain(), followed by this file:
+//
+//   snoise, src/game/shaders/game.glsl, the hero's points.vert, this file
+//
+// so the hero's uniforms, attributes, varyings and code are never copied here.
+// At uGame <= 0.001 the program runs exactly the hero's main().
 
-// snoise(vec3) and src/game/shaders/game.glsl are concatenated in ahead of this file.
-
-uniform sampler2D uPositions;
-uniform sampler2D uPalette;
-uniform float uSize;
-uniform float uPixelScale; // drawingBufferHeight / (2 * tan(fov/2))
-uniform float uColorScale;
-uniform float uColorSpread;
-uniform float uFocus;      // camera distance to the phrase's plane
-uniform float uDof;        // how fast particles off that plane defocus
 uniform float uGame;       // 0: the hero's look, 1: the game's; blends between
-
-attribute vec2  aRef;
-attribute float aJitter;
-
-varying vec3  vColor;
-varying float vSpeed;
-varying float vFocus;
 
 // The game's look, ported from the CPU prototype's vertex shader and evalGoal
 // (docs/superpowers/specs/2026-11-24-particle-ship-game-prototype.html).
@@ -37,16 +25,6 @@ varying float vFocus;
 #define GAME_ALPHA 0.8
 #define GAME_GAMMA 1.8
 #define GAME_OPACITY 0.52
-
-vec3 heroColor(vec3 p) {
-  // Hue follows world position, so neighbouring particles agree no matter which
-  // phrase they are currently spelling. Two octaves: the coarse one sets the
-  // color regions, the fine one keeps them from looking airbrushed.
-  float n = snoise(p * uColorScale) * 0.7
-          + snoise(p * uColorScale * 2.4 + 31.7) * 0.3;
-  float t = clamp(n * uColorSpread + 0.5, 0.0, 1.0);
-  return texture2D(uPalette, vec2(t, 0.5)).rgb * aJitter;
-}
 
 // Per-role brightness and point size of particle `idx` at world position `p`.
 // Brightness 0 means the particle is not drawn.
@@ -104,7 +82,13 @@ void gameMain(vec4 p) {
   // all warm. The hero's palette is only worked out while it still shows.
   float tone = idx < uGameEnds.x ? 1.0 : gameHash(idx, 13u) < 0.25 ? 1.0 : gameHash(idx, 14u) * 0.3;
   vec3 white = mix(vec3(0.92, 0.95, 1.0), vec3(1.0, 0.95, 0.88), tone);
-  vec3 hero = uGame < 0.999 ? heroColor(p.xyz) : white;
+  // While the hero's look still shows, its colour is whatever the hero's own
+  // main() gives this particle; every output it writes is replaced below.
+  vec3 hero = white;
+  if (uGame < 0.999) {
+    heroMain();
+    hero = vColor;
+  }
   // The hero sparks on speed; in the game everything moves, so it would all spark.
   vSpeed = p.w * (1.0 - uGame);
 
@@ -130,29 +114,9 @@ void gameMain(vec4 p) {
 }
 
 void main() {
-  vec4 p = texture2D(uPositions, aRef);
-
   if (uGame > 0.001) {
-    gameMain(p);
+    gameMain(texture2D(uPositions, aRef));
     return;
   }
-
-  vColor = heroColor(p.xyz);
-  vSpeed = p.w;
-
-  vec4 mv = modelViewMatrix * vec4(p.xyz, 1.0);
-  float depth = max(-mv.z, 0.001);
-
-  // Depth of field, as in the Cream v3 proof: a particle away from the
-  // phrase's plane grows and loses brightness in proportion, so its light is
-  // spread rather than added. At rest the field is within ±0.16 of the plane
-  // and stays sharp; mid-morph, particles flung forward turn into bokeh.
-  float defocus = abs(depth - uFocus) * uDof;
-  float grow = 1.0 + min(defocus, 3.0) * 1.1;
-  vFocus = 1.0 / (grow * grow);
-
-  // Narrow viewports push the camera far enough back that points go sub-pixel,
-  // where drivers clamp or drop them and the field turns to faint static.
-  gl_PointSize = max(uSize * uPixelScale / depth * grow, 1.0);
-  gl_Position = projectionMatrix * mv;
+  heroMain();
 }
