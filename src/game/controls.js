@@ -47,6 +47,12 @@ export function createKeyState() {
   };
 }
 
+function isEditable(t) {
+  if (!t) return false;
+  const tag = typeof t.tagName === 'string' ? t.tagName.toUpperCase() : '';
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable === true;
+}
+
 export function attachControls(win) {
   const keys = createKeyState();
   let pointer = null;
@@ -55,7 +61,11 @@ export function attachControls(win) {
     pointer = { x: (e.clientX / w) * 2 - 1, y: 1 - (e.clientY / h) * 2 };
   };
   const onDown = (e) => {
-    if (KEY_MAP[e.key]) { keys.set(e.key, true); e.preventDefault(); }
+    if (!KEY_MAP[e.key]) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isEditable(e.target)) return;
+    keys.set(e.key, true);
+    if (e.key.startsWith('Arrow')) e.preventDefault(); // stops page scroll
   };
   const onUp = (e) => keys.set(e.key, false);
   const onBlur = () => keys.releaseAll();

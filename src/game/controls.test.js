@@ -108,3 +108,56 @@ test('attachControls tracks the pointer in NDC (y up) and disposes listeners', (
   c.dispose();
   assert.equal(win.count(), 0);
 });
+
+function keyEv(key, extra = {}) {
+  return { key, prevented: false, preventDefault() { this.prevented = true; }, ...extra };
+}
+
+test('modifier-held WASD keydown is ignored: not latched, not prevented', () => {
+  for (const mod of ['ctrlKey', 'metaKey', 'altKey']) {
+    const win = fakeWindow();
+    const c = attachControls(win);
+    const ev = keyEv('a', { [mod]: true });
+    win.dispatch('keydown', ev);
+    assert.equal(ev.prevented, false);
+    assert.equal(c.read().kx, 0);
+    c.dispose();
+  }
+});
+
+test('keydown targeting an input, textarea, select or contentEditable is ignored', () => {
+  const targets = [{ tagName: 'INPUT' }, { tagName: 'TEXTAREA' }, { tagName: 'SELECT' }, { tagName: 'DIV', isContentEditable: true }];
+  for (const target of targets) {
+    const win = fakeWindow();
+    const c = attachControls(win);
+    const ev = keyEv('ArrowLeft', { target });
+    win.dispatch('keydown', ev);
+    assert.equal(ev.prevented, false);
+    assert.equal(c.read().kx, 0);
+    c.dispose();
+  }
+});
+
+test('WASD moves without preventDefault; arrows are prevented', () => {
+  const win = fakeWindow();
+  const c = attachControls(win);
+  const w = keyEv('d', { target: { tagName: 'BODY' } });
+  win.dispatch('keydown', w);
+  assert.equal(c.read().kx, 1);
+  assert.equal(w.prevented, false);
+  const a = keyEv('ArrowUp');
+  win.dispatch('keydown', a);
+  assert.equal(a.prevented, true);
+  assert.equal(c.read().ky, 1);
+  c.dispose();
+});
+
+test('keyup always releases a latched key, even with a modifier or input target', () => {
+  const win = fakeWindow();
+  const c = attachControls(win);
+  win.dispatch('keydown', keyEv('a'));
+  assert.equal(c.read().kx, -1);
+  win.dispatch('keyup', keyEv('a', { ctrlKey: true, target: { tagName: 'INPUT' } }));
+  assert.equal(c.read().kx, 0);
+  c.dispose();
+});
