@@ -37,11 +37,6 @@ uniform sampler2D uFluid;
 uniform float uFluidForce;
 uniform mat4 uViewProj;
 
-// Which end of the morph is the game (src/shaders/lib/game.glsl, concatenated
-// in ahead of this file). Both 0 on the hero: the game branch never runs.
-uniform float uGameA;
-uniform float uGameB;
-
 #define PI 3.14159265359
 
 float hash12(vec2 p) {
@@ -70,87 +65,49 @@ void main() {
   vec4 tb = texture2D(uTargetB, uv);
   vec3 ga = mix(ta.xyz, uHeadPivot + uHeadRot * (ta.xyz - uHeadPivot), uHeadA * ta.w);
   vec3 gb = mix(tb.xyz, uHeadPivot + uHeadRot * (tb.xyz - uHeadPivot), uHeadB * tb.w);
-  vec3 goal;
-  float gw = 0.0; // how far this particle follows the game rather than a phrase
-  GameGoal gg;
-  if (uGameA + uGameB > 0.5) {
-    gg = gameGoal(floor(gl_FragCoord.y) * resolution.x + floor(gl_FragCoord.x));
-    if (gg.free > 0.5) gg.pos = pos;
-    gw = uGameA * (1.0 - m) + uGameB * m;
-    goal = uGameA > 0.5 ? gb : ga;
-  } else {
-    goal = mix(ga, gb, m);
-  }
+  vec3 goal = mix(ga, gb, m);
 
-  // The game's spring is the prototype's: stiffness by role, damped toward
-  // the goal's own velocity so objects in motion are followed without lag.
-  // A free particle (parked, or the ship after it blew up) only drags.
-  vec3 gameForce = vec3(0.0);
-  if (gw > 0.0) {
-    float c = gg.k > 0.0 ? 1.9 * sqrt(gg.k) : 1.3;
-    gameForce = (gg.pos - pos) * gg.k - c * (vel - gg.vel);
-  }
+  // Peaks at the midpoint of a transition and is zero while a phrase is held.
+  float energy = sin(PI * clamp(uMorph, 0.0, 1.0));
 
-  // Everything below is the phrase's pull, weighted by 1 - gw: with no game
-  // in the morph that weight is exactly 1 and this is the hero as it was.
-  float hw = 1.0 - gw;
-  if (hw > 0.0) {
-    // Peaks at the midpoint of a transition and is zero while a phrase is held.
-    float energy = sin(PI * clamp(uMorph, 0.0, 1.0));
+  // Slacken the spring mid-flight so particles arc rather than track straight.
+  // While a scroll morph lands (uSnap), the spring is four times as stiff near
+  // the ends of the transition, so the letters settle in under half the time;
+  // the extra damping below keeps that spring near critical (spring 36 wants
+  // about 12/s of damping, the base gives 5.7), so it lands without bounce.
+  float snap = uSnap * (1.0 - energy);
+  vec3 force = (goal - pos) * (uSpring * mix(1.0, 0.45, energy) * (1.0 + 3.0 * snap));
 
-    // Slacken the spring mid-flight so particles arc rather than track straight.
-    // While a scroll morph lands (uSnap), the spring is four times as stiff near
-    // the ends of the transition, so the letters settle in under half the time;
-    // the extra damping below keeps that spring near critical (spring 36 wants
-    // about 12/s of damping, the base gives 5.7), so it lands without bounce.
-    float snap = uSnap * (1.0 - energy);
-    vec3 force = (goal - pos) * (uSpring * mix(1.0, 0.45, energy) * (1.0 + 3.0 * snap));
+  vec3 swirl = curlNoise(pos * uNoiseScale + vec3(0.0, 0.0, uTime * uFlow));
+  force += swirl * (uTurbulence * (1.0 + 4.0 * energy));
 
-    vec3 swirl = curlNoise(pos * uNoiseScale + vec3(0.0, 0.0, uTime * uFlow));
-    force += swirl * (uTurbulence * (1.0 + 4.0 * energy));
+  // Cursor: a radial shove plus a push along the pointer's travel direction,
+  // so it leaves a directional wake rather than a symmetric hole.
+  vec3 d = pos - uMouse;
+  d.z *= 0.35;
+  float falloff = exp(-dot(d, d) / (uRadius * uRadius)) * uMouseActive;
+  float repel = uRepel * uRepelScale;
+  force += normalize(d + 1e-5) * (repel * falloff);
+  force += uMouseVel * (repel * uWake * falloff);
 
-    // Cursor: a radial shove plus a push along the pointer's travel direction,
-    // so it leaves a directional wake rather than a symmetric hole.
-    vec3 d = pos - uMouse;
-    d.z *= 0.35;
-    float falloff = exp(-dot(d, d) / (uRadius * uRadius)) * uMouseActive;
-    float repel = uRepel * uRepelScale;
-    force += normalize(d + 1e-5) * (repel * falloff);
-    force += uMouseVel * (repel * uWake * falloff);
+  // Screen-space fluid stirred by the pointer and the scroll. Sampled where the
+  // particle currently sits on screen and applied in the camera's plane, so a
+  // swirl drawn by the cursor curls the letters under it and then lets go.
+  vec4 clip = uViewProj * vec4(pos, 1.0);
+  vec2 fuv = clip.xy / max(clip.w, 1e-3) * 0.5 + 0.5;
+  vec2 inside = step(vec2(0.0), fuv) * step(fuv, vec2(1.0));
+  vec2 flow = texture2D(uFluid, fuv).xy * inside.x * inside.y;
+  force.xy += flow * uFluidForce;
 
-    // Screen-space fluid stirred by the pointer and the scroll. Sampled where the
-    // particle currently sits on screen and applied in the camera's plane, so a
-    // swirl drawn by the cursor curls the letters under it and then lets go.
-    vec4 clip = uViewProj * vec4(pos, 1.0);
-    vec2 fuv = clip.xy / max(clip.w, 1e-3) * 0.5 + 0.5;
-    vec2 inside = step(vec2(0.0), fuv) * step(fuv, vec2(1.0));
-    vec2 flow = texture2D(uFluid, fuv).xy * inside.x * inside.y;
-    force.xy += flow * uFluidForce;
-
-    // Framerate-independent damping.
-    vel *= pow(uDamping, uDt * 60.0 * hw);
-    vel *= exp(-uDt * 6.3 * snap * hw);
-    vel += force * (uDt * hw);
-  }
-
-  float maxSpeed = uMaxSpeed;
-  if (gw > 0.0) {
-    vel += gameForce * (uDt * gw);
-    maxSpeed = 120.0;
-
-    // The ship blows apart: one outward kick for the ship, flame and ring.
-    if (uBurst > 0.5 && gg.role <= ROLE_RING) {
-      float idx = floor(gl_FragCoord.y) * resolution.x + floor(gl_FragCoord.x);
-      vec3 jitter = vec3(gameHash(idx, 8u), gameHash(idx, 9u), gameHash(idx, 10u)) - 0.5;
-      vec3 dir = normalize(pos - vec3(uShip.xy, 0.0) + jitter * 0.4 + 1e-5);
-      vel += dir * ((2.0 + 7.0 * gameHash(idx, 11u)) * gw);
-    }
-  }
+  // Framerate-independent damping.
+  vel *= pow(uDamping, uDt * 60.0);
+  vel *= exp(-uDt * 6.3 * snap);
+  vel += force * uDt;
 
   float speed = length(vel);
-  if (speed > maxSpeed) {
-    vel *= maxSpeed / speed;
-    speed = maxSpeed;
+  if (speed > uMaxSpeed) {
+    vel *= uMaxSpeed / speed;
+    speed = uMaxSpeed;
   }
 
   gl_FragColor = vec4(vel, speed);

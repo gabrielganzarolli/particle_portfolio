@@ -7,6 +7,8 @@
 //                                           part 3: edge cases, captures in
 //                                           shots/flow-*.png)
 //
+//   node scripts/game-check.cjs heroPrograms (the hero's programs carry no
+//                                           game code at load or after a game)
 //   node scripts/game-check.cjs bench     (hero frame time vs main; exit 0 pass,
 //                                           1 fail, 3 inconclusive; see bench)
 //
@@ -56,6 +58,10 @@ async function positionsInPage() {
   const g = field.phrases.length;
   field.setGame(g, g + 1);
   field.setGameBudget(budget, local);
+  // What the controller does on start: the game's programs replace the hero's.
+  const { buildGamePrograms } = await import('/src/game/gpu.js');
+  await field.loadGameShaders(buildGamePrograms);
+  field.useGameShaders(true);
   field.setPair(0, g);
   field.setMorph(1);
 
@@ -192,6 +198,10 @@ async function lookInPage() {
   const g = field.phrases.length;
   field.setGame(g, g + 1);
   field.setGameBudget(budget, local);
+  // What the controller does on start: the game's programs replace the hero's.
+  const { buildGamePrograms } = await import('/src/game/gpu.js');
+  await field.loadGameShaders(buildGamePrograms);
+  field.useGameShaders(true);
   field.setPair(0, g);
   field.setMorph(1);
   field.setGameLook(1);
@@ -344,7 +354,7 @@ async function flowInPage() {
   const out = { level: state().level, notes: [] };
   const note = (ok, text) => out.notes.push({ ok, text });
 
-  game.start(REST);
+  await game.start(REST);
   note(game.active && game.phase === 'enter', `start(REST) -> ${game.phase}, active ${game.active}`);
   note(calls.onEnter === 1, `onEnter called ${calls.onEnter} time(s) (1)`);
 
@@ -408,7 +418,7 @@ async function flowInPage() {
     heroPose: () => ({ px: 0, py: 0, pz: heroZ }),
     hooks: { onEnter() {}, onExited() {}, onRunEnd: (info) => slowCalls.push(info) },
   });
-  slowGame.start(REST);
+  await slowGame.start(REST);
   let clock = 0;
   for (let f = 0; f < 400 && slowGame.phase !== 'dying'; f++) {
     // Meteors near the ship are moved out of the corridor, so only kill() ends
@@ -457,7 +467,7 @@ async function flowInPage() {
       await held;
       return realSetPhrase.call(this, i, text);
     };
-    gated.start(REST);
+    await gated.start(REST);
     await gRun(() => gated.phase === 'play', 200);
     await gRun(() => false, 10);
     gated.debug.kill();
@@ -1189,7 +1199,128 @@ async function bench() {
   return code || (budgetFailed ? 1 : 0);
 }
 
-const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench };
+// Runs in the page. The hero's velocity, position and points programs must be
+// the hero's own (no game code, uniforms or samplers) at load and again after
+// a game round trip; the game's variants are only in place during a game.
+async function heroProgramsInPage() {
+  const { field, renderer, camera, post, state } = window.__pf;
+  renderer.setAnimationLoop(null);
+  const GAME_MARKS = ['uGame', 'gameGoal', 'uGameLocal'];
+  const programs = () => {
+    const mats = { velocity: field.velVar.material, position: field.posVar.material, points: field.points.material };
+    const out = {};
+    for (const [k, m] of Object.entries(mats)) {
+      const src = k === 'points' ? m.vertexShader : m.fragmentShader;
+      out[k] = {
+        src,
+        entries: Object.keys(m.uniforms).length,
+        samplers: (src.match(/uniform\s+sampler2D/g) || []).length,
+        game: GAME_MARKS.filter((s) => src.includes(s)),
+      };
+    }
+    return out;
+  };
+  const out = { level: state().level, notes: [] };
+  const note = (ok, text) => out.notes.push({ ok, text });
+
+  const atLoad = programs();
+  for (const [k, p] of Object.entries(atLoad)) {
+    note(p.game.length === 0, `at load: ${k} has no game code (found ${JSON.stringify(p.game)})`);
+  }
+
+  const { createGame } = await import('/src/game/index.js');
+  const REST = 0;
+  const GAME = field.gameIndex;
+  const SCORE = field.scoreIndex;
+  const heroZ = camera.position.z;
+  let exitedPrograms = null;
+  const game = createGame({
+    field,
+    camera,
+    renderer,
+    indices: { REST, GAME, SCORE },
+    level: () => state().level,
+    lang: () => 'en',
+    heroPose: () => ({ px: 0, py: 0, pz: heroZ }),
+    hooks: {
+      onEnter() {},
+      // The hero takes over in onExited: its programs must be back by then.
+      onExited: () => (exitedPrograms = programs()),
+      onRunEnd() {},
+    },
+  });
+  const DT = 1 / 60;
+  let now = 0, elapsed = 0;
+  const run = async (done, max) => {
+    for (let f = 0; f < max && !done(); f++) {
+      now += DT * 1000;
+      elapsed += DT;
+      game.update(DT, now);
+      field.update(DT, elapsed);
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return done();
+  };
+
+  const t0 = performance.now();
+  await game.start(REST);
+  out.startMs = performance.now() - t0;
+  const during = programs();
+  for (const k of ['velocity', 'position', 'points']) {
+    note(during[k].src.includes('gameGoal') || during[k].src.includes('uGame'), `during the game: ${k} runs the game variant`);
+  }
+  // start() compiled them: the first game frame links no new program.
+  const before = renderer.info.programs.length;
+  game.update(DT, (now += DT * 1000));
+  field.update(DT, (elapsed += DT));
+  post.render(DT, elapsed);
+  const after = renderer.info.programs.length;
+  note(after === before, `first game frame: programs ${before} -> ${after} (no compile on the frame)`);
+  await run(() => game.phase === 'play', 300);
+  note(game.phase === 'play', `game reached ${game.phase} (play)`);
+  game.requestExit();
+  await run(() => game.phase === 'idle', 400);
+  note(game.phase === 'idle', `after the exit -> ${game.phase} (idle)`);
+
+  for (const [label, p] of [['in onExited', exitedPrograms], ['after the exit', programs()]]) {
+    if (!p) {
+      note(false, `${label}: onExited was not called`);
+      continue;
+    }
+    for (const k of ['velocity', 'position', 'points']) {
+      const a = atLoad[k], b = p[k];
+      note(
+        b.src === a.src && b.entries === a.entries && b.samplers === a.samplers,
+        `${label}: ${k} source identical to load ${b.src === a.src}, uniform entries ${b.entries} (${a.entries}), samplers ${b.samplers} (${a.samplers})`
+      );
+    }
+  }
+  return out;
+}
+
+async function heroPrograms() {
+  const { browser, page, errors } = await openSite();
+  let failed = false;
+  try {
+    const r = await page.evaluate(heroProgramsInPage);
+    console.log(`level ${r.level}; game start (shader load and compile) ${r.startMs.toFixed(0)} ms`);
+    for (const n of r.notes) {
+      console.log(`${n.ok ? 'PASS' : 'FAIL'} ${n.text}`);
+      if (!n.ok) failed = true;
+    }
+  } catch (err) {
+    console.log(`FAIL ${err.message.split('\n')[0]}`);
+    failed = true;
+  }
+  if (errors.length) {
+    console.log(`FAIL console errors:\n  ${errors.join('\n  ')}`);
+    failed = true;
+  }
+  await browser.close();
+  return failed;
+}
+
+const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench, heroPrograms };
 
 (async () => {
   const run = checks[mode];

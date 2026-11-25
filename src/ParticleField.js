@@ -3,7 +3,6 @@ import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRe
 
 import simplex from './shaders/lib/simplex3d.glsl?raw';
 import curl from './shaders/lib/curl.glsl?raw';
-import game from './shaders/lib/game.glsl?raw';
 import simVelocity from './shaders/simVelocity.frag?raw';
 import simPosition from './shaders/simPosition.frag?raw';
 import pointsVert from './shaders/points.vert?raw';
@@ -13,9 +12,8 @@ import { buildTarget, buildTargetInSlices, toDataTexture } from './textTargets.j
 import { createPaletteTexture } from './palette.js';
 
 // No #include preprocessor here — the noise library is just concatenated in.
-const VELOCITY_SHADER = `${simplex}\n${curl}\n${game}\n${simVelocity}`;
-const POSITION_SHADER = `${game}\n${simPosition}`;
-const POINTS_VERT = `${simplex}\n${game}\n${pointsVert}`;
+const VELOCITY_SHADER = `${simplex}\n${curl}\n${simVelocity}`;
+const POINTS_VERT = `${simplex}\n${pointsVert}`;
 
 // The damping term works out to c = -60*ln(damping) per second, so critical
 // damping sits at spring = (c/2)^2 — about 8.0 at 0.91. Sitting just above it
@@ -60,7 +58,8 @@ const DEFAULTS = {
 
 /**
  * The game's virtual phrase. Its destinations are not a texture but are
- * computed in the sim shaders from the game uniforms (src/shaders/lib/game.glsl).
+ * computed in the game's sim programs from the game uniforms
+ * (src/game/shaders/game.glsl).
  */
 export const GAME_PHRASE = Object.freeze({ game: true });
 
@@ -204,7 +203,7 @@ export class ParticleField {
     u.uTargetA.value = this.#target(index);
     u.uTargetB.value = this.pending.targets[index];
     u.uHeadA.value = u.uHeadB.value = index === this.headIndex ? 1 : 0;
-    u.uGameA.value = u.uGameB.value = 0;
+    this.gameEnds.uGameA.value = this.gameEnds.uGameB.value = 0;
     this.setMorph(0);
   }
 
@@ -265,7 +264,7 @@ export class ParticleField {
       v[i4 + 0] = v[i4 + 1] = v[i4 + 2] = v[i4 + 3] = 0;
     }
 
-    this.posVar = gpu.addVariable('texturePosition', POSITION_SHADER, pos0);
+    this.posVar = gpu.addVariable('texturePosition', simPosition, pos0);
     this.velVar = gpu.addVariable('textureVelocity', VELOCITY_SHADER, vel0);
 
     gpu.setVariableDependencies(this.posVar, [this.posVar, this.velVar]);
@@ -273,10 +272,12 @@ export class ParticleField {
 
     const t = this.reducedMotion ? 0.02 : DEFAULTS.turbulence;
 
+    this.posVar.material.uniforms.uDt = { value: 0 };
+
     const uTime = { value: 0 };
-    const uMorph = { value: 0 };
-    // Game uniforms (src/shaders/lib/game.glsl). The same objects go into the
-    // velocity, position and points materials, so one write reaches all three.
+    // Game uniforms (src/game/shaders/game.glsl). The hero's programs have none
+    // of them: they only reach the game's variants of the velocity, position
+    // and points programs (src/game/gpu.js), which share these objects.
     this.gameUniforms = {
       uGameLocal: { value: null },
       uGameEnds: { value: new THREE.Vector4() },
@@ -292,13 +293,15 @@ export class ParticleField {
       uBurst: { value: 0 },
       uGameTime: uTime,
     };
-    const ends = { uMorph, uGameA: { value: 0 }, uGameB: { value: 0 } };
+    // Which end of the morph is the game.
+    this.gameEnds = { uGameA: { value: 0 }, uGameB: { value: 0 } };
+    // The points' blend from the hero's look to the game's.
+    this.gameLook = { value: 0 };
 
-    Object.assign(this.posVar.material.uniforms, { uDt: { value: 0 } }, ends, this.gameUniforms);
-
-    Object.assign(this.velVar.material.uniforms, ends, this.gameUniforms, {
+    Object.assign(this.velVar.material.uniforms, {
       uTime,
       uDt: { value: 0 },
+      uMorph: { value: 0 },
       uTargetA: { value: null },
       uTargetB: { value: null },
       uMouse: { value: new THREE.Vector3(1e6, 1e6, 0) },
@@ -374,8 +377,6 @@ export class ParticleField {
         uColorSpread: { value: DEFAULTS.colorSpread },
         uFocus: { value: 10 },
         uDof: { value: this.reducedMotion ? 0 : DEFAULTS.dof },
-        uGame: { value: 0 },
-        ...this.gameUniforms,
       },
       vertexShader: POINTS_VERT,
       fragmentShader: pointsFrag,
@@ -397,8 +398,8 @@ export class ParticleField {
     u.uTargetB.value = this.#target(this.indexB);
     u.uHeadA.value = this.indexA === this.headIndex ? 1 : 0;
     u.uHeadB.value = this.indexB === this.headIndex ? 1 : 0;
-    u.uGameA.value = this.phrases[this.indexA]?.game === true ? 1 : 0;
-    u.uGameB.value = this.phrases[this.indexB]?.game === true ? 1 : 0;
+    this.gameEnds.uGameA.value = this.phrases[this.indexA]?.game === true ? 1 : 0;
+    this.gameEnds.uGameB.value = this.phrases[this.indexB]?.game === true ? 1 : 0;
   }
 
   /**
@@ -440,7 +441,7 @@ export class ParticleField {
     return this.morph >= 0.5 ? this.indexB : this.indexA;
   }
 
-  /** Sets the morph for the velocity and position passes (one shared uniform). */
+  /** Sets the morph; the game's position program shares the same uniform. */
   setMorph(t) {
     this.morph = t;
     this.velVar.material.uniforms.uMorph.value = t;
@@ -523,6 +524,7 @@ export class ParticleField {
     const solid = Boolean(this.occluder) && t > 0.3;
     if (this.occluder) this.occluder.visible = solid;
     this.material.depthTest = solid;
+    if (this.gamePrograms) this.gamePrograms.points.depthTest = solid;
   }
 
   /** The head's turn this frame, as a rotation matrix. */
@@ -635,10 +637,42 @@ export class ParticleField {
   /**
    * 0..1: how far the points take the game's look (per-role size and
    * brightness, white, weak depth of field, parked particles hidden) rather
-   * than the hero's. At 0 the game's vertex code does not run at all.
+   * than the hero's. Only the game's points program reads it.
    */
   setGameLook(amount) {
-    this.material.uniforms.uGame.value = Math.min(1, Math.max(0, amount));
+    this.gameLook.value = Math.min(1, Math.max(0, amount));
+  }
+
+  /**
+   * Build the game's programs once, with `build` (buildGamePrograms from
+   * src/game/gpu.js, which lives in the game chunk). Resolves when they are
+   * compiled; useGameShaders() needs that.
+   */
+  loadGameShaders(build) {
+    this.gameShaders ??= build(this).then(
+      (programs) => {
+        this.gamePrograms = programs;
+      },
+      (err) => {
+        this.gameShaders = null;
+        throw err;
+      }
+    );
+    return this.gameShaders;
+  }
+
+  /**
+   * Bind the game's programs (true) or the hero's (false). The game binds its
+   * own while a run is on and hands the hero's back before the hero resumes.
+   */
+  useGameShaders(on) {
+    if (on && !this.gamePrograms) throw new Error('useGameShaders: the game shaders are not loaded');
+    const p = on ? this.gamePrograms : this.heroPrograms;
+    if (!p || this.velVar.material === p.velocity) return;
+    this.heroPrograms ??= { velocity: this.velVar.material, position: this.posVar.material, points: this.material };
+    this.velVar.material = p.velocity;
+    this.posVar.material = p.position;
+    this.points.material = p.points;
   }
 
   /** Kick the ship, flame and ring outward on the next frame. */
@@ -676,6 +710,8 @@ export class ParticleField {
   }
 
   dispose() {
+    this.useGameShaders(false);
+    if (this.gamePrograms) for (const m of Object.values(this.gamePrograms)) m.dispose();
     this.gpu.dispose();
     this.points.geometry.dispose();
     this.occluder?.geometry.dispose();

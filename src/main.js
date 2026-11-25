@@ -458,15 +458,17 @@ async function boot() {
       if (exitButton) exitButton.hidden = false;
       return game;
     });
-    gameLoad
-      .then((g) => {
-        // The visitor may have moved on while the module loaded.
-        if (!g.active && canStartFrom(from)) g.start(from);
-      })
-      .catch((err) => {
+    gameLoad.then(
+      (g) => {
+        // The visitor may have moved on while the module (and, on the first
+        // start, the game's programs) loaded.
+        if (!g.active && canStartFrom(from)) g.start(from, () => canStartFrom(from)).catch((err) => console.warn(err));
+      },
+      (err) => {
         gameLoad = null;
         console.warn(err);
-      });
+      }
+    );
   }
 
   function onGameEnter() {

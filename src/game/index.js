@@ -14,6 +14,7 @@ import { gameCamera, blendPose, stepBlend, HERO_FOV } from './camera.js';
 import { createPhases, PHASE, ENTER_S, EXIT_S } from './phases.js';
 import { formatTime } from './text.js';
 import { createRng } from './rng.js';
+import { buildGamePrograms } from './gpu.js';
 
 // Seconds for the score text to form once its pair is set. Shorter than
 // SCORE_RESTART_S, so the text has landed before a click can restart.
@@ -63,6 +64,7 @@ export function createGame(ctx) {
   let controls = null;
   let blend = 0; // camera and look: 0 = hero, 1 = chase
   let run = 0; // bumped on every new run and on exit; stale async work checks it
+  let starting = false; // start() is waiting for the game's programs
   let runEnded = false;
   let scorePhrase = null; // promise from field.setPhrase(SCORE, ...)
   // True once the player has seen the score: its morph reached 1 (or the text
@@ -193,6 +195,8 @@ export function createGame(ctx) {
     controls = null;
     window.removeEventListener('pointerdown', onScoreClick);
     world = null;
+    // The hero's own programs are back before the hero takes over.
+    field.useGameShaders(false);
     hooks.onExited();
   }
 
@@ -251,9 +255,22 @@ export function createGame(ctx) {
       return phases.phase;
     },
 
-    /** Start from phrase index `from` (the head, or REST for #jogo). */
-    start(from) {
-      if (phases.phase !== PHASE.IDLE) return;
+    /**
+     * Start from phrase index `from` (the head, or REST for #jogo). The first
+     * start builds and compiles the game's programs before the run begins;
+     * `canStart` is asked again once they are ready, as the page may have
+     * moved on meanwhile.
+     */
+    async start(from, canStart = () => true) {
+      if (phases.phase !== PHASE.IDLE || starting) return;
+      starting = true;
+      try {
+        await field.loadGameShaders(buildGamePrograms);
+      } finally {
+        starting = false;
+      }
+      if (phases.phase !== PHASE.IDLE || !canStart()) return;
+      field.useGameShaders(true);
       phases.begin();
       blend = 0;
       beginRun(from);
