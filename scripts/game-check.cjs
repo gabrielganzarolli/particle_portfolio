@@ -2,6 +2,7 @@
 //
 //   node scripts/game-check.cjs positions
 //   node scripts/game-check.cjs look       (captures in shots/look-nivelN.png)
+//   node scripts/game-check.cjs flow       (part 1: the controller on its own)
 //
 // Needs the dev server (`npm run dev -- --port 5199`) and the globally
 // installed Playwright. The site's own animation loop is stopped and the check
@@ -277,7 +278,170 @@ async function look() {
   return failed;
 }
 
-const checks = { positions, look };
+// Runs in the page. Part 1 of the flow check: the controller on its own,
+// built by hand from window.__pf (main.js does not wire it yet). The site's
+// loop is stopped and the check drives game.update + field.update itself at a
+// fixed dt, yielding to the event loop between frames so the score phrase can
+// build in slices. Records every phase change and every hook call.
+async function flowInPage() {
+  const { field, renderer, camera, state } = window.__pf;
+  renderer.setAnimationLoop(null);
+
+  const { createGame } = await import('/src/game/index.js');
+
+  const REST = 0;
+  const GAME = field.phrases.length;
+  const SCORE = GAME + 1;
+  field.setGame(GAME, SCORE);
+
+  const calls = { onEnter: 0, onExited: 0, onRunEnd: [] };
+  const heroZ = camera.position.z;
+  const game = createGame({
+    field,
+    camera,
+    renderer,
+    indices: { REST, GAME, SCORE },
+    level: () => state().level,
+    lang: () => 'en',
+    heroPose: () => ({ px: 0, py: 0, pz: heroZ }),
+    hooks: {
+      onEnter: () => calls.onEnter++,
+      onExited: () => calls.onExited++,
+      onRunEnd: (info) => calls.onRunEnd.push(info),
+    },
+  });
+
+  const DT = 1 / 60;
+  const phases = [game.phase];
+  let now = 0;
+  let elapsed = 0;
+  const frame = () => {
+    now += DT * 1000;
+    elapsed += DT;
+    game.update(DT, now);
+    field.update(DT, elapsed);
+    if (phases[phases.length - 1] !== game.phase) phases.push(game.phase);
+  };
+  // Step until `done()` holds; give up after `max` frames.
+  const run = async (done, max) => {
+    for (let f = 0; f < max && !done(); f++) {
+      frame();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return done();
+  };
+  const click = () =>
+    window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 640, clientY: 400, button: 0, bubbles: true }));
+
+  const out = { level: state().level, notes: [] };
+  const note = (ok, text) => out.notes.push({ ok, text });
+
+  game.start(REST);
+  note(game.active && game.phase === 'enter', `start(REST) -> ${game.phase}, active ${game.active}`);
+  note(calls.onEnter === 1, `onEnter called ${calls.onEnter} time(s) (1)`);
+
+  await run(() => game.phase === 'play', 200);
+  note(game.phase === 'play', `after ${(1.5).toFixed(1)} s of steps -> ${game.phase}`);
+
+  await run(() => false, 30); // a little play, so the probe has frames
+  const scale = field.material.uniforms.uPixelScale.value;
+  const want = renderer.domElement.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+  note(Math.abs(scale - want) < 1e-3, `pixel scale ${scale.toFixed(3)} matches fov ${camera.fov.toFixed(2)} (${want.toFixed(3)})`);
+
+  const t = game.debug.world.t;
+  game.debug.kill();
+  frame();
+  note(game.phase === 'dying', `kill() -> ${game.phase}`);
+  note(calls.onRunEnd.length === 1, `onRunEnd at death: ${JSON.stringify(calls.onRunEnd[0])}`);
+
+  await run(() => game.phase === 'score', 200);
+  note(game.phase === 'score', `after the explosion -> ${game.phase}`);
+
+  // The score must be on its way to the particles: the phrase holds the time.
+  await run(() => field.indexB === SCORE, 200);
+  const text = field.phrases[SCORE];
+  note(field.indexA === GAME && field.indexB === SCORE, `pair ${field.indexA} -> ${field.indexB} (${GAME} -> ${SCORE})`);
+  note(typeof text === 'string' && /^\d+\.\d s$/.test(text), `score phrase "${text}" (world t ${t.toFixed(2)} s at kill)`);
+
+  // A click before SCORE_RESTART_S is ignored.
+  click();
+  frame();
+  note(game.phase === 'score', `early click in score -> ${game.phase} (ignored)`);
+
+  await run(() => false, Math.ceil(1.75 / DT));
+  click();
+  frame();
+  note(game.phase === 'enter', `click after 1.7 s in score -> ${game.phase}`);
+  note(field.indexA === SCORE && field.indexB === GAME, `restart pair ${field.indexA} -> ${field.indexB}`);
+  note(game.debug.world.alive && game.debug.world.t < 0.1, `fresh world (t ${game.debug.world.t.toFixed(3)})`);
+
+  await run(() => false, 10);
+  game.requestExit();
+  note(game.phase === 'exit', `requestExit() -> ${game.phase}`);
+  note(field.indexB === REST, `exit pair ${field.indexA} -> ${field.indexB} (B = REST ${REST})`);
+  game.requestExit(); // idempotent
+  await run(() => game.phase === 'idle', 200);
+  note(game.phase === 'idle' && !game.active, `after the exit -> ${game.phase}, active ${game.active}`);
+  game.requestExit();
+  await run(() => false, 5);
+  note(calls.onExited === 1, `onExited called ${calls.onExited} time(s) (1)`);
+  note(calls.onRunEnd.length === 2, `onRunEnd called ${calls.onRunEnd.length} time(s) (death + exit)`);
+
+  out.phases = phases;
+
+  // The quality probe: a second run whose PLAY frames arrive every 30 ms
+  // (dt stays fixed, only the clock passed as `now` is slow).
+  const slowCalls = [];
+  const slowGame = createGame({
+    field, camera, renderer,
+    indices: { REST, GAME, SCORE },
+    level: () => state().level,
+    lang: () => 'pt',
+    heroPose: () => ({ px: 0, py: 0, pz: heroZ }),
+    hooks: { onEnter() {}, onExited() {}, onRunEnd: (info) => slowCalls.push(info) },
+  });
+  slowGame.start(REST);
+  let clock = 0;
+  for (let f = 0; f < 400 && slowGame.phase !== 'dying'; f++) {
+    if (slowGame.phase === 'play' && f > 300) slowGame.debug.kill();
+    clock += slowGame.phase === 'play' ? 30 : DT * 1000;
+    slowGame.update(DT, clock);
+  }
+  note(slowCalls.length === 1 && slowCalls[0].slow === true, `30 ms frames -> onRunEnd ${JSON.stringify(slowCalls[0])} (slow)`);
+  await run(() => false, 3); // let the score phrase start building
+  slowGame.requestExit();
+  for (let f = 0; f < 200 && slowGame.active; f++) slowGame.update(DT, (clock += DT * 1000));
+  note(!slowGame.active && slowCalls.length === 1, `slow run exited, onRunEnd ${slowCalls.length} time(s) (1)`);
+  return out;
+}
+
+async function flow() {
+  const { browser, page, errors } = await openSite();
+  let failed = false;
+  try {
+    const r = await page.evaluate(flowInPage);
+    console.log(`level ${r.level}`);
+    for (const n of r.notes) {
+      console.log(`${n.ok ? 'PASS' : 'FAIL'} ${n.text}`);
+      if (!n.ok) failed = true;
+    }
+    const want = ['idle', 'enter', 'play', 'dying', 'score', 'enter', 'exit', 'idle'];
+    const ok = JSON.stringify(r.phases) === JSON.stringify(want);
+    console.log(`${ok ? 'PASS' : 'FAIL'} phases ${r.phases.join(' > ')}`);
+    if (!ok) failed = true;
+  } catch (err) {
+    console.log(`FAIL ${err.message.split('\n')[0]}`);
+    failed = true;
+  }
+  if (errors.length) {
+    console.log(`FAIL console errors:\n  ${errors.join('\n  ')}`);
+    failed = true;
+  }
+  await browser.close();
+  return failed;
+}
+
+const checks = { positions, look, flow };
 
 (async () => {
   const run = checks[mode];
