@@ -3,7 +3,9 @@
 //   node scripts/game-check.cjs positions
 //   node scripts/game-check.cjs look       (captures in shots/look-nivelN.png)
 //   node scripts/game-check.cjs flow       (part 1: the controller on its own;
-//                                           part 2: the game inside the live hero)
+//                                           part 2: the game inside the live hero;
+//                                           part 3: edge cases, captures in
+//                                           shots/flow-*.png)
 //
 // Needs the dev server (`npm run dev -- --port 5199`) and the globally
 // installed Playwright. The site's own animation loop is stopped and the check
@@ -16,7 +18,7 @@ const mode = process.argv[2];
 
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
-async function openSite(hash = '', options = {}) {
+async function openSite(hash = '', options = {}, setup = null) {
   const browser = await chromium.launch({ args: LAUNCH_ARGS });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, ...options });
   const errors = [];
@@ -24,6 +26,7 @@ async function openSite(hash = '', options = {}) {
     if (msg.type() === 'error') errors.push(msg.text());
   });
   page.on('pageerror', (err) => errors.push(String(err)));
+  if (setup) setup(page);
   await page.goto(`${BASE}/${hash}`);
   await page.waitForFunction(() => window.__pf && window.__pf.state().frames > 2, null, { timeout: 300000, polling: 500 });
   return { browser, page, errors };
@@ -702,10 +705,320 @@ async function flowPart2() {
   return failed;
 }
 
+// Part 3 helpers. Wraps the live game's update (main.js looks it up every
+// frame) to count frames, time spent in the current phase, the camera at the
+// last EXIT frame, and to keep meteors off the ship while `safe`, so a run
+// only ends through debug.kill().
+function instrumentGame(page) {
+  return page.evaluate(() => {
+    const g = window.__pf.game;
+    if (g.__checked) return;
+    const { camera } = window.__pf;
+    const log = (window.__g = { frames: 0, phase: g.phase, phaseT: 0, safe: true, exitZ: null, exitFov: null });
+    const update = g.update;
+    g.update = function (dt, now) {
+      const w = g.debug.world;
+      if (log.safe && w && g.phase !== 'exit') for (const m of w.meteors) if (m.z > -25) m.x = 100;
+      update.call(g, dt, now);
+      log.frames++;
+      if (g.phase !== log.phase) {
+        log.phase = g.phase;
+        log.phaseT = 0;
+      } else log.phaseT += dt;
+      if (g.phase === 'exit') {
+        log.exitZ = camera.position.z;
+        log.exitFov = camera.fov;
+      }
+    };
+    g.__checked = true;
+  });
+}
+
+const waitFrames = (page, n) =>
+  page.evaluate((n) => window.__g.frames + n, n).then((until) =>
+    page.waitForFunction((until) => window.__g.frames >= until, until, WAIT)
+  );
+
+// The hero's camera distance for the current viewport (main.js resize()).
+const heroZFor = () => {
+  const aspect = window.innerWidth / window.innerHeight;
+  const t = Math.tan((50 * Math.PI) / 180 / 2);
+  return Math.max(10 / 0.86 / (2 * t * aspect), (10 * 0.25) / 0.86 / (2 * t));
+};
+
+async function flowPart3() {
+  const fs = require('fs');
+  const path = require('path');
+  let failed = false;
+  const report = (ok, text) => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${text}`);
+    if (!ok) failed = true;
+  };
+  const gameRequests = [];
+  const site = await openSite('#nivel1', { viewport: { width: 1280, height: 720 } }, (page) =>
+    page.on('request', (r) => {
+      if (/\/game\/index/.test(r.url())) gameRequests.push(r.url());
+    })
+  );
+  const { page } = site;
+  fs.mkdirSync('shots', { recursive: true });
+  const shot = (name) => page.screenshot({ path: path.join('shots', `flow-${name}.png`) });
+  const phase = () => page.evaluate(() => window.__pf.game?.phase ?? 'none');
+  const waitPhase = (p) =>
+    page.waitForFunction((p) => window.__pf.game?.phase === p, p, { ...WAIT, polling: 'raf' }).then(() => true, () => false);
+  const away = () => page.mouse.move(20, 700); // off the name, so no hover
+  const atRest = async (label) => {
+    const back = await page.waitForFunction(onNameAtRest, true, WAIT).then(() => true, () => false);
+    const r = await page.evaluate(() => ({
+      phase: window.__pf.game.phase,
+      scrollY: window.scrollY,
+      gameOn: document.documentElement.classList.contains('game-on'),
+      fov: window.__pf.camera.fov,
+      langDisabled: document.querySelector('[data-lang-toggle]').disabled,
+    }));
+    report(back && r.phase === 'idle' && r.scrollY === 0 && !r.gameOn && r.fov === 50 && !r.langDisabled,
+      `${label}: name ${back}, ${JSON.stringify(r)} (idle, scrollY 0, no game-on, fov 50, language toggle enabled)`);
+  };
+  const startFromName = async (label) => {
+    await page.evaluate(() => window.__pf.game.start(0));
+    const ok = await waitPhase('play');
+    report(ok, `${label}: start() from idle -> play ${ok}`);
+    return ok;
+  };
+  const killAndWait = async (p) => {
+    await page.evaluate(() => window.__pf.game.debug.kill());
+    return waitPhase(p);
+  };
+  const clickCentre = () => page.mouse.click(640, 360).then(away);
+
+  try {
+    console.log(`part 3 level ${await page.evaluate(() => window.__pf.state().level)}`);
+    await page.waitForFunction(() => window.__pf.state().frames > 30, null, WAIT);
+    report(gameRequests.length === 0, `(lazy) boot without #jogo: game module requests ${gameRequests.length} (0)`);
+
+    // Start through the head, as a visitor does.
+    if (!(await formHead(page, report, '(start)'))) throw new Error('head never formed');
+    const pt = await headScreenPoint(page, 'centre');
+    await page.mouse.click(pt.x, pt.y);
+    await away();
+    await page.waitForFunction(() => window.__pf.game, null, WAIT);
+    await instrumentGame(page);
+    const played = await waitPhase('play');
+    report(played && gameRequests.length >= 1, `(lazy) click on the head -> play ${played}, game module requested ${gameRequests.length} time(s)`);
+    await waitFrames(page, 10);
+    await shot('play');
+
+    // Language toggle during play.
+    {
+      const before = await page.evaluate(() => ({
+        phase: window.__pf.game.phase,
+        index: window.__pf.field.currentIndex,
+        lang: document.documentElement.lang,
+        text: document.querySelector('[data-lang-toggle]').textContent,
+      }));
+      await page.evaluate(() => document.querySelector('[data-lang-toggle]').click());
+      await page.waitForTimeout(1200); // the crossfade would take 500 ms
+      await waitFrames(page, 5);
+      const after = await page.evaluate(() => ({
+        phase: window.__pf.game.phase,
+        index: window.__pf.field.currentIndex,
+        lang: document.documentElement.lang,
+        text: document.querySelector('[data-lang-toggle]').textContent,
+        swapping: document.documentElement.classList.contains('lang-swapping'),
+      }));
+      report(after.phase === 'play' && after.index === before.index && after.lang === before.lang && after.text === before.text && !after.swapping,
+        `(lang) toggle click in play: ${JSON.stringify(before)} -> ${JSON.stringify(after)} (unchanged, no swap)`);
+    }
+
+    // Viewport changes during play, then an exit at a new viewport.
+    {
+      const scaleOk = async (label) => {
+        await waitFrames(page, 4);
+        const r = await page.evaluate(() => {
+          const { field, renderer, camera } = window.__pf;
+          return {
+            phase: window.__pf.game.phase,
+            h: renderer.domElement.height,
+            got: field.material.uniforms.uPixelScale.value,
+            want: renderer.domElement.height / (2 * Math.tan((camera.fov * Math.PI) / 180 / 2)),
+            fov: camera.fov,
+          };
+        });
+        report(r.phase === 'play' && Math.abs(r.got - r.want) < 0.001,
+          `(resize) ${label}: phase ${r.phase}, canvas height ${r.h}, uPixelScale ${r.got.toFixed(4)} vs ${r.want.toFixed(4)} at fov ${r.fov.toFixed(2)}`);
+      };
+      await page.setViewportSize({ width: 390, height: 844 });
+      await scaleOk('1280x720 -> 390x844');
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await scaleOk('390x844 -> 1280x720');
+      await page.setViewportSize({ width: 390, height: 844 });
+      await scaleOk('1280x720 -> 390x844 again');
+      await page.keyboard.press('Escape');
+      await waitPhase('idle');
+      await waitFrames(page, 0);
+      await page.waitForTimeout(300);
+      const heroZ = await page.evaluate(heroZFor);
+      const r = await page.evaluate((heroZ) => {
+        const { camera } = window.__pf;
+        return { z: camera.position.z, fov: camera.fov, heroZ, exitZ: window.__g.exitZ, exitFov: window.__g.exitFov };
+      }, heroZ);
+      report(Math.abs(r.z - r.heroZ) < 1e-6 && r.fov === 50,
+        `(resize) idle after exit at 390x844: camera z ${r.z.toFixed(4)}, hero z ${r.heroZ.toFixed(4)}, fov ${r.fov}`);
+      report(Math.abs(r.exitZ - r.heroZ) < r.heroZ * 0.01,
+        `(resize) last exit frame lands on the new hero pose: z ${r.exitZ.toFixed(4)} vs ${r.heroZ.toFixed(4)} (1%), fov ${r.exitFov.toFixed(2)}`);
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await away();
+      await atRest('(resize) back to 1280x720');
+    }
+
+    // Mashing everything, three full cycles.
+    for (let c = 1; c <= 3; c++) {
+      const L = `(mash ${c})`;
+      // A fresh start() after idle: the controls are attached again.
+      if (!(await startFromName(`${L} a`))) throw new Error('no play');
+      const x0 = await page.evaluate(() => window.__pf.game.debug.world.ship.x);
+      await page.keyboard.down('ArrowRight');
+      const moved = await page
+        .waitForFunction((x0) => window.__pf.game.debug.world.ship.x > x0 + 1, x0, WAIT)
+        .then(() => true, () => false);
+      await page.keyboard.up('ArrowRight');
+      report(moved, `${L} a: ArrowRight moves the ship (keys attached again)`);
+
+      // kill() and Esc in the same task.
+      const r1 = await page.evaluate(() => {
+        const g = window.__pf.game;
+        g.debug.kill();
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        return g.phase;
+      });
+      report(r1 === 'exit', `${L} b: kill() then Esc at once -> ${r1}`);
+      await waitPhase('idle');
+      await away();
+      await atRest(`${L} b`);
+
+      // Two clicks right after the explosion; neither restarts.
+      if (!(await startFromName(`${L} c`))) throw new Error('no play');
+      await killAndWait('dying');
+      if (c === 1) await shot('dying');
+      await clickCentre();
+      await clickCentre();
+      const pd = await phase();
+      const formed = await page
+        .waitForFunction(() => window.__pf.game.debug.scoreFormed, null, { ...WAIT, polling: 'raf' })
+        .then(() => true, () => false);
+      const pf = await phase();
+      report(pd === 'dying' && formed && pf === 'score', `${L} c: two clicks in dying -> ${pd}; score formed ${formed}, phase ${pf} (no restart)`);
+
+      // Two clicks in the same frame once the score formed: one restart.
+      await page.waitForFunction(() => window.__g.phase === 'score' && window.__g.phaseT >= 1.75, null, { ...WAIT, polling: 'raf' });
+      if (c === 1) {
+        // The capture waits for the particles to land; the click gate (above
+        // and below) only knows the morph reached 1.
+        await page.waitForFunction(() => window.__g.phaseT >= 3.5, null, { ...WAIT, polling: 'raf' });
+        await shot('score');
+      }
+      const r2 = await page.evaluate(() => {
+        const g = window.__pf.game;
+        const down = () =>
+          document.getElementById('scene').dispatchEvent(new PointerEvent('pointerdown', { clientX: 640, clientY: 360, button: 0, bubbles: true }));
+        down();
+        const w1 = g.debug.world;
+        const p1 = g.phase;
+        down();
+        return { p1, p2: g.phase, same: g.debug.world === w1, t: w1.t };
+      });
+      report(r2.p1 === 'enter' && r2.p2 === 'enter' && r2.same && r2.t === 0,
+        `${L} d: two clicks in one frame after the score -> ${r2.p1}, ${r2.p2}, one fresh world ${r2.same}`);
+
+      // Esc during dying, twice.
+      await waitPhase('play');
+      await killAndWait('dying');
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      const pe = await phase();
+      report(pe === 'exit', `${L} e: Esc twice in dying -> ${pe}`);
+      await waitPhase('idle');
+      await atRest(`${L} e`);
+
+      // Esc while the score is forming.
+      if (!(await startFromName(`${L} f`))) throw new Error('no play');
+      await page.evaluate(() => window.__pf.game.debug.kill());
+      const forming = await page
+        .waitForFunction(() => {
+          const { game, field } = window.__pf;
+          return game.phase === 'score' && field.indexB === field.scoreIndex && field.morph < 1 && !game.debug.scoreFormed;
+        }, null, { ...WAIT, polling: 'raf' })
+        .then(() => true, () => false);
+      await page.keyboard.press('Escape');
+      const pf2 = await phase();
+      report(forming && pf2 === 'exit', `${L} f: Esc while the score forms (caught ${forming}) -> ${pf2}`);
+      await waitPhase('idle');
+      await atRest(`${L} f`);
+
+      // A click while the score text is still being built (setPhrase held).
+      if (!(await startFromName(`${L} g`))) throw new Error('no play');
+      await page.evaluate(() => {
+        const { field } = window.__pf;
+        const real = Object.getPrototypeOf(field).setPhrase;
+        window.__held = new Promise((r) => (window.__release = r));
+        field.setPhrase = async function (i, text) {
+          await window.__held;
+          return real.call(this, i, text);
+        };
+      });
+      try {
+        await killAndWait('score');
+        await page.waitForFunction(() => window.__g.phase === 'score' && window.__g.phaseT >= 1.8, null, { ...WAIT, polling: 'raf' });
+        await clickCentre();
+        await page.waitForFunction(() => window.__g.phaseT >= 2.1, null, { ...WAIT, polling: 'raf' });
+        const r3 = await page.evaluate(() => ({ phase: window.__pf.game.phase, b: window.__pf.field.indexB, score: window.__pf.field.scoreIndex }));
+        report(r3.phase === 'score' && r3.b !== r3.score, `${L} g: click while the score text is pending -> ${r3.phase}, pair B ${r3.b} (not ${r3.score})`);
+        await page.evaluate(() => window.__release());
+        const ok = await page
+          .waitForFunction(() => window.__pf.game.debug.scoreFormed, null, { ...WAIT, polling: 'raf' })
+          .then(() => true, () => false);
+        await clickCentre();
+        const pg = await phase();
+        report(ok && pg === 'enter', `${L} g: score formed ${ok}, click -> ${pg}`);
+      } finally {
+        await page.evaluate(() => {
+          window.__release?.();
+          delete window.__pf.field.setPhrase;
+        });
+      }
+      await page.keyboard.press('Escape');
+      await waitPhase('idle');
+      await atRest(`${L} end of cycle`);
+    }
+
+    // Scrolling after the game works as before.
+    {
+      await page.mouse.move(640, 600);
+      const y0 = await page.evaluate(() => window.scrollY);
+      for (let i = 0; i < 6; i++) {
+        await page.mouse.wheel(0, 500);
+        await page.waitForTimeout(150);
+      }
+      const reached = await page
+        .waitForFunction(() => window.__pf.state().chainShown >= 1 && document.querySelector('.work .reveal.is-in'), null, WAIT)
+        .then(() => true, () => false);
+      const r = await page.evaluate(() => ({ y: window.scrollY, chain: window.__pf.state().chainShown, pair: window.__pf.state().pair }));
+      report(r.y > y0 && reached, `(scroll) after the game: scrollY ${y0} -> ${r.y}, chainShown ${r.chain}, pair ${r.pair}, WORK revealed ${reached}`);
+    }
+  } catch (err) {
+    report(false, `(part 3) ${err.message.split('\n')[0]}`);
+  }
+  if (site.errors.length) report(false, `(part 3) console errors:\n  ${site.errors.join('\n  ')}`);
+  else report(true, '(part 3) no console errors');
+  await site.browser.close();
+  return failed;
+}
+
 async function flow() {
   const failed1 = await flowPart1();
   const failed2 = await flowPart2();
-  return failed1 || failed2;
+  const failed3 = await flowPart3();
+  return failed1 || failed2 || failed3;
 }
 
 async function flowPart1() {
@@ -734,7 +1047,7 @@ async function flowPart1() {
   return failed;
 }
 
-const checks = { positions, look, flow, flow2: flowPart2 };
+const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3 };
 
 (async () => {
   const run = checks[mode];

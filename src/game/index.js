@@ -62,7 +62,6 @@ export function createGame(ctx) {
   let world = null;
   let controls = null;
   let blend = 0; // camera and look: 0 = hero, 1 = chase
-  let hero = null; // the hero camera pose this run started from
   let run = 0; // bumped on every new run and on exit; stale async work checks it
   let runEnded = false;
   let scorePhrase = null; // promise from field.setPhrase(SCORE, ...)
@@ -222,6 +221,10 @@ export function createGame(ctx) {
     if (p === PHASE.EXIT) blend = Math.min(blend, 1 - phases.t / EXIT_S);
     const e = ease(blend);
 
+    // The hero pose is read every frame, not kept from start(): a resize
+    // mid-game moves it, and the exit must land where the hero will draw.
+    const h = ctx.heroPose();
+    const hero = { px: h.px, py: h.py, pz: h.pz, tx: 0, ty: 0, tz: 0, fov: HERO_FOV };
     const c = blendPose(hero, gameCamera(world.ship, world.speed), e);
     camera.position.set(c.px, c.py, c.pz);
     camera.lookAt(c.tx, c.ty, c.tz);
@@ -252,8 +255,6 @@ export function createGame(ctx) {
     start(from) {
       if (phases.phase !== PHASE.IDLE) return;
       phases.begin();
-      const h = ctx.heroPose();
-      hero = { px: h.px, py: h.py, pz: h.pz, tx: 0, ty: 0, tz: 0, fov: HERO_FOV };
       blend = 0;
       beginRun(from);
       controls = attachControls(window);

@@ -429,6 +429,9 @@ async function boot() {
   let gameLoad = null;
   let curLang = lang;
   const exitButton = document.querySelector('[data-game-exit]');
+  // Disabled while the game runs: CSS only hides it, and a programmatic or
+  // assistive-tech click would still switch the page's language mid-game.
+  const langToggle = document.querySelector('[data-lang-toggle]');
 
   /** Can a game start from phrase `from` right now? */
   function canStartFrom(from) {
@@ -446,7 +449,9 @@ async function boot() {
         indices: { REST, GAME, SCORE },
         level: () => level,
         lang: () => curLang,
-        heroPose: () => ({ px: camera.position.x, py: camera.position.y, pz: camera.position.z }),
+        // The pose the hero's next frame would set (see step()), read live:
+        // cameraZ follows a resize made mid-game.
+        heroPose: () => ({ px: camX * tune.parallaxX, py: camY * tune.parallaxY, pz: cameraZ }),
         hooks: { onEnter: onGameEnter, onExited: onGameExited, onRunEnd: onGameRunEnd },
       });
       // From here on CSS alone shows it, while html.game-on is set.
@@ -466,6 +471,7 @@ async function boot() {
 
   function onGameEnter() {
     document.documentElement.classList.add('game-on');
+    if (langToggle) langToggle.disabled = true;
     exitButton?.setAttribute('aria-label', exitLabel(curLang));
     document.body.style.cursor = '';
     cursorHint = false;
@@ -480,6 +486,7 @@ async function boot() {
 
   function onGameExited() {
     document.documentElement.classList.remove('game-on');
+    if (langToggle) langToggle.disabled = false;
     dust.visible = true;
     camera.fov = FOV;
     camera.updateProjectionMatrix();
