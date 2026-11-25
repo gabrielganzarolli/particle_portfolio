@@ -1,7 +1,9 @@
 # Jogo da nave em partículas — design
 
-2026-11-24. Status: aprovado por Gabriel em 2026-11-25, depois de jogar o protótipo, com a
-decisão de usar 70 mil partículas (ver "Orçamento de partículas").
+2026-11-24. Status: implementado em 2026-11-25 (branch
+`claude/godot-game-portfolio-idea-nbss4h`). Aprovado por Gabriel em 2026-11-25, depois de
+jogar o protótipo, com a decisão de usar 70 mil partículas (ver "Orçamento de partículas").
+Os valores finais e os números da entrega estão no fim de "Protótipo de referência".
 
 ## Intenção
 
@@ -208,8 +210,10 @@ A forma da nave e dos meteoritos é o que se preserva por último.
 - Código novo em `src/game/` (lógica, formas, destino em shader).
 - Pontos de contato com o resto: um estado de jogo no loop de `main.js`, a
   rolagem travada enquanto joga e a rolagem restaurada ao sair, os textos do
-  fim em `src/homeI18n.js` e `src/home.pt.js`, e o ramo do jogo em
-  `src/shaders/simVelocity.frag`.
+  fim em `src/homeI18n.js` e `src/home.pt.js`, e o ramo do jogo, que no fim
+  ficou em variantes dos shaders do herói (`src/game/shaders`, montadas e
+  compiladas só na primeira partida) para que `src/shaders` continue igual ao
+  de `main`.
 - Enquanto o jogo roda, o nome, a bio e a cadeia de morphs da rolagem ficam
   desligados.
 
@@ -239,6 +243,53 @@ esperado. Valores de partida que ele usa:
 - Desfoque por profundidade bem mais fraco que o do herói, e o brilho de pontos
   menores que um pixel só é compensado pela metade. Sem isso, meteoritos e
   riscos distantes somem.
+
+### Valores finais no site (ajuste da Tarefa 12)
+
+Os valores acima do protótipo valem no site, com estes acréscimos e ajustes
+(constantes em `src/game/shaders/points.vert`, `src/game/gpu.js`,
+`src/game/shaders/simVelocity.frag` e `src/game/index.js`):
+
+- Partículas ativas: 70 000 (nível 3), 40 000 (nível 2), 24 995 (nível 1,
+  arredondado para riscos inteiros de 10 pontos).
+- Aparência por papel, como no protótipo: profundidade de campo 0,011; ponto
+  mínimo de 1,15 px CSS vezes a densidade de pixels da tela; alfa 0,8; a
+  intensidade do protótipo (espaço de exibição) vai para luz linear com
+  expoente 1,8 e é dividida pela opacidade base do herói (`uOpacity`, 0,52).
+  A compensação de pontos menores que o mínimo é a razão dos diâmetros (não
+  das áreas), aplicada antes da curva. Meteoritos surgem entre z −112 e −88;
+  riscos entre −112 e −85 (os dois valores são os do protótipo).
+- Sem bloom (nível 1), os pontos do jogo são 1,7× maiores e mais brilhantes
+  (no nível 2, com bloom 0,75, 1,175×). Medido na captura do `look` em t = 8 s:
+  pixels acesos 2,47% / 5,63% / 6,30% e quase brancos 0,20% / 0,20% / 0,21%
+  nos níveis 1, 2 e 3; o `look` falha acima de 0,5% de quase branco.
+- Velocidade máxima das partículas: 120 u/s enquanto o par de morph inclui o
+  jogo (a do herói é 10 u/s).
+- Nota: morph de 1,2 s com a aterrissagem firme do herói (`snap` = 1); o
+  clique para jogar de novo só vale 1,5 s depois do fim do morph (e nunca
+  antes de 1,7 s em SCORE). Medido no software (nível 1): no instante em que o
+  clique passa a valer, ~99% das partículas estão a menos de 0,15 do seu lugar
+  no texto (antes do ajuste: 0%, a 90 unidades, porque as do fundo do
+  corredor vinham a 10 u/s e levavam ~10 s).
+
+### Números da entrega
+
+- **Custo do herói:** os programas do herói são idênticos aos de `main`; os do
+  jogo são compilados só na primeira partida. `bench` (6 rodadas alternadas,
+  `#nivel1`, renderização por software): 81,55 ms contra 80,63 ms por quadro,
+  razão 1,011, veredito INCONCLUSIVE (saída 3) só porque a dispersão de `main`
+  (9,7%) passa da margem; a branch foi mais lenta em 4 de 6 pares.
+- **Bundle:** o *chunk* principal tem 600 205 B, +5,3 KB brutos / +1,7 KB gzip
+  sobre `main` (594 903 B), pela API de jogo do `ParticleField` e pelos
+  ganchos do `main.js` (+16 B da divisão em *chunk* sob demanda, mais 19 B do
+  ajuste final). O *chunk* do jogo, baixado só no primeiro clique na cabeça,
+  tem 30,3 KB (12,6 KB gzip; 28,6 KB / 12,1 KB antes do ajuste final, que
+  acrescentou constantes e comentários aos shaders).
+- **Primeira partida:** montar e compilar os três programas do jogo leva ~18 ms
+  de compilação por software (19 ms no nível 3); com o laço do site rodando
+  ao mesmo tempo, a espera do primeiro `start` foi de 217 ms (nível 1) e
+  573 ms (nível 3), porque os quadros por software são lentos.
+- **A taxa de quadros real só se mede no computador do Gabriel.**
 
 ## Verificação
 
