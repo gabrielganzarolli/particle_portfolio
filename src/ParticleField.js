@@ -3,6 +3,7 @@ import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRe
 
 import simplex from './shaders/lib/simplex3d.glsl?raw';
 import curl from './shaders/lib/curl.glsl?raw';
+import game from './shaders/lib/game.glsl?raw';
 import simVelocity from './shaders/simVelocity.frag?raw';
 import simPosition from './shaders/simPosition.frag?raw';
 import pointsVert from './shaders/points.vert?raw';
@@ -12,7 +13,8 @@ import { buildTarget, buildTargetInSlices, toDataTexture } from './textTargets.j
 import { createPaletteTexture } from './palette.js';
 
 // No #include preprocessor here — the noise library is just concatenated in.
-const VELOCITY_SHADER = `${simplex}\n${curl}\n${simVelocity}`;
+const VELOCITY_SHADER = `${simplex}\n${curl}\n${game}\n${simVelocity}`;
+const POSITION_SHADER = `${game}\n${simPosition}`;
 const POINTS_VERT = `${simplex}\n${pointsVert}`;
 
 // The damping term works out to c = -60*ln(damping) per second, so critical
@@ -56,6 +58,14 @@ const DEFAULTS = {
   dof: 0.33,
 };
 
+/**
+ * The game's virtual phrase. Its destinations are not a texture but are
+ * computed in the sim shaders from the game uniforms (src/shaders/lib/game.glsl).
+ */
+export const GAME_PHRASE = Object.freeze({ game: true });
+
+const SLOTS = 10;
+
 export class ParticleField {
   /**
    * @param {THREE.WebGLRenderer} renderer
@@ -84,6 +94,9 @@ export class ParticleField {
     this.indexA = 0;
     this.indexB = 0;
     this.headIndex = -1;
+    this.gameIndex = -1;
+    this.scoreIndex = -1;
+    this.gameBudget = null;
     this.#applyTargets();
   }
 
@@ -105,12 +118,24 @@ export class ParticleField {
 
   #target(i) {
     if (this.targets[i]) return this.targets[i];
+    if (this.phrases[i]?.game === true) {
+      this.targets[i] = this.#gameTarget();
+      this.bounds[i] = { halfW: 0, halfH: 0 };
+      return this.targets[i];
+    }
     const { positions, jitter, bounds } = buildTarget(this.phrases[i], {
       count: this.count,
       fieldWidth: this.fieldWidth,
     });
     this.#store(i, positions, jitter, bounds);
     return this.targets[i];
+  }
+
+  // The sim reads the game's destinations from its uniforms; the texture only
+  // fills the uTargetA/B slot on that end of the morph.
+  #gameTarget() {
+    if (!this.gameTexture) this.gameTexture = toDataTexture(new Float32Array(4), 1);
+    return this.gameTexture;
   }
 
   #store(i, positions, jitter, bounds) {
@@ -129,7 +154,8 @@ export class ParticleField {
   async buildRemaining() {
     const phrases = this.phrases;
     for (let i = 0; i < phrases.length; i++) {
-      if (this.targets[i]) continue;
+      // The game has no texture to build; the score is built by setPhrase.
+      if (this.targets[i] || phrases[i]?.game === true || i === this.scoreIndex) continue;
       const { positions, jitter, bounds } = await buildTargetInSlices(phrases[i], {
         count: this.count,
         fieldWidth: this.fieldWidth,
@@ -178,6 +204,7 @@ export class ParticleField {
     u.uTargetA.value = this.#target(index);
     u.uTargetB.value = this.pending.targets[index];
     u.uHeadA.value = u.uHeadB.value = index === this.headIndex ? 1 : 0;
+    u.uGameA.value = u.uGameB.value = 0;
     this.setMorph(0);
   }
 
@@ -238,7 +265,7 @@ export class ParticleField {
       v[i4 + 0] = v[i4 + 1] = v[i4 + 2] = v[i4 + 3] = 0;
     }
 
-    this.posVar = gpu.addVariable('texturePosition', simPosition, pos0);
+    this.posVar = gpu.addVariable('texturePosition', POSITION_SHADER, pos0);
     this.velVar = gpu.addVariable('textureVelocity', VELOCITY_SHADER, vel0);
 
     gpu.setVariableDependencies(this.posVar, [this.posVar, this.velVar]);
@@ -246,12 +273,32 @@ export class ParticleField {
 
     const t = this.reducedMotion ? 0.02 : DEFAULTS.turbulence;
 
-    this.posVar.material.uniforms.uDt = { value: 0 };
+    const uTime = { value: 0 };
+    const uMorph = { value: 0 };
+    // Game uniforms (src/shaders/lib/game.glsl). The same objects go into the
+    // velocity, position and points materials, so one write reaches all three.
+    this.gameUniforms = {
+      uGameLocal: { value: null },
+      uGameEnds: { value: new THREE.Vector4() },
+      uGameActive: { value: 0 },
+      uShip: { value: new Float32Array(4) },
+      uShipRot: { value: new Float32Array([1, 0]) },
+      uMeteor: { value: new Float32Array(SLOTS * 4) },
+      uMeteorRot: { value: new Float32Array(SLOTS * 2) },
+      uGameSpeed: { value: 0 },
+      uGameDist: { value: 0 },
+      uGameAlive: { value: 1 },
+      uDeadFor: { value: 0 },
+      uBurst: { value: 0 },
+      uGameTime: uTime,
+    };
+    const ends = { uMorph, uGameA: { value: 0 }, uGameB: { value: 0 } };
 
-    Object.assign(this.velVar.material.uniforms, {
-      uTime: { value: 0 },
+    Object.assign(this.posVar.material.uniforms, { uDt: { value: 0 } }, ends, this.gameUniforms);
+
+    Object.assign(this.velVar.material.uniforms, ends, this.gameUniforms, {
+      uTime,
       uDt: { value: 0 },
-      uMorph: { value: 0 },
       uTargetA: { value: null },
       uTargetB: { value: null },
       uMouse: { value: new THREE.Vector3(1e6, 1e6, 0) },
@@ -327,6 +374,7 @@ export class ParticleField {
         uColorSpread: { value: DEFAULTS.colorSpread },
         uFocus: { value: 10 },
         uDof: { value: this.reducedMotion ? 0 : DEFAULTS.dof },
+        ...this.gameUniforms,
       },
       vertexShader: POINTS_VERT,
       fragmentShader: pointsFrag,
@@ -348,6 +396,8 @@ export class ParticleField {
     u.uTargetB.value = this.#target(this.indexB);
     u.uHeadA.value = this.indexA === this.headIndex ? 1 : 0;
     u.uHeadB.value = this.indexB === this.headIndex ? 1 : 0;
+    u.uGameA.value = this.phrases[this.indexA]?.game === true ? 1 : 0;
+    u.uGameB.value = this.phrases[this.indexB]?.game === true ? 1 : 0;
   }
 
   /**
@@ -389,6 +439,7 @@ export class ParticleField {
     return this.morph >= 0.5 ? this.indexB : this.indexA;
   }
 
+  /** Sets the morph for the velocity and position passes (one shared uniform). */
   setMorph(t) {
     this.morph = t;
     this.velVar.material.uniforms.uMorph.value = t;
@@ -502,12 +553,13 @@ export class ParticleField {
    * view-projection to find each particle on the fluid, and the render pass
    * needs the distance to the phrase's plane to set the focus.
    */
-  setCamera(camera) {
+  setCamera(camera, focus) {
     this.velVar.material.uniforms.uViewProj.value.multiplyMatrices(
       camera.projectionMatrix,
       camera.matrixWorldInverse
     );
-    this.material.uniforms.uFocus.value = camera.position.length();
+    // The game's chase camera is not looking at the origin; it passes its own.
+    this.material.uniforms.uFocus.value = focus ?? camera.position.length();
   }
 
   /** 0..1, relative to the configured base opacity. */
@@ -524,9 +576,93 @@ export class ParticleField {
     vu.uTime.value = elapsed;
     if (this.fluid) vu.uFluid.value = this.fluid.texture;
 
+    const g = this.gameUniforms;
+    g.uDeadFor.value = g.uGameAlive.value > 0.5 ? 0 : g.uDeadFor.value + dt;
+
     this.gpu.compute();
     this.material.uniforms.uPositions.value =
       this.gpu.getCurrentRenderTarget(this.posVar).texture;
+    // The burst is a one-frame impulse.
+    g.uBurst.value = 0;
+  }
+
+  // ---------------------------------------------------------------- game
+
+  /**
+   * Mark which phrase indices are the game and its score. An index at or past
+   * the end of the set appends GAME_PHRASE (or a placeholder score) to it.
+   */
+  setGame(gameIndex, scoreIndex) {
+    const extend = (i, phrase) => {
+      if (i < this.phrases.length) return;
+      this.phrases[i] = phrase;
+      this.targets[i] = null;
+      this.bounds[i] = null;
+    };
+    extend(gameIndex, GAME_PHRASE);
+    extend(scoreIndex, '0,0 s');
+    this.gameIndex = gameIndex;
+    this.scoreIndex = scoreIndex;
+    this.#applyTargets();
+  }
+
+  /**
+   * The game's particle budget (src/game/budget.js) and each particle's local
+   * offset and base brightness (src/game/shapes.js, size×size RGBA).
+   */
+  setGameBudget(budget, local) {
+    this.gameBudget = budget;
+    const g = this.gameUniforms;
+    g.uGameLocal.value?.dispose();
+    g.uGameLocal.value = toDataTexture(local, this.size);
+    g.uGameEnds.value.set(budget.flame, budget.shipEnd, budget.ringEnd, budget.meteorEnd);
+    g.uGameActive.value = budget.active;
+  }
+
+  /** This frame's world, as gameUniforms() in src/game/world.js returns it. */
+  setGameState(u) {
+    const g = this.gameUniforms;
+    g.uShip.value.set(u.ship);
+    g.uShipRot.value.set(u.shipRot);
+    g.uMeteor.value.set(u.meteors);
+    g.uMeteorRot.value.set(u.meteorRot);
+    g.uGameSpeed.value = u.speed;
+    g.uGameDist.value = u.distance;
+    g.uGameAlive.value = u.alive;
+  }
+
+  /** Kick the ship, flame and ring outward on the next frame. */
+  pulseBurst() {
+    this.gameUniforms.uBurst.value = 1;
+  }
+
+  /**
+   * Replace phrase `index` with `text`, sampled in slices between frames. The
+   * old destinations stay in use until the new ones are ready.
+   */
+  async setPhrase(index, text) {
+    const token = {};
+    (this.phraseJobs ??= new Map()).set(index, token);
+    const { positions, jitter, bounds } = await buildTargetInSlices(text, {
+      count: this.count,
+      fieldWidth: this.fieldWidth,
+    });
+    // A newer call for the same index won; this result is stale.
+    if (this.phraseJobs.get(index) !== token) return;
+    this.phraseJobs.delete(index);
+    const old = this.targets[index];
+    this.phrases[index] = text;
+    this.#store(index, positions, jitter, bounds);
+    old?.dispose();
+    this.#applyTargets();
+  }
+
+  /** The current particle positions (xyzw per particle). For checks only. */
+  readPositions() {
+    const out = new Float32Array(this.count * 4);
+    const rt = this.gpu.getCurrentRenderTarget(this.posVar);
+    this.renderer.readRenderTargetPixels(rt, 0, 0, this.size, this.size, out);
+    return out;
   }
 
   dispose() {
@@ -535,6 +671,8 @@ export class ParticleField {
     this.occluder?.geometry.dispose();
     this.material.dispose();
     for (const t of this.targets) t?.dispose();
+    this.gameUniforms.uGameLocal.value?.dispose();
+    this.gameTexture?.dispose();
     this.palette.dispose();
   }
 }
