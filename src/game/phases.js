@@ -17,12 +17,9 @@ export const SCORE_RESTART_S = 1.7;
 export const EXIT_S = 1.5;
 
 export function createPhases() {
-  let scoreFormed = false;
-
   const go = (s, next) => {
     s.phase = next;
     s.t = 0;
-    scoreFormed = false;
   };
 
   return {
@@ -50,14 +47,6 @@ export function createPhases() {
       const p = this.phase;
       if (p === PHASE.ENTER || p === PHASE.PLAY || p === PHASE.DYING || p === PHASE.SCORE) {
         go(this, PHASE.EXIT);
-      }
-    },
-
-    // The score particles finished forming: start the restart clock from now.
-    markScoreFormed() {
-      if (this.phase === PHASE.SCORE && !scoreFormed) {
-        scoreFormed = true;
-        this.t = 0;
       }
     },
 

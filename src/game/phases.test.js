@@ -176,17 +176,13 @@ test('tick in IDLE and SCORE only advances t, never changes phase', () => {
   assert.equal(s.phase, PHASE.SCORE);
 });
 
-test('markScoreFormed restarts the restart clock once, only in SCORE', () => {
+test('canRestart is monotonic within SCORE', () => {
   const p = at(PHASE.SCORE);
-  p.tick(1);
-  p.markScoreFormed();
-  assert.equal(p.t, 0);
-  p.tick(1);
-  p.markScoreFormed();
-  assert.equal(p.t, 1);
-  assert.equal(p.canRestart(), false);
-  const q = at(PHASE.PLAY);
-  q.tick(1);
-  q.markScoreFormed();
-  assert.equal(q.t, 1);
+  p.tick(SCORE_RESTART_S);
+  assert.equal(p.canRestart(), true);
+  for (let i = 0; i < 20; i++) {
+    p.tick(0.5);
+    assert.equal(p.canRestart(), true);
+  }
+  assert.equal(p.phase, PHASE.SCORE);
 });
