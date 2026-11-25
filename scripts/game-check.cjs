@@ -1,6 +1,7 @@
 // Browser checks for the game inside the particle field.
 //
 //   node scripts/game-check.cjs positions
+//   node scripts/game-check.cjs look       (captures in shots/look-nivelN.png)
 //
 // Needs the dev server (`npm run dev -- --port 5199`) and the globally
 // installed Playwright. The site's own animation loop is stopped and the check
@@ -161,7 +162,122 @@ async function positions() {
   return failed;
 }
 
-const checks = { positions };
+// Runs in the page. Puts the field on the game with the game's look and the
+// chase camera, with the world at t = 8 s, renders one frame through the
+// site's post chain and measures the share of non-dark pixels on the canvas.
+async function lookInPage() {
+  const { field, renderer, camera, post, dust, state } = window.__pf;
+  renderer.setAnimationLoop(null);
+
+  const { gameBudget } = await import('/src/game/budget.js');
+  const { buildGameLocal } = await import('/src/game/shapes.js');
+  const { createWorld, stepWorld, gameUniforms } = await import('/src/game/world.js');
+  const { gameCamera } = await import('/src/game/camera.js');
+  const { createRng } = await import('/src/game/rng.js');
+  const { LEVELS } = await import('/src/quality.js');
+
+  const level = state().level;
+  const budget = gameBudget(level);
+  const local = buildGameLocal(budget, field.size, createRng(7));
+  const world = createWorld(createRng(11));
+
+  const g = field.phrases.length;
+  field.setGame(g, g + 1);
+  field.setGameBudget(budget, local);
+  field.setPair(0, g);
+  field.setMorph(1);
+  field.setGameLook(1);
+  // What the game controller does on entering (hooks.onEnter).
+  dust.visible = false;
+  field.setHeadSolid(0);
+  field.setDim(0);
+  field.setSnap(0);
+  field.setRepelScale(0);
+  post.setBloomScale(LEVELS[level].bloom);
+
+  const placeCamera = () => {
+    const c = gameCamera(world.ship, world.speed);
+    camera.fov = c.fov;
+    camera.position.set(c.px, c.py, c.pz);
+    camera.lookAt(c.tx, c.ty, c.tz);
+    camera.updateProjectionMatrix();
+    field.setPixelScale(renderer.domElement.height / (2 * Math.tan((c.fov * Math.PI) / 360)));
+    camera.updateMatrixWorld();
+    const s = world.ship;
+    field.setCamera(camera, Math.hypot(c.px - s.x, c.py - s.y, c.pz));
+  };
+
+  const DT = 1 / 60;
+  // The world alone up to 1.5 s before the capture, then world and field
+  // together, long enough for every spring to settle.
+  while (world.t < 6.5) stepWorld(world, DT, { x: 0, y: 0 }, { collide: false });
+  let elapsed = 0;
+  while (world.t < 8) {
+    stepWorld(world, DT, { x: 0, y: 0 }, { collide: false });
+    field.setGameState(gameUniforms(world));
+    placeCamera();
+    elapsed += DT;
+    field.update(DT, elapsed);
+  }
+  post.render(DT, elapsed);
+
+  // Read the canvas in the same task as the render, before it is presented.
+  const src = renderer.domElement;
+  const c2 = document.createElement('canvas');
+  c2.width = src.width;
+  c2.height = src.height;
+  const ctx = c2.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(src, 0, 0);
+  const px = ctx.getImageData(0, 0, c2.width, c2.height).data;
+  let lit = 0, white = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const m = Math.max(px[i], px[i + 1], px[i + 2]);
+    if (m > 48) lit++;
+    if (px[i] > 240 && px[i + 1] > 240 && px[i + 2] > 240) white++;
+  }
+  const total = px.length / 4;
+  return {
+    level,
+    active: budget.active,
+    t: world.t,
+    lit: lit / total,
+    white: white / total,
+    png: c2.toDataURL('image/png'),
+  };
+}
+
+async function look() {
+  const fs = require('fs');
+  const path = require('path');
+  let failed = false;
+  for (const level of [1, 2, 3]) {
+    const { browser, page, errors } = await openSite(`#nivel${level}`);
+    try {
+      const r = await page.evaluate(lookInPage);
+      const file = path.join('shots', `look-nivel${level}.png`);
+      fs.mkdirSync('shots', { recursive: true });
+      fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
+      const pct = (v) => `${(v * 100).toFixed(2)}%`;
+      const ok = r.level === level && r.lit >= 0.002 && r.lit <= 0.12;
+      console.log(
+        `${ok ? 'PASS' : 'FAIL'} level ${r.level}: ${r.active} active, t ${r.t.toFixed(2)} s, ` +
+          `non-dark ${pct(r.lit)} (within [0.20%, 12%]), white ${pct(r.white)}, ${file}`
+      );
+      if (!ok) failed = true;
+    } catch (err) {
+      console.log(`FAIL level ${level}: ${err.message.split('\n')[0]}`);
+      failed = true;
+    }
+    if (errors.length) {
+      console.log(`FAIL level ${level} console errors:\n  ${errors.join('\n  ')}`);
+      failed = true;
+    }
+    await browser.close();
+  }
+  return failed;
+}
+
+const checks = { positions, look };
 
 (async () => {
   const run = checks[mode];

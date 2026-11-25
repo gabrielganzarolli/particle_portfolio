@@ -15,7 +15,7 @@ import { createPaletteTexture } from './palette.js';
 // No #include preprocessor here — the noise library is just concatenated in.
 const VELOCITY_SHADER = `${simplex}\n${curl}\n${game}\n${simVelocity}`;
 const POSITION_SHADER = `${game}\n${simPosition}`;
-const POINTS_VERT = `${simplex}\n${pointsVert}`;
+const POINTS_VERT = `${simplex}\n${game}\n${pointsVert}`;
 
 // The damping term works out to c = -60*ln(damping) per second, so critical
 // damping sits at spring = (c/2)^2 — about 8.0 at 0.91. Sitting just above it
@@ -374,6 +374,7 @@ export class ParticleField {
         uColorSpread: { value: DEFAULTS.colorSpread },
         uFocus: { value: 10 },
         uDof: { value: this.reducedMotion ? 0 : DEFAULTS.dof },
+        uGame: { value: 0 },
         ...this.gameUniforms,
       },
       vertexShader: POINTS_VERT,
@@ -629,6 +630,15 @@ export class ParticleField {
     g.uGameSpeed.value = u.speed;
     g.uGameDist.value = u.distance;
     g.uGameAlive.value = u.alive;
+  }
+
+  /**
+   * 0..1: how far the points take the game's look (per-role size and
+   * brightness, white, weak depth of field, parked particles hidden) rather
+   * than the hero's. At 0 the game's vertex code does not run at all.
+   */
+  setGameLook(amount) {
+    this.material.uniforms.uGame.value = Math.min(1, Math.max(0, amount));
   }
 
   /** Kick the ship, flame and ring outward on the next frame. */
