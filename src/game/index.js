@@ -16,9 +16,15 @@ import { formatTime } from './text.js';
 import { createRng } from './rng.js';
 import { buildGamePrograms } from './gpu.js';
 
-// Seconds for the score text to form once its pair is set. Shorter than
-// SCORE_RESTART_S, so the text has landed before a click can restart.
+// Seconds of the score morph once its pair is set, then seconds the click
+// waits after it for the text to settle. The morph's end is not the text's:
+// its particles come from all along the corridor (down to z = -112) and the
+// last of them let go of the game only as the morph ends. With the game's
+// speed cap and the stiff landing (snap) they arrive about 1.2 s later
+// (measured: 95% within 0.15 of their destinations); the hold has a margin.
+// scripts/game-check.cjs flow part 3 measures it at the moment the click opens.
 const SCORE_FORM_S = 1.2;
+const SCORE_SETTLE_S = 1.5;
 
 // Quality probe: PLAY frame times, the first few ignored (shader warm-up).
 const PROBE_SKIP = 30;
@@ -67,10 +73,12 @@ export function createGame(ctx) {
   let starting = false; // start() is waiting for the game's programs
   let runEnded = false;
   let scorePhrase = null; // promise from field.setPhrase(SCORE, ...)
-  // True once the player has seen the score: its morph reached 1 (or the text
-  // failed to build, so there is nothing to wait for). Gates the restart click
-  // together with phases.canRestart(), which only knows about time in SCORE.
+  // True once the player has seen the score: SCORE_SETTLE_S after its morph
+  // reached 1 (or at once if the text failed to build, so there is nothing to
+  // wait for). Gates the restart click together with phases.canRestart(),
+  // which only knows about time in SCORE.
   let scoreFormed = false;
+  let settle = -1; // seconds since the score morph ended; -1 when not settling
   let probe = { frames: 0, samples: 0, slow: 0, last: null };
 
   // A 0 -> 1 ramp of the field's morph, eased on the way to the shader.
@@ -119,11 +127,13 @@ export function createGame(ctx) {
     runEnded = false;
     scorePhrase = null;
     scoreFormed = false;
+    settle = -1;
     probe = { frames: 0, samples: 0, slow: 0, last: null };
     installShapes();
     world = createWorld(createRng(newSeed()));
     steer.tx = steer.ty = 0;
     field.setGameState(gameUniforms(world));
+    field.setSnap(0);
     field.setPair(from, GAME);
     startMorph(ENTER_S);
   }
@@ -174,8 +184,11 @@ export function createGame(ctx) {
       return;
     }
     field.setPair(GAME, SCORE);
+    // The hero's landing: a stiffer, near-critically damped spring as the
+    // morph ends (beginRun and requestExit set it back to 0).
+    field.setSnap(1);
     startMorph(SCORE_FORM_S, () => {
-      if (mine === run) scoreFormed = true;
+      if (mine === run) settle = 0;
     });
   }
 
@@ -288,6 +301,11 @@ export function createGame(ctx) {
 
       stepWorldFrame(dt);
       if (phases.phase === PHASE.PLAY) onPlay(now);
+      // Counted from the frame after the score morph ended.
+      if (settle >= 0 && (settle += dt) >= SCORE_SETTLE_S) {
+        settle = -1;
+        scoreFormed = true;
+      }
       stepMorph(dt);
       placeCamera(dt);
     },
@@ -298,6 +316,8 @@ export function createGame(ctx) {
       phases.exit();
       if (phases.phase !== PHASE.EXIT || before === PHASE.EXIT) return;
       run++; // drops a pending score pairing
+      settle = -1;
+      field.setSnap(0); // the exit lands as it does from play
       endRun();
       field.setPair(field.currentIndex, REST);
       startMorph(EXIT_S);

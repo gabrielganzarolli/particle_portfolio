@@ -52,6 +52,9 @@ uniform float uGameA;
 uniform float uGameB;
 
 #define PI 3.14159265359
+// The game's speed cap (the hero's is uMaxSpeed, 10 u/s): streaks fly past
+// at the world's speed and a respawned meteor jumps a long way.
+#define GAME_MAX_SPEED 120.0
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -142,10 +145,13 @@ void main() {
     vel += force * (uDt * hw);
   }
 
-  float maxSpeed = uMaxSpeed;
+  // The game's speed cap holds for as long as the pair includes the game, not
+  // only while this particle still follows it: the score text gathers its
+  // particles from all along the corridor (z down to -112), and at the hero's
+  // cap they would take ten seconds to arrive after the morph has ended.
+  float maxSpeed = uGameA + uGameB > 0.5 ? GAME_MAX_SPEED : uMaxSpeed;
   if (gw > 0.0) {
     vel += gameForce * (uDt * gw);
-    maxSpeed = 120.0;
 
     // The ship blows apart: one outward kick for the ship, flame and ring.
     if (uBurst > 0.5 && gg.role <= ROLE_RING) {

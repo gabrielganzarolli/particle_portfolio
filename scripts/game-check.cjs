@@ -7,6 +7,8 @@
 //                                           part 3: edge cases, captures in
 //                                           shots/flow-*.png)
 //
+//   (flow1, flow2, flow3 run one part alone)
+//
 //   node scripts/game-check.cjs heroPrograms (the hero's programs carry no
 //                                           game code at load or after a game)
 //   node scripts/game-check.cjs bench     (hero frame time vs main; exit 0 pass,
@@ -386,10 +388,17 @@ async function flowInPage() {
   frame();
   note(game.phase === 'score', `early click in score -> ${game.phase} (ignored)`);
 
+  // SCORE_RESTART_S has passed but the text is still settling: ignored too.
   await run(() => false, Math.ceil(1.75 / DT));
+  const formedEarly = game.debug.scoreFormed;
   click();
   frame();
-  note(game.phase === 'enter', `click after 1.7 s in score -> ${game.phase}`);
+  note(game.phase === 'score' && !formedEarly, `click 1.75 s into score, text still settling (scoreFormed ${formedEarly}) -> ${game.phase} (ignored)`);
+
+  await run(() => game.debug.scoreFormed, 400);
+  click();
+  frame();
+  note(game.phase === 'enter', `click once the score text settled -> ${game.phase}`);
   note(field.indexA === SCORE && field.indexB === GAME, `restart pair ${field.indexA} -> ${field.indexB}`);
   note(game.debug.world.alive && game.debug.world.t < 0.1, `fresh world (t ${game.debug.world.t.toFixed(3)})`);
 
@@ -478,7 +487,7 @@ async function flowInPage() {
     note(gated.phase === 'score' && field.indexB !== SCORE,
       `slow score text: click ${restartAfter} frames into score -> ${gated.phase} (ignored), pair ${field.indexA} -> ${field.indexB}`);
     release();
-    await gRun(() => field.indexB === SCORE && field.morph === 1, 400);
+    await gRun(() => gated.debug.scoreFormed, 400);
     note(field.indexB === SCORE && field.morph === 1 && gated.debug.scoreFormed, `slow score text formed: pair ${field.indexA} -> ${field.indexB}, morph ${field.morph}, scoreFormed ${gated.debug.scoreFormed}, phase ${gated.phase}`);
     click();
     gFrame();
@@ -721,13 +730,37 @@ async function flowPart2() {
 // Part 3 helpers. Wraps the live game's update (main.js looks it up every
 // frame) to count frames, time spent in the current phase, the camera at the
 // last EXIT frame, and to keep meteors off the ship while `safe`, so a run
-// only ends through debug.kill().
+// only ends through debug.kill(). Also wraps field.update to measure, on the
+// first frame drawn with debug.scoreFormed true, how many particles sit on
+// their score text destinations (window.__g.formedAt, one entry per score).
 function instrumentGame(page) {
   return page.evaluate(() => {
     const g = window.__pf.game;
     if (g.__checked) return;
-    const { camera } = window.__pf;
-    const log = (window.__g = { frames: 0, phase: g.phase, phaseT: 0, safe: true, exitZ: null, exitFov: null });
+    const { camera, field } = window.__pf;
+    const log = (window.__g = { frames: 0, phase: g.phase, phaseT: 0, safe: true, exitZ: null, exitFov: null, formedAt: [], measured: false });
+    const fieldUpdate = field.update;
+    field.update = function (dt, elapsed) {
+      fieldUpdate.call(field, dt, elapsed);
+      if (g.phase !== 'score') {
+        log.measured = false;
+        return;
+      }
+      if (log.measured || !g.debug.scoreFormed || field.indexB !== field.scoreIndex) return;
+      log.measured = true;
+      const pos = field.readPositions();
+      const tgt = field.targets[field.scoreIndex].image.data;
+      const active = field.gameUniforms.uGameActive.value;
+      let inActive = 0, inAll = 0;
+      for (let i = 0; i < field.count; i++) {
+        const d = Math.hypot(pos[4 * i] - tgt[4 * i], pos[4 * i + 1] - tgt[4 * i + 1], pos[4 * i + 2] - tgt[4 * i + 2]);
+        if (d < 0.15) {
+          inAll++;
+          if (i < active) inActive++;
+        }
+      }
+      log.formedAt.push({ active: inActive / active, all: inAll / field.count, phaseT: log.phaseT, morph: field.morph });
+    };
     const update = g.update;
     g.update = function (dt, now) {
       const w = g.debug.world;
@@ -911,6 +944,7 @@ async function flowPart3() {
 
       // Two clicks right after the explosion; neither restarts.
       if (!(await startFromName(`${L} c`))) throw new Error('no play');
+      await page.evaluate(() => (window.__g.formedAt.length = 0));
       await killAndWait('dying');
       if (c === 1) await shot('dying');
       await clickCentre();
@@ -921,12 +955,23 @@ async function flowPart3() {
         .then(() => true, () => false);
       const pf = await phase();
       report(pd === 'dying' && formed && pf === 'score', `${L} c: two clicks in dying -> ${pd}; score formed ${formed}, phase ${pf} (no restart)`);
+      // The click gate opens only once the time is readable: on the first frame
+      // drawn with scoreFormed, 95% of the particles are on their text
+      // destinations (within 0.15 world units).
+      {
+        const m = await page
+          .waitForFunction(() => window.__g.formedAt[0], null, WAIT)
+          .then((h) => h.jsonValue(), () => null);
+        const pct = (v) => `${(v * 100).toFixed(1)}%`;
+        report(m && m.active >= 0.95 && m.all >= 0.95,
+          `${L} c: score text formed when the click opens: ${m ? `${pct(m.active)} of active, ${pct(m.all)} of all particles within 0.15 of their targets, ${m.phaseT.toFixed(2)} s into score, morph ${m.morph}` : 'not measured'} (>= 95%)`);
+      }
 
       // Two clicks in the same frame once the score formed: one restart.
       await page.waitForFunction(() => window.__g.phase === 'score' && window.__g.phaseT >= 1.75, null, { ...WAIT, polling: 'raf' });
       if (c === 1) {
-        // The capture waits for the particles to land; the click gate (above
-        // and below) only knows the morph reached 1.
+        // The capture of the score, its text landed (the click gate waits
+        // for that too: see the check right after (c)).
         await page.waitForFunction(() => window.__g.phaseT >= 3.5, null, { ...WAIT, polling: 'raf' });
         await shot('score');
       }
@@ -1320,7 +1365,7 @@ async function heroPrograms() {
   return failed;
 }
 
-const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench, heroPrograms };
+const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench, heroPrograms };
 
 (async () => {
   const run = checks[mode];
