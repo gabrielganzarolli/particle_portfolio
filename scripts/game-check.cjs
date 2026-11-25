@@ -1018,7 +1018,8 @@ async function flow() {
   const failed1 = await flowPart1();
   const failed2 = await flowPart2();
   const failed3 = await flowPart3();
-  return failed1 || failed2 || failed3;
+  const failed4 = await probeCheck();
+  return failed1 || failed2 || failed3 || failed4;
 }
 
 async function flowPart1() {
@@ -1047,7 +1048,129 @@ async function flowPart1() {
   return failed;
 }
 
-const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3 };
+// The frame probe is switched off while a game runs; after the game it must be
+// back on (when the level is above 1), or the quality could never drop again.
+// SwiftShader is always level 1, so the check poses as a discrete GPU.
+async function probeCheck() {
+  let failed = false;
+  const report = (ok, text) => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${text}`);
+    if (!ok) failed = true;
+  };
+  // Two cores make it level 2, the cheapest level above software rendering.
+  const { browser, page, errors } = await openSite('#jogo', { viewport: { width: 800, height: 450 } }, (pg) =>
+    pg.addInitScript(() => {
+      Object.defineProperty(navigator, 'hardwareConcurrency', { value: 2 });
+      for (const C of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) {
+        if (!C) continue;
+        const real = C.prototype.getParameter;
+        C.prototype.getParameter = function (p) {
+          return p === 0x9246 ? 'NVIDIA GeForce RTX (probe check)' : real.call(this, p);
+        };
+      }
+    })
+  );
+  try {
+    const wait = (fn, arg) => page.waitForFunction(fn, arg, WAIT).then(() => true, () => false);
+    const level = await page.evaluate(() => window.__pf.state().level);
+    report(level > 1, `(probe) posing as a discrete GPU: level ${level} (above 1)`);
+    const played = await wait(() => window.__pf.game?.phase === 'play');
+    report(played, '(probe) #jogo -> play');
+    const during = await page.evaluate(() => window.__pf.state().probing);
+    report(during === false, `(probe) probing during the game ${during} (false)`);
+    await page.keyboard.press('Escape');
+    const idle = await wait(() => window.__pf.game.phase === 'idle');
+    const after = await page.evaluate(() => window.__pf.state());
+    report(idle && after.probing === after.level > 1,
+      `(probe) after the exit: probing ${after.probing} at level ${after.level} (on when level > 1)`);
+  } catch (err) {
+    report(false, err.message.split('\n')[0]);
+  }
+  if (errors.length) report(false, `(probe) console errors:\n  ${errors.join('\n  ')}`);
+  await browser.close();
+  return failed;
+}
+
+// Hero cost: the average frame time of the live hero at #nivel1 (3 s warm-up,
+// 10 s measured) on this branch and on main, alternating the builds. Software
+// rendering is noisy, so the verdict compares medians and reports the spread.
+//   MAIN_BASE (default http://localhost:5198) serves a `git worktree` of main.
+//   BENCH_RUNS (default 4) runs per build.
+async function benchRun(base) {
+  const browser = await chromium.launch({ args: LAUNCH_ARGS });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.goto(`${base}/#nivel1`);
+  await page.waitForFunction(() => window.__pf && window.__pf.state().frames > 2, null, { timeout: 300000, polling: 500 });
+  await page.waitForTimeout(3000);
+  const r = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const f0 = window.__pf.state().frames;
+        const t0 = performance.now();
+        setTimeout(() => {
+          const f1 = window.__pf.state().frames;
+          resolve({ frames: f1 - f0, ms: performance.now() - t0 });
+        }, 10000);
+      })
+  );
+  await browser.close();
+  return r.ms / r.frames;
+}
+
+const median = (a) => {
+  const s = [...a].sort((x, y) => x - y);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+// The game's particle budget per level: 25000, 40000, 70000 active. The count is
+// rounded down to whole streaks (10 points each), so it may sit up to 9 below
+// the table (budget.test.js allows the same).
+async function budgetCheck() {
+  let failed = false;
+  const want = { 1: 25000, 2: 40000, 3: 70000 };
+  for (const lvl of [1, 2, 3]) {
+    const { browser, page } = await openSite(`#nivel${lvl}-jogo`);
+    const got = await page
+      .waitForFunction(() => window.__pf.field.gameBudget?.active ?? false, null, WAIT)
+      .then((h) => h.jsonValue(), () => null);
+    const ok = got !== null && got <= want[lvl] && want[lvl] - got <= 9;
+    console.log(`${ok ? 'PASS' : 'FAIL'} level ${lvl}: game budget active ${got} (${want[lvl]}, up to 9 below)`);
+    if (!ok) failed = true;
+    await browser.close();
+  }
+  return failed;
+}
+
+async function bench() {
+  const runs = +(process.env.BENCH_RUNS || 4);
+  const mainBase = process.env.MAIN_BASE || 'http://localhost:5198';
+  const branch = [];
+  const main = [];
+  for (let i = 0; i < runs; i++) {
+    branch.push(await benchRun(BASE));
+    main.push(await benchRun(mainBase));
+    console.log(`run ${i + 1}: branch ${branch[i].toFixed(1)} ms/frame, main ${main[i].toFixed(1)} ms/frame`);
+  }
+  const mb = median(branch);
+  const mm = median(main);
+  const ratio = mb / mm;
+  const spread = (a) => (Math.max(...a) - Math.min(...a)) / median(a);
+  console.log(`branch median ${mb.toFixed(2)} ms  runs ${branch.map((v) => v.toFixed(1)).join(', ')}  spread ${(spread(branch) * 100).toFixed(1)}%`);
+  console.log(`main   median ${mm.toFixed(2)} ms  runs ${main.map((v) => v.toFixed(1)).join(', ')}  spread ${(spread(main) * 100).toFixed(1)}%`);
+  console.log(`ratio branch/main ${ratio.toFixed(3)} (criterion <= 1.10)`);
+  const noise = Math.max(spread(branch), spread(main));
+  let failed = false;
+  if (ratio <= 1.1) console.log('PASS hero cost within +10%');
+  else if (Math.abs(ratio - 1) < noise) console.log(`INCONCLUSIVE ratio ${ratio.toFixed(3)} is inside the run-to-run spread ${(noise * 100).toFixed(1)}%`);
+  else {
+    console.log('FAIL hero cost above +10%');
+    failed = true;
+  }
+  return failed || (await budgetCheck());
+}
+
+const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench };
 
 (async () => {
   const run = checks[mode];

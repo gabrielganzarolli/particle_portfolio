@@ -476,6 +476,7 @@ async function boot() {
     document.body.style.cursor = '';
     cursorHint = false;
     dust.visible = false;
+    probingBefore = probing;
     probing = false;
     field.setHeadSolid(0);
     field.setDim(0);
@@ -488,6 +489,10 @@ async function boot() {
     document.documentElement.classList.remove('game-on');
     if (langToggle) langToggle.disabled = false;
     dust.visible = true;
+    // The probe gets back what the game took, unless a stepDown already
+    // reached level 1. Samples taken before the game do not count.
+    probing = probingBefore && level > 1;
+    probe.length = 0;
     camera.fov = FOV;
     camera.updateProjectionMatrix();
     applyPixelScale();
@@ -589,6 +594,7 @@ async function boot() {
   // Frame probe: steps the quality level down if frames run long ----------
   const probe = [];
   let probing = level > 1 && !/nivel/.test(location.hash);
+  let probingBefore = probing; // whether the probe was on when a game entered
 
   function stepDown() {
     level -= 1;
@@ -925,6 +931,7 @@ async function boot() {
       pair: `${label(pairA)} -> ${label(pairB)}`,
       phrase: label(field.currentIndex),
       headOn,
+      probing,
       scrollY: window.scrollY,
     });
 
