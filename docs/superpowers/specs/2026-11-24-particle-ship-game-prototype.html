@@ -1,0 +1,515 @@
+<title>Protótipo da nave</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;800&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: uma tela cheia de partículas; interface mínima nas bordas, só para o protótipo. */
+:root {
+  --bg: #07060c;
+  --fg: #eef1f8;
+  --dim: #9a9fb2;
+  --line: rgba(238, 241, 248, 0.2);
+  --panel: rgba(7, 6, 12, 0.72);
+  --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 13px/1.45 var(--display); overflow: hidden; touch-action: none; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(7, 6, 12, 0.85) 100%); }
+.hud { position: fixed; z-index: 5; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--dim); }
+.top { top: calc(12px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.group span { text-transform: uppercase; letter-spacing: 0.1em; margin-right: 4px; }
+button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+button:hover { border-color: var(--fg); }
+button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+#exit { width: 32px; height: 32px; padding: 0; font-size: 16px; line-height: 1; }
+.bottom { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+#cap { font-family: var(--display); font-size: 14px; color: var(--fg); max-width: 46ch; text-wrap: balance; }
+.note { max-width: 44ch; text-align: right; }
+@media (max-width: 560px) { .note { text-align: left; } }
+</style>
+
+<canvas id="c" aria-label="Protótipo do jogo da nave feito de partículas"></canvas>
+<div class="vig"></div>
+
+<div class="hud top">
+  <div class="group" role="group" aria-label="Quantidade de partículas">
+    <span>Partículas</span>
+    <button type="button" data-n="40000" aria-pressed="false" id="q1">40 mil</button>
+    <button type="button" data-n="70000" aria-pressed="true" id="q2">70 mil</button>
+    <button type="button" data-n="110000" aria-pressed="false" id="q3">110 mil</button>
+    <span id="fps" style="margin-left:8px"></span>
+  </div>
+  <button type="button" id="exit" aria-label="Voltar ao nome" title="Voltar ao nome (Esc)">×</button>
+</div>
+
+<div class="hud bottom">
+  <div id="cap">Clique no nome para jogar.</div>
+  <div class="note">Protótipo descartável, feito em CPU só para mostrar o visual. Pula a etapa da cabeça. O código final roda na GPU, como o campo de partículas do site.</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('c');
+  const capEl = document.getElementById('cap');
+  const fpsEl = document.getElementById('fps');
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+  if (!gl) { capEl.textContent = 'Este navegador não oferece WebGL.'; return; }
+
+  const rnd = Math.random;
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+  // ---------- ruído de valor, para meteoritos irregulares ----------
+  function hash3(x, y, z) {
+    let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483629);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  }
+  function noise3(x, y, z) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    const xf = x - xi, yf = y - yi, zf = z - zi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+    const l = (a, b, t) => a + (b - a) * t;
+    return l(
+      l(l(hash3(xi, yi, zi), hash3(xi + 1, yi, zi), u), l(hash3(xi, yi + 1, zi), hash3(xi + 1, yi + 1, zi), u), v),
+      l(l(hash3(xi, yi, zi + 1), hash3(xi + 1, yi, zi + 1), u), l(hash3(xi, yi + 1, zi + 1), hash3(xi + 1, yi + 1, zi + 1), u), v),
+      w
+    );
+  }
+  function gauss() { return (rnd() + rnd() + rnd() + rnd() - 2) * 1.7; }
+
+  // ---------- shaders ----------
+  const VS = `
+  attribute vec3 aPos; attribute float aB; attribute float aSz; attribute float aTone;
+  uniform vec3 uCam; uniform vec3 uR0; uniform vec3 uR1; uniform vec3 uR2;
+  uniform float uF; uniform float uAspect; uniform float uPx; uniform float uMin;
+  uniform float uFocus; uniform float uMul; uniform float uAlpha; uniform float uSizeK;
+  varying vec3 vCol; varying float vA;
+  void main() {
+    vec3 d = aPos - uCam;
+    vec3 v = vec3(dot(d, uR0), dot(d, uR1), dot(d, uR2));
+    float depth = -v.z;
+    if (depth < 0.15 || aB <= 0.001) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vA = 0.0; vCol = vec3(0.0); return; }
+    float defocus = abs(depth - uFocus) * 0.012;
+    float grow = 1.0 + min(defocus, 1.6);
+    float truePx = aSz * uSizeK * uPx / depth * grow * uMul;
+    float px = max(truePx, uMin);
+    float comp = truePx / px;
+    gl_PointSize = px;
+    gl_Position = vec4(v.x * uF / uAspect, v.y * uF, 0.0, depth);
+    vA = aB * uAlpha * comp / (grow * grow);
+    vCol = mix(vec3(0.92, 0.95, 1.0), vec3(1.0, 0.95, 0.88), aTone);
+  }`;
+  const FS = `
+  precision mediump float;
+  varying vec3 vCol; varying float vA;
+  void main() {
+    float r = length(gl_PointCoord - 0.5) * 2.0;
+    if (r > 1.0) discard;
+    float a = 1.0 - r; a = a * a * (3.0 - 2.0 * a);
+    gl_FragColor = vec4(vCol * vA * a, 1.0);
+  }`;
+  function sh(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const loc = (n) => gl.getUniformLocation(prog, n);
+  const U = {};
+  ['uCam', 'uR0', 'uR1', 'uR2', 'uF', 'uAspect', 'uPx', 'uMin', 'uFocus', 'uMul', 'uAlpha', 'uSizeK'].forEach((n) => (U[n] = loc(n)));
+  const AL = { aPos: gl.getAttribLocation(prog, 'aPos'), aB: gl.getAttribLocation(prog, 'aB'), aSz: gl.getAttribLocation(prog, 'aSz'), aTone: gl.getAttribLocation(prog, 'aTone') };
+
+  // ---------- estado ----------
+  const MODE_NAME = 0, MODE_GAME = 1, MODE_SCORE = 2;
+  const ROLE_HULL = 0, ROLE_FLAME = 1, ROLE_RING = 2, ROLE_MET = 3, ROLE_STR = 4;
+  const SLOTS = 10, K = 10, LZ = 120;
+  const WC = 3.2, HC = 1.7; // meio corredor, em unidades do mundo
+
+  let N = 0, nShip = 0, nRing = 0, per = 0, mStart = 0, sStart = 0, nStr = 0;
+  let pos, vel, bright, sizeA, tone, role, A, B, locl, nameT, scoreT, nb, hb, pgz;
+  let bufPos, bufB, bufSz, bufTone;
+
+  let mode = MODE_NAME, prevMode = -1, tPhase = 0, time = 0, cb = 0;
+  let alive = true, tDeath = 0, shake = 0;
+  const g = { t: 0, v: 4, D: 0 };
+  const ship = { x: 0, y: 0, vx: 0, vy: 0, bank: 0, tx: 0, ty: 0 };
+  const sl = { x: new Float32Array(SLOTS), y: new Float32Array(SLOTS), z: new Float32Array(SLOTS), R: new Float32Array(SLOTS), w: new Float32Array(SLOTS), a: new Float32Array(SLOTS), c: new Float32Array(SLOTS), s: new Float32Array(SLOTS) };
+  let sx, sy, sz0, slen, sbase;
+  const ptr = { x: 0, y: 0, active: false, moved: false };
+  const keys = { l: 0, r: 0, u: 0, d: 0 };
+  let aspect = 1, camZ = 6, wW = 10;
+
+  // ---------- alvos de texto ----------
+  function buildTextTarget(text, out) {
+    const cw = 1600, ch = 420;
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#000'; x.fillRect(0, 0, cw, ch);
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    const fam = "800 SIZEpx Archivo, 'Helvetica Neue', Arial, sans-serif";
+    let size = 260; x.font = fam.replace('SIZE', size);
+    const m = x.measureText(text).width;
+    size = Math.min(340, size * (cw * 0.9) / m); x.font = fam.replace('SIZE', size);
+    x.fillText(text, cw / 2, ch / 2 + size * 0.04);
+    const d = x.getImageData(0, 0, cw, ch).data;
+    const lit = [];
+    for (let i = 0; i < cw * ch; i++) if (d[i * 4] > 128) lit.push(i);
+    for (let i = 0; i < N; i++) {
+      const p = lit[(rnd() * lit.length) | 0];
+      const px = (p % cw) + rnd(), py = ((p / cw) | 0) + rnd();
+      out[i * 3] = (px / cw - 0.5) * wW;
+      out[i * 3 + 1] = -(py - ch / 2) / cw * wW;
+      out[i * 3 + 2] = (rnd() - 0.5) * 0.12;
+    }
+  }
+
+  // ---------- a nave, em partículas ----------
+  function fuselage() {
+    for (;;) {
+      const u = rnd(), z = -1.3 + 2.3 * u;
+      const rad = 0.36 * Math.pow(Math.sin(Math.PI * (0.04 + 0.92 * u)), 0.75);
+      const phi = rnd() * 6.2832, cx = Math.cos(phi), cy = Math.sin(phi);
+      const nz = u < 0.3 ? -0.6 : u > 0.7 ? 0.25 : 0;
+      const facing = cy * 0.35 + nz; // a câmera está atrás e um pouco acima
+      if (rnd() < 0.22 + 0.78 * clamp(facing * 1.2 + 0.5, 0, 1)) {
+        const canopy = cy > 0 ? 0.09 * Math.exp(-Math.pow((z + 0.15) / 0.45, 2)) : 0;
+        return [rad * cx * 1.15, rad * cy * 0.62 + canopy, z, 0.5 + rnd() * 0.35];
+      }
+    }
+  }
+  const WA = [0.25, -0.02, 0.55], WB = [1.55, -0.06, 0.85], WCc = [0.3, -0.02, -0.45];
+  function tri(a, b, c) {
+    let u = rnd(), v = rnd(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+    return [a[0] + (b[0] - a[0]) * u + (c[0] - a[0]) * v, a[1] + (b[1] - a[1]) * u + (c[1] - a[1]) * v, a[2] + (b[2] - a[2]) * u + (c[2] - a[2]) * v];
+  }
+  function shipPoint() {
+    const r = rnd();
+    if (r < 0.44) return fuselage();
+    if (r < 0.68) { const p = tri(WA, WB, WCc); const s = rnd() < 0.5 ? -1 : 1; return [p[0] * s, p[1] + (rnd() - 0.5) * 0.018, p[2], 0.3 + rnd() * 0.2]; } // asa: rala
+    if (r < 0.80) { // borda da asa: densa
+      const e = (rnd() * 3) | 0, t = rnd(), s = rnd() < 0.5 ? -1 : 1;
+      const [a, b] = e === 0 ? [WA, WB] : e === 1 ? [WB, WCc] : [WCc, WA];
+      return [(a[0] + (b[0] - a[0]) * t) * s, a[1] + (b[1] - a[1]) * t + (rnd() - 0.5) * 0.02, a[2] + (b[2] - a[2]) * t, 0.95];
+    }
+    if (r < 0.87) { const p = tri([0, 0.18, 0.25], [0, 0.78, 0.9], [0, 0.18, 0.9]); return [(rnd() - 0.5) * 0.02, p[1], p[2], 0.55 + rnd() * 0.3]; } // leme
+    const s = rnd() < 0.5 ? -1 : 1; // casulos dos motores
+    if (rnd() < 0.35) { const a = rnd() * 6.2832, rr = Math.sqrt(rnd()) * 0.14; return [s * 0.42 + Math.cos(a) * rr, -0.02 + Math.sin(a) * rr, 1.16, 1.5]; }
+    const a = rnd() * 6.2832;
+    return [s * 0.42 + Math.cos(a) * 0.14, -0.02 + Math.sin(a) * 0.14, 0.72 + rnd() * 0.44, 0.9];
+  }
+
+  // ---------- construção ----------
+  function build(n) {
+    nShip = Math.floor(n * 0.12); nRing = Math.floor(n * 0.035);
+    per = Math.floor(n * 0.43 / SLOTS);
+    const nMet = SLOTS * per;
+    nStr = Math.floor((n - nShip - nRing - nMet) / K) * K;
+    N = nShip + nRing + nMet + nStr;
+    mStart = nShip + nRing; sStart = mStart + nMet;
+    pos = new Float32Array(N * 3); vel = new Float32Array(N * 3);
+    bright = new Float32Array(N); sizeA = new Float32Array(N); tone = new Float32Array(N);
+    role = new Uint8Array(N); A = new Float32Array(N); B = new Float32Array(N);
+    locl = new Float32Array(N * 3); nameT = new Float32Array(N * 3); scoreT = new Float32Array(N * 3);
+    nb = new Float32Array(N); hb = new Float32Array(N); pgz = new Float32Array(N).fill(1e9);
+    const nFlame = Math.floor(nShip * 0.14);
+    for (let i = 0; i < N; i++) {
+      A[i] = rnd(); B[i] = rnd(); tone[i] = rnd() < 0.25 ? 1 : rnd() * 0.3; nb[i] = 0.55 + rnd() * 0.45;
+      if (i < nShip) {
+        if (i < nFlame) { role[i] = ROLE_FLAME; sizeA[i] = 0.024; hb[i] = 1; tone[i] = 1; }
+        else { role[i] = ROLE_HULL; sizeA[i] = 0.018; const p = shipPoint(); locl[i * 3] = p[0]; locl[i * 3 + 1] = p[1]; locl[i * 3 + 2] = p[2]; hb[i] = p[3]; }
+      } else if (i < mStart) {
+        role[i] = ROLE_RING; sizeA[i] = 0.016;
+        if (rnd() < 0.7) { const j = rnd() < 0.5 ? 0 : 1, t = rnd() * 6.2832; locl[i * 3] = Math.cos(t) * (2.2 + 0.3 * j); locl[i * 3 + 1] = -0.42; locl[i * 3 + 2] = Math.sin(t) * (1.7 + 0.25 * j); hb[i] = 0.5; }
+        else { const s = Math.sqrt(rnd()), t = rnd() * 6.2832; locl[i * 3] = Math.cos(t) * 2.2 * s; locl[i * 3 + 1] = -0.42; locl[i * 3 + 2] = Math.sin(t) * 1.7 * s; hb[i] = 0.14; }
+      } else if (i < sStart) {
+        role[i] = ROLE_MET; sizeA[i] = 0.02;
+        const s = ((i - mStart) / per) | 0;
+        let dx = gauss(), dy = gauss(), dz = gauss(); const l = Math.hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
+        const rr = 1 + 0.6 * (noise3(dx * 1.6 + s * 7.3, dy * 1.6, dz * 1.6) - 0.5) + (rnd() - 0.5) * 0.1;
+        const inside = rnd() < 0.22 ? Math.cbrt(rnd()) * 0.9 : 1;
+        locl[i * 3] = dx * rr * inside; locl[i * 3 + 1] = dy * rr * inside; locl[i * 3 + 2] = dz * rr * inside;
+        hb[i] = inside < 1 ? 0.3 : 0.5 + rnd() * 0.4;
+      } else { role[i] = ROLE_STR; sizeA[i] = 0.022; }
+    }
+    const ns = nStr / K;
+    sx = new Float32Array(ns); sy = new Float32Array(ns); sz0 = new Float32Array(ns); slen = new Float32Array(ns); sbase = new Float32Array(ns);
+    for (let j = 0; j < ns; j++) {
+      const th = rnd() * 6.2832, r = 3.5 + 24 * Math.pow(rnd(), 1.8);
+      sx[j] = r * Math.cos(th); sy[j] = r * Math.sin(th) * 0.8; sz0[j] = rnd() * LZ;
+      slen[j] = 0.22 + Math.pow(rnd(), 2) * 1.7; sbase[j] = 0.45 + rnd() * 0.55;
+    }
+    if (bufPos) [bufPos, bufB, bufSz, bufTone].forEach((b) => gl.deleteBuffer(b));
+    const mk = (data, usage) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, usage); return b; };
+    bufPos = mk(pos, gl.DYNAMIC_DRAW); bufB = mk(bright, gl.DYNAMIC_DRAW); bufSz = mk(sizeA, gl.STATIC_DRAW); bufTone = mk(tone, gl.STATIC_DRAW);
+    buildTextTarget('Gabriel Ganzarolli', nameT);
+    for (let i = 0; i < N; i++) { // começa como uma nuvem solta
+      const r = 6 + rnd() * 8, t = rnd() * 6.2832, ph = Math.acos(2 * rnd() - 1);
+      pos[i * 3] = r * Math.sin(ph) * Math.cos(t); pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(t) * 0.5; pos[i * 3 + 2] = r * Math.cos(ph) * 0.3;
+    }
+    mode = MODE_NAME; prevMode = -1; tPhase = 0; cb = 0; alive = true;
+    caption();
+  }
+
+  // ---------- jogo ----------
+  function spawn(s, initial) {
+    sl.z[s] = initial ? -(55 + s * 11 + rnd() * 6) : -(112 + rnd() * 22);
+    const aim = rnd() < 0.45;
+    sl.x[s] = aim ? ship.x + (rnd() - 0.5) * 1.8 : (rnd() * 2 - 1) * (WC + 1.4);
+    sl.y[s] = aim ? ship.y + (rnd() - 0.5) * 1.4 : (rnd() * 2 - 1) * (HC + 0.8);
+    sl.R[s] = 0.5 + rnd() * 0.95; sl.w[s] = (rnd() - 0.5) * 1.3; sl.a[s] = rnd() * 6.28;
+  }
+  function startGame() {
+    alive = true; shake = 0;
+    g.t = 0; g.v = 4; g.D = 0;
+    ship.x = ship.y = ship.vx = ship.vy = 0; ship.tx = ship.ty = 0; ship.bank = 0;
+    for (let s = 0; s < SLOTS; s++) spawn(s, true);
+    setMode(MODE_GAME);
+  }
+  function setMode(m) {
+    prevMode = mode; mode = m; tPhase = 0; pgz.fill(1e9); caption();
+  }
+  function kill() {
+    if (!alive) return;
+    alive = false; tDeath = time; shake = 1;
+    for (let i = 0; i < N; i++) {
+      if (role[i] > ROLE_RING) continue;
+      let dx = pos[i * 3] - ship.x + (rnd() - 0.5) * 0.4, dy = pos[i * 3 + 1] - ship.y + (rnd() - 0.5) * 0.4, dz = pos[i * 3 + 2] + (rnd() - 0.5) * 0.4;
+      const l = Math.hypot(dx, dy, dz) || 1, sp = 2 + rnd() * 7;
+      vel[i * 3] += dx / l * sp; vel[i * 3 + 1] += dy / l * sp; vel[i * 3 + 2] += dz / l * sp;
+    }
+    const txt = g.t.toFixed(1).replace('.', ',') + ' s';
+    buildTextTarget(txt, scoreT);
+    lastScore = txt;
+  }
+  let lastScore = '';
+  let god = false; // só para conferir o visual em teste
+
+  function caption() {
+    capEl.textContent = mode === MODE_NAME ? 'Clique no nome para jogar.'
+      : mode === MODE_GAME ? (alive ? 'Mova o mouse ou o dedo, ou use as setas e WASD. Esc volta ao nome.' : 'Você bateu.')
+      : 'Clique para jogar de novo. Esc volta ao nome.';
+  }
+
+  // ---------- gols por partícula ----------
+  let gx = 0, gy = 0, gz = 0, gvx = 0, gvy = 0, gvz = 0, gb = 0, gk = 8;
+  let cr = 1, sr = 0; // rotação de inclinação da nave
+  function evalGoal(i, m) {
+    if (m === MODE_NAME) { gx = nameT[i * 3]; gy = nameT[i * 3 + 1]; gz = nameT[i * 3 + 2]; gvx = gvy = gvz = 0; gb = nb[i]; gk = 8; return; }
+    if (m === MODE_SCORE) { gx = scoreT[i * 3]; gy = scoreT[i * 3 + 1]; gz = scoreT[i * 3 + 2]; gvx = gvy = gvz = 0; gb = nb[i]; gk = 8; return; }
+    const r = role[i];
+    if (r <= ROLE_FLAME) {
+      if (!alive) { gx = pos[i * 3]; gy = pos[i * 3 + 1]; gz = pos[i * 3 + 2]; gvx = gvy = gvz = 0; gk = 0; gb = (r === ROLE_FLAME ? 1 : hb[i]) * Math.max(0, 1 - (time - tDeath) * 0.55); return; }
+      let lx, ly, lz;
+      if (r === ROLE_FLAME) {
+        const s = (B[i] + time * 2.6) % 1, side = A[i] < 0.5 ? -0.42 : 0.42, ang = A[i] * 40, rad = 0.12 * (1 - s * 0.85) * (0.4 + B[i] * 0.6);
+        lx = side + Math.cos(ang) * rad; ly = -0.02 + Math.sin(ang) * rad; lz = 1.15 + s * 1.5;
+        gb = Math.pow(1 - s, 1.4) * 1.1 + 0.06;
+      } else { lx = locl[i * 3]; ly = locl[i * 3 + 1]; lz = locl[i * 3 + 2]; gb = hb[i] * 0.62; }
+      gx = ship.x + lx * cr - ly * sr; gy = ship.y + lx * sr + ly * cr; gz = lz;
+      gvx = ship.vx; gvy = ship.vy; gvz = 0; gk = 70; return;
+    }
+    if (r === ROLE_RING) {
+      if (!alive) { gx = pos[i * 3]; gy = pos[i * 3 + 1]; gz = pos[i * 3 + 2]; gvx = gvy = gvz = 0; gk = 0; gb = hb[i] * Math.max(0, 1 - (time - tDeath) * 1.2); return; }
+      const pu = 1 + 0.04 * Math.sin(time * 2.2);
+      gx = ship.x + locl[i * 3] * pu; gy = ship.y + locl[i * 3 + 1]; gz = locl[i * 3 + 2] * pu;
+      gvx = ship.vx; gvy = ship.vy; gvz = 0; gk = 40;
+      gb = hb[i] * (0.8 + 0.2 * Math.sin(time * 3 + A[i] * 20)); return;
+    }
+    if (r === ROLE_MET) {
+      const s = ((i - mStart) / per) | 0, R = sl.R[s], c = sl.c[s], sn = sl.s[s], lx = locl[i * 3], lz = locl[i * 3 + 2];
+      gx = sl.x[s] + R * (lx * c - lz * sn); gy = sl.y[s] + R * locl[i * 3 + 1]; gz = sl.z[s] + R * (lx * sn + lz * c);
+      gvx = gvy = 0; gvz = g.v; gk = 18;
+      gb = 1.7 * hb[i] * smooth(-112, -88, gz) * (1 - smooth(1.5, 5, gz)); return;
+    }
+    const j = ((i - sStart) / K) | 0, k = i - sStart - j * K;
+    const zz = -112 + ((sz0[j] + g.D) % LZ);
+    gz = zz - k * (0.09 + 0.018 * g.v) * slen[j]; gx = sx[j]; gy = sy[j];
+    gvx = gvy = 0; gvz = g.v; gk = 30;
+    gb = 3.2 * sbase[j] * Math.pow(1 - k / K, 1.3) * smooth(-112, -85, gz) * (1 - smooth(1.5, 5, gz));
+  }
+
+  // ---------- passo ----------
+  function tick(dt) {
+    time += dt; tPhase += dt;
+    const worldOn = mode === MODE_GAME || (prevMode === MODE_GAME && tPhase < 2.6);
+    if (mode === MODE_GAME) {
+      if (alive) {
+        g.t += dt;
+        const vt = Math.min(14 + g.t * 0.45, 38);
+        g.v += (vt - g.v) * Math.min(1, dt * 1.4);
+        // controle
+        const kx = keys.r - keys.l, ky = keys.u - keys.d;
+        if (kx || ky) { ship.tx = clamp(ship.tx + kx * 5 * dt, -WC, WC); ship.ty = clamp(ship.ty + ky * 4 * dt, -HC, HC); ptr.moved = false; }
+        else if (ptr.moved) { ship.tx = clamp(ptr.x * WC, -WC, WC); ship.ty = clamp(ptr.y * HC, -HC, HC); }
+        const k = 45, c = 2 * Math.sqrt(k) * 0.92;
+        ship.vx += (-k * (ship.x - ship.tx) - c * ship.vx) * dt; ship.vy += (-k * (ship.y - ship.ty) - c * ship.vy) * dt;
+        ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+        ship.bank += (clamp(-ship.vx * 0.085, -0.65, 0.65) - ship.bank) * Math.min(1, dt * 8);
+        cr = Math.cos(ship.bank); sr = Math.sin(ship.bank);
+      } else g.v *= Math.exp(-dt * 2.2);
+    }
+    if (worldOn) {
+      g.D += g.v * dt;
+      for (let s = 0; s < SLOTS; s++) {
+        sl.z[s] += g.v * dt; sl.a[s] += sl.w[s] * dt; sl.c[s] = Math.cos(sl.a[s]); sl.s[s] = Math.sin(sl.a[s]);
+        if (sl.z[s] > 9) spawn(s, false);
+      }
+      if (alive && mode === MODE_GAME && g.t > 2.2) {
+        const sph = [[0, 0, -0.6, 0.3], [0, 0, 0.2, 0.42], [-0.9, 0, 0.4, 0.3], [0.9, 0, 0.4, 0.3]];
+        for (let s = 0; s < SLOTS; s++) {
+          if (sl.z[s] < -3 || sl.z[s] > 3.5) continue;
+          for (const p of sph) {
+            const wx = ship.x + p[0] * cr - p[1] * sr, wy = ship.y + p[0] * sr + p[1] * cr;
+            const dx = wx - sl.x[s], dy = wy - sl.y[s], dz = p[2] - sl.z[s], rr = p[3] + sl.R[s] * 0.8;
+            if (!god && dx * dx + dy * dy + dz * dz < rr * rr) { kill(); break; }
+          }
+          if (!alive) break;
+        }
+      }
+      if (!alive && time - tDeath > 1.5 && mode === MODE_GAME) setMode(MODE_SCORE);
+    }
+    shake *= Math.exp(-dt * 4);
+    if (prevMode >= 0 && tPhase > 2.4) prevMode = -1;
+    cb += ((mode === MODE_GAME ? 1 : 0) - cb) * (1 - Math.exp(-dt * 2.2));
+
+    // partículas
+    const hasPrev = prevMode >= 0;
+    const txtCur = mode !== MODE_GAME, txtPrev = hasPrev && prevMode !== MODE_GAME;
+    const halfH = camZ * Math.tan(25 * Math.PI / 180), mx = ptr.x * halfH * aspect, my = ptr.y * halfH;
+    const useRepel = ptr.active && (txtCur || txtPrev);
+    for (let i = 0; i < N; i++) {
+      const i3 = i * 3;
+      evalGoal(i, mode);
+      let ax = gx, ay = gy, az = gz, avx = gvx, avy = gvy, avz = gvz, ab = gb, ak = gk, w = 1;
+      if (hasPrev) {
+        w = clamp((tPhase / 1.5 - A[i] * 0.5) / 0.5, 0, 1); w = w * w * (3 - 2 * w);
+        if (w < 1) {
+          evalGoal(i, prevMode); const u = 1 - w;
+          ax = gx * u + ax * w; ay = gy * u + ay * w; az = gz * u + az * w; avx = gvx * u + avx * w; avy = gvy * u + avy * w; avz = gvz * u + avz * w; ab = gb * u + ab * w; ak = gk * u + ak * w;
+        }
+      }
+      const rr = role[i];
+      if (mode === MODE_GAME && rr >= ROLE_MET) { // reaparecimentos: salta, não voa
+        if (pgz[i] < 1e8 && Math.abs(az - pgz[i]) > 40 && w > 0.6) { pos[i3 + 2] = az; pos[i3] = ax; pos[i3 + 1] = ay; vel[i3] = avx; vel[i3 + 1] = avy; vel[i3 + 2] = avz; }
+        pgz[i] = az;
+      }
+      let px = pos[i3], py = pos[i3 + 1], pz = pos[i3 + 2], vx = vel[i3], vy = vel[i3 + 1], vz = vel[i3 + 2];
+      const c = ak > 0 ? 1.9 * Math.sqrt(ak) : 1.3;
+      let fx = -ak * (px - ax) - c * (vx - avx), fy = -ak * (py - ay) - c * (vy - avy), fz = -ak * (pz - az) - c * (vz - avz);
+      const ta = (txtCur ? w : 0) + (txtPrev ? 1 - w : 0);
+      if (ta > 0) {
+        fx += Math.sin(py * 1.3 + time * 0.4 + px * 0.5) * 0.35 * ta; fy += Math.sin(pz * 1.1 + time * 0.37 + px * 0.7) * 0.35 * ta; fz += Math.sin(px * 1.2 + time * 0.31) * 0.35 * ta;
+        if (useRepel) {
+          const dx = px - mx, dy = py - my, d2 = dx * dx + dy * dy + pz * pz * 0.1, f = 4.8 * Math.exp(-d2 / 1.44) * ta, l = Math.sqrt(d2) + 1e-4;
+          fx += dx / l * f; fy += dy / l * f;
+        }
+      }
+      vx += fx * dt; vy += fy * dt; vz += fz * dt;
+      const sp2 = vx * vx + vy * vy + vz * vz; if (sp2 > 14400) { const s = 120 / Math.sqrt(sp2); vx *= s; vy *= s; vz *= s; }
+      pos[i3] = px + vx * dt; pos[i3 + 1] = py + vy * dt; pos[i3 + 2] = pz + vz * dt;
+      vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
+      bright[i] = ab;
+    }
+  }
+
+  // ---------- câmera e desenho ----------
+  const camP = [0, 0, 6], camT = [0, 0, 0], R0 = [1, 0, 0], R1 = [0, 1, 0], R2 = [0, 0, 1];
+  let fov = 50, focus = 6;
+  function norm(v) { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+  function updateCamera() {
+    const e = cb * cb * (3 - 2 * cb);
+    const sh = shake * 0.28;
+    const gp = [ship.x * 0.55 + (rnd() - 0.5) * sh, 1.35 + ship.y * 0.45 + (rnd() - 0.5) * sh, 4.6];
+    const gt = [ship.x * 0.35, 0.15 + ship.y * 0.3, -30];
+    for (let k = 0; k < 3; k++) {
+      camP[k] = (k === 2 ? camZ : 0) * (1 - e) + gp[k] * e;
+      camT[k] = 0 * (1 - e) + gt[k] * e;
+    }
+    fov = 50 * (1 - e) + (58 + Math.min(g.v, 40) * 0.22) * e;
+    const f = norm([camT[0] - camP[0], camT[1] - camP[1], camT[2] - camP[2]]);
+    const right = norm([-f[2], 0, f[0]]); // f x (0,1,0)
+    const up = [right[1] * f[2] - right[2] * f[1], right[2] * f[0] - right[0] * f[2], right[0] * f[1] - right[1] * f[0]]; // right x f
+    for (let k = 0; k < 3; k++) { R0[k] = right[k]; R1[k] = up[k]; R2[k] = -f[k]; }
+    const dx = camP[0] - ship.x, dy = camP[1] - ship.y, dz = camP[2];
+    focus = (1 - e) * camZ + e * Math.hypot(dx, dy, dz);
+  }
+  let dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const w = Math.max(1, Math.floor(window.innerWidth * dpr)), h = Math.max(1, Math.floor(window.innerHeight * dpr));
+    canvas.width = w; canvas.height = h; aspect = w / h;
+    const halfTan = Math.tan(25 * Math.PI / 180);
+    camZ = Math.max(wW / 0.86 / (2 * halfTan * aspect), 2.2 / 0.86 / (2 * halfTan));
+  }
+  function draw() {
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(7 / 255, 6 / 255, 12 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(prog);
+    const f = 1 / Math.tan(fov * Math.PI / 360);
+    gl.uniform3fv(U.uCam, camP); gl.uniform3fv(U.uR0, R0); gl.uniform3fv(U.uR1, R1); gl.uniform3fv(U.uR2, R2);
+    gl.uniform1f(U.uF, f); gl.uniform1f(U.uAspect, aspect); gl.uniform1f(U.uPx, canvas.height * f / 2); gl.uniform1f(U.uMin, 1.15 * dpr);
+    gl.uniform1f(U.uFocus, focus);
+    const e = cb * cb * (3 - 2 * cb);
+    gl.uniform1f(U.uSizeK, 0.6 + 0.4 * e);
+    const bind = (buf, loc, size) => { gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); };
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufPos); gl.bufferSubData(gl.ARRAY_BUFFER, 0, pos);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufB); gl.bufferSubData(gl.ARRAY_BUFFER, 0, bright);
+    bind(bufPos, AL.aPos, 3); bind(bufB, AL.aB, 1); bind(bufSz, AL.aSz, 1); bind(bufTone, AL.aTone, 1);
+    const base = 0.5 + 0.2 * e;
+    gl.uniform1f(U.uMul, 5.5); gl.uniform1f(U.uAlpha, base * 0.07); gl.drawArrays(gl.POINTS, 0, N); // brilho
+    gl.uniform1f(U.uMul, 1); gl.uniform1f(U.uAlpha, base); gl.drawArrays(gl.POINTS, 0, N); // grão
+  }
+
+  // ---------- entrada ----------
+  window.addEventListener('pointermove', (e) => { ptr.x = (e.clientX / window.innerWidth) * 2 - 1; ptr.y = -((e.clientY / window.innerHeight) * 2 - 1); ptr.active = true; ptr.moved = true; }, { passive: true });
+  window.addEventListener('pointerdown', (e) => {
+    if (e.target.closest && e.target.closest('button')) return;
+    ptr.x = (e.clientX / window.innerWidth) * 2 - 1; ptr.y = -((e.clientY / window.innerHeight) * 2 - 1); ptr.active = true; ptr.moved = true;
+    if (mode === MODE_NAME && tPhase > 0.6) startGame();
+    else if (mode === MODE_SCORE && time - tDeath > 3.2) startGame();
+  });
+  document.documentElement.addEventListener('pointerleave', () => { ptr.active = false; });
+  const keyMap = { ArrowLeft: 'l', a: 'l', A: 'l', ArrowRight: 'r', d: 'r', D: 'r', ArrowUp: 'u', w: 'u', W: 'u', ArrowDown: 'd', s: 'd', S: 'd' };
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (mode !== MODE_NAME) { if (!alive && mode === MODE_GAME) { /* deixa a explosão terminar */ } setMode(MODE_NAME); } return; }
+    const k = keyMap[e.key]; if (k) { keys[k] = 1; e.preventDefault(); }
+  });
+  window.addEventListener('keyup', (e) => { const k = keyMap[e.key]; if (k) keys[k] = 0; });
+  document.getElementById('exit').addEventListener('click', () => { if (mode !== MODE_NAME) setMode(MODE_NAME); });
+  document.querySelectorAll('[data-n]').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-n]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    build(+b.dataset.n);
+  }));
+  window.addEventListener('resize', resize);
+
+  // ---------- laço ----------
+  let last = 0, acc = 0, nf = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000 || 0.016); last = now;
+    tick(dt); updateCamera(); draw();
+    acc += dt; nf++;
+    if (acc > 0.8) { fpsEl.textContent = Math.round(nf / acc) + ' fps'; acc = 0; nf = 0; }
+    requestAnimationFrame(frame);
+  }
+
+  window.__t = { god: (v) => { god = v; }, go: startGame, kill,name: () => setMode(MODE_NAME), setN: build, st: () => ({ mode, alive, t: g.t, tPhase, N }) };
+  resize();
+  const coarse = matchMedia('(pointer: coarse)').matches || window.innerWidth < 760;
+  const startN = coarse ? 40000 : 70000;
+  document.querySelectorAll('[data-n]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.n === startN)));
+  const go = () => { build(startN); requestAnimationFrame(frame); };
+  (document.fonts && document.fonts.load ? document.fonts.load('800 120px Archivo').catch(() => {}) : Promise.resolve()).then(go, go);
+})();
+</script>

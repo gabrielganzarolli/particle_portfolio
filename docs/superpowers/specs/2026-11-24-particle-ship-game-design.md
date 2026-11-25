@@ -1,6 +1,7 @@
 # Jogo da nave em partículas — design
 
-2026-11-24. Status: aguardando aprovação final de Gabriel.
+2026-11-24. Status: aprovado por Gabriel em 2026-11-25, depois de jogar o protótipo, com a
+decisão de usar 70 mil partículas (ver "Orçamento de partículas").
 
 ## Intenção
 
@@ -126,15 +127,22 @@ nome ──clique──▶ cabeça ──clique na cabeça──▶ JOGO ──b
 
 ### As partículas
 
-Cada partícula tem um **papel fixo**, definido pelo índice. Valores iniciais,
-para ajustar vendo o resultado:
+**Orçamento de partículas (decisão de Gabriel).** O jogo usa **70 mil partículas
+ativas** no nível 3, o valor com que o protótipo foi aprovado. A aparência
+depende da densidade: com as 262 mil do campo inteiro, as mesmas formas ficariam
+3,7 vezes mais densas e estourariam em branco. As demais partículas do campo
+ficam estacionadas e invisíveis (brilho zero) enquanto o jogo roda, e o campo do
+herói continua com 512². *(Escolha minha)* Nível 2: 40 mil. Nível 1: 25 mil.
 
-| Papel | Parte do total | Como se forma |
+Cada partícula tem um **papel fixo**, definido pelo índice. As proporções
+abaixo são as do protótipo aprovado, sobre o orçamento do jogo:
+
+| Papel | Parte do orçamento | Como se forma |
 |---|---|---|
-| Nave | ~5% | Superfície de uma forma procedural (casco, asas, motor), amostrada no código |
-| Anel em volta da nave | ~1,5% | Um anel de partículas, pulsando de leve |
-| Meteoritos | ~35% | Cascas irregulares (esfera com ruído), uma por lugar do conjunto |
-| Riscos e estrelas | o resto | Fileiras de K pontos (K entre 8 e 16) alinhadas na direção do movimento |
+| Nave | ~12% (cerca de 14% disso é chama dos motores) | Superfície de uma forma procedural (casco, asas, motor), amostrada no código |
+| Anel em volta da nave | ~3,5% | Elipse de partículas no plano do chão, com preenchimento ralo |
+| Meteoritos | ~43% | Cascas irregulares (esfera com ruído), 10 lugares reaproveitados |
+| Riscos e estrelas | o resto (~41%) | Fileiras de K = 10 pontos alinhadas na direção do movimento |
 
 - **Densidade como transparência.** O casco e o motor têm mais partículas por
   área, as asas têm menos e a borda das asas é mais densa. O lado que a câmera
@@ -205,6 +213,33 @@ A forma da nave e dos meteoritos é o que se preserva por último.
 - Enquanto o jogo roda, o nome, a bio e a cadeia de morphs da rolagem ficam
   desligados.
 
+## Protótipo de referência
+
+`docs/superpowers/specs/2026-11-24-particle-ship-game-prototype.html` é o
+protótipo que Gabriel jogou e aprovou. **É descartável e não é o código
+final**: roda em CPU, tem o próprio sistema de partículas e pula a etapa da
+cabeça. Serve para o construtor ler os valores calibrados e ver o visual
+esperado. Valores de partida que ele usa:
+
+- Corredor: ±3,2 de largura e ±1,7 de altura. A nave segue o ponteiro com mola
+  (k = 45, amortecimento próximo do crítico) e inclina até ~0,65 rad conforme a
+  velocidade lateral.
+- Câmera: em (0,55·x da nave; 1,35 + 0,45·y; 4,6), olhando para
+  (0,35·x; 0,15 + 0,3·y; −30). Campo de visão de 58° a 66° conforme a velocidade.
+- Velocidade do mundo: 14 unidades/s, subindo 0,45/s até 38.
+- Colisão: quatro esferas na nave, (0; 0; −0,6; r 0,3), (0; 0; 0,2; r 0,42) e
+  (±0,9; 0; 0,4; r 0,3), contra uma esfera por meteorito (raio 0,5 a 1,45, com
+  80% do raio na colisão). 45% dos meteoritos nascem mirando na nave. Nada
+  colide nos primeiros 2,2 s.
+- Molas por papel: nave 70, anel 40, meteoritos 18, riscos 30, com
+  realimentação da velocidade do destino, para que o que se move em linha reta
+  não fique para trás.
+- Os riscos e os meteoritos que reaparecem **saltam** para o novo destino, em
+  vez de voar até ele.
+- Desfoque por profundidade bem mais fraco que o do herói, e o brilho de pontos
+  menores que um pixel só é compensado pela metade. Sem isso, meteoritos e
+  riscos distantes somem.
+
 ## Verificação
 
 - Funções puras (colisão, sorteio de meteoritos, mapa de papéis por índice)
@@ -234,3 +269,4 @@ A forma da nave e dos meteoritos é o que se preserva por último.
 7. Os números iniciais de partículas, meteoritos e dificuldade.
 8. Cliques são ignorados até o tempo terminar de se formar.
 9. Se a máquina é lenta, o nível cai entre partidas, nunca durante uma.
+10. Nos níveis 2 e 1, o jogo usa 40 mil e 25 mil partículas.
