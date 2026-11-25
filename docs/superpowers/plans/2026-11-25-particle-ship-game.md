@@ -115,8 +115,8 @@ O design é uma visão; estes casos ele não menciona e quebrariam a experiênci
   - `ship target is clamped to the corridor`: alvo (99, -99) termina em `x ≤ 3.2`, `y ≥ -1.7`.
   - `no collisions in the first 2.2 s`: um meteorito posto em cima da nave não mata antes de `t = 2.2`; depois mata (`alive === false`).
   - `collision spheres`: a nave tem as esferas `(0,0,-0.6,r.3)`, `(0,0,0.2,r.42)`, `(±0.9,0,0.4,r.3)`; um meteorito de `R = 1` a 0,5 de distância lateral do centro colide; a 2,5 não. O raio de colisão do meteorito é `0.8·R`.
-  - `a small fast meteor does not tunnel` (Review Focus 1): `R = 0.5`, `speed = 38`, `dt = 0.05`, meteorito vindo de `z = -3` direto na nave: `sweptHit` retorna `true` em algum passo; o teste de ponto sozinho falharia.
-  - `meteors respawn at the far end after passing the camera`: `z > 9` volta a `z ∈ [-134, -112]`; 45% dos nascimentos (entre 0,40 e 0,50 em 2.000 sorteios) miram a nave (`|x - ship.x| ≤ 0.9`).
+  - `a small fast meteor does not tunnel` (Review Focus 1): `R = 0.5`, `speed = 38`, `dt = 0.05`, meteorito vindo de `z = -3` com deslocamento lateral `y = 0.6` em relação à nave: `sweptHit` retorna `true` em algum passo, e um teste de ponto em cada passo nunca acerta. (O deslocamento é necessário: um meteorito exatamente no centro tem janela de contato de ~2,3 u, maior que o passo de 1,9 u, e um teste de ponto também o pegaria; o teste de ponto só deixa passar perto da borda.)
+  - `meteors respawn at the far end after passing the camera`: `z > 9` volta a `z ∈ [-134, -112]`; 45% dos nascimentos (entre 0,40 e 0,50 em 2.000 sorteios) miram a nave (`|x - ship.x| ≤ 0.9` **e** `|y - ship.y| ≤ 0.7`; só em x, cerca de 20% dos sorteios aleatórios também cairiam na faixa e a fração mediria ~0,57).
   - `initial meteors start far`: `z ≤ -55` e nenhum alcança `z > -3` em menos de 3 s.
   - `dt is clamped to 0.05`: um passo de dt = 5 anda o mesmo que um de 0,05.
   - `gameUniforms`: `distance === world.distance % 120`; `meteors[4*i..]` igual a `x,y,z,R` do meteorito `i`; `alive` 1 ou 0.
