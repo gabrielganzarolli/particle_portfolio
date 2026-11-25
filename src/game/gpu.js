@@ -28,8 +28,9 @@ const POINTS_VERT = `${simplex}\n${game}\n${gamePointsVert(heroPointsVert, gameP
 // flame as separate dots. With the bloom off the game's points are drawn this
 // much larger and brighter (display space, before the curve to linear light);
 // in between by a share of it (level 2's bloom is 0.75 -> 1.175). Judged on
-// the look check's captures: at 1.7 level 1's lit share (2.5%) is level 2's
-// and its near-white share (0.2%) level 3's.
+// the look check's captures (lit share / near-white share at t = 8 s): level 1
+// went 0.94% / 0.01% -> 2.47% / 0.20%, level 2 2.50% / 0.08% -> 5.64% / 0.20%;
+// level 3 (no lift) is 6.30% / 0.21%.
 const NO_BLOOM_LIFT = 1.7;
 
 /** The game's size and brightness lift (uGameLift) for a bloom strength 0..1. */

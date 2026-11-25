@@ -6,9 +6,11 @@
 //   node scripts/game-check.cjs flow       (part 1: the controller on its own;
 //                                           part 2: the game inside the live hero;
 //                                           part 3: edge cases, captures in
-//                                           shots/flow-*.png)
+//                                           shots/flow-*.png;
+//                                           part 4: a portrait phone, the
+//                                           keyboard and focus, abort on Esc)
 //
-//   (flow1, flow2, flow3 run one part alone)
+//   (flow1, flow2, flow3, flow4 run one part alone)
 //
 //   node scripts/game-check.cjs heroPrograms (the hero's programs carry no
 //                                           game code at load or after a game)
@@ -283,7 +285,7 @@ async function look() {
       fs.mkdirSync('shots', { recursive: true });
       fs.writeFileSync(file, Buffer.from(r.png.split(',')[1], 'base64'));
       const pct = (v) => `${(v * 100).toFixed(2)}%`;
-      // Near-white cap: measured 0.20% (level 1), 0.08% (2), 0.21% (3) with
+      // Near-white cap: measured 0.20% (level 1), 0.20% (2), 0.21% (3) with
       // the final values; a blown-out field (the flames and the ship merging
       // into white) goes well past it.
       const ok = r.level === level && r.lit >= 0.002 && r.lit <= 0.12 && r.white <= WHITE_CAP;
@@ -1080,12 +1082,307 @@ async function flowPart3() {
   return failed;
 }
 
+// Part 4: a portrait phone (390x844). (abort) Esc while the first start
+// compiles the game's programs leaves the hero as it was. (focus) The game
+// enters with the focus on the "×", the page inert; its hit area is 44 px.
+// (corridor) With the pointer at either screen edge the ship's centre stays
+// on screen, and meteors aimed at it arrive on screen. (keys) Space restarts
+// from the score; Shift+Tab mid-game neither scrolls the locked page nor
+// freezes the game; Enter on the "×" exits; the focus comes back after the
+// game (to the language toggle too, which the game disables).
+async function flowPart4() {
+  const fs = require('fs');
+  const path = require('path');
+  let failed = false;
+  const report = (ok, text) => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${text}`);
+    if (!ok) failed = true;
+  };
+  const W = 390, H = 844;
+  const site = await openSite('#nivel1', { viewport: { width: W, height: H } });
+  const { page } = site;
+  const SHORT = { timeout: 60000, polling: 'raf' };
+  fs.mkdirSync('shots', { recursive: true });
+  const shot = (name) => page.screenshot({ path: path.join('shots', `flow-${name}.png`) });
+  const waitPhase = (p, opts = SHORT) =>
+    page.waitForFunction((p) => window.__pf.game?.phase === p, p, opts).then(() => true, () => false);
+  const away = () => page.mouse.move(W / 2, H - 40);
+  const focusInfo = () =>
+    page.evaluate(() => {
+      const a = document.activeElement;
+      return {
+        focus: a === document.body ? 'body' : a?.matches?.('[data-game-exit]') ? 'exit' : a?.matches?.('[data-lang-toggle]') ? 'lang' : a?.tagName,
+        mainInert: document.querySelector('main').inert,
+        overlayInert: document.querySelector('.overlay').inert,
+        gameOn: document.documentElement.classList.contains('game-on'),
+        scrollY: window.scrollY,
+        phase: window.__pf.game?.phase ?? 'none',
+      };
+    });
+  const formHeadHere = async (label) => {
+    if (await page.evaluate(headFormed)) return true;
+    await page.mouse.click(W / 2, H / 2); // the name, at the centre
+    await away();
+    const ok = await page.waitForFunction(headFormed, null, WAIT).then(() => true, () => false);
+    report(ok, `${label}: click on the name -> head formed`);
+    return ok;
+  };
+  const clickHead = async () => {
+    const pt = await headScreenPoint(page, 'centre');
+    await page.mouse.click(pt.x, pt.y);
+    await away();
+  };
+  // The ship's centre (or any world point) in NDC through the live camera.
+  const ndcOf = (p) =>
+    page.evaluate((p) => {
+      const { camera } = window.__pf;
+      const v = camera.position.clone().set(p.x, p.y, p.z).project(camera);
+      return { x: v.x, y: v.y };
+    }, p);
+  const settleShip = async (side) => {
+    await page.mouse.move(side < 0 ? 0 : W - 0.5, H / 2);
+    await waitFrames(page, 30);
+    await page.waitForFunction(() => {
+      const s = window.__pf.game.debug.world.ship;
+      return Math.abs(s.vx) < 0.02 && Math.abs(s.vy) < 0.02;
+    }, null, SHORT);
+    const ship = await page.evaluate(() => {
+      const w = window.__pf.game.debug.world;
+      return { x: w.ship.x, y: w.ship.y, z: 0, corridor: w.corridor ?? null };
+    });
+    return { ship, ndc: await ndcOf(ship) };
+  };
+
+  try {
+    console.log(`part 4 level ${await page.evaluate(() => window.__pf.state().level)}, viewport ${W}x${H}`);
+    await page.waitForFunction(() => window.__pf.state().frames > 30, null, WAIT);
+
+    // (abort) The first start waits for the game's programs; hold that wait.
+    await page.evaluate(() => {
+      const { field } = window.__pf;
+      const real = Object.getPrototypeOf(field).loadGameShaders;
+      window.__compileHeld = new Promise((r) => (window.__compileRelease = r));
+      field.loadGameShaders = async function (build) {
+        await window.__compileHeld;
+        return real.call(this, build);
+      };
+    });
+    try {
+      if (!(await formHeadHere('(abort)'))) throw new Error('head never formed');
+      const heroState = () =>
+        page.evaluate(() => {
+          const { field, state } = window.__pf;
+          const s = state();
+          window.__heroVel ??= field.velVar.material;
+          window.__heroPoints ??= field.points.material;
+          return {
+            headOn: s.headOn,
+            morphT: s.morphT,
+            pair: s.pair,
+            heroPrograms: field.velVar.material === window.__heroVel && field.points.material === window.__heroPoints,
+            gameOn: document.documentElement.classList.contains('game-on'),
+            mainInert: document.querySelector('main').inert,
+            langDisabled: document.querySelector('[data-lang-toggle]').disabled,
+          };
+        });
+      const before = await heroState();
+      await clickHead();
+      const waiting = await page.waitForFunction(() => window.__pf.game, null, WAIT).then(() => true, () => false);
+      await page.waitForTimeout(300); // start() is now held in its compile wait
+      const held = await page.evaluate(() => ({ phase: window.__pf.game?.phase, starting: window.__pf.game?.starting }));
+      await page.keyboard.press('Escape');
+      await page.evaluate(() => window.__compileRelease());
+      await page.waitForTimeout(1500);
+      await page.waitForFunction(() => window.__pf.state().frames > 0, null, WAIT);
+      const after = { ...(await heroState()), phase: await page.evaluate(() => window.__pf.game.phase) };
+      report(waiting && after.phase === 'idle' && !after.gameOn && !after.mainInert && after.headOn === before.headOn &&
+          after.morphT === before.morphT && after.pair === before.pair && after.heroPrograms && !after.langDisabled,
+        `(abort) Esc during the first compile wait (held: ${JSON.stringify(held)}): before ${JSON.stringify(before)}, after ${JSON.stringify(after)} (idle, hero untouched)`);
+    } finally {
+      await page.evaluate(() => {
+        window.__compileRelease?.();
+        delete window.__pf.field.loadGameShaders;
+      });
+    }
+    if ((await page.evaluate(() => window.__pf.game?.phase)) !== 'idle') {
+      await page.keyboard.press('Escape');
+      await waitPhase('idle', WAIT);
+    }
+
+    // (focus) A real start through the head.
+    if (!(await formHeadHere('(focus)'))) throw new Error('head never formed');
+    await clickHead();
+    const played = await waitPhase('play', WAIT);
+    await instrumentGame(page);
+    const f0 = await focusInfo();
+    report(played && f0.focus === 'exit' && f0.mainInert && f0.overlayInert && f0.scrollY === 0,
+      `(focus) game entered: ${JSON.stringify(f0)} (focus on the "×", main and .overlay inert)`);
+    {
+      const hit = await page.evaluate(() => {
+        const b = document.querySelector('[data-game-exit]');
+        const r = b.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const at = (dx, dy) => document.elementFromPoint(cx + dx, cy + dy) === b;
+        return { w: +r.width.toFixed(1), h: +r.height.toFixed(1), edges: [at(-21, 0), at(21, 0), at(0, -21), at(0, 21), at(-21, -21), at(21, 21)] };
+      });
+      report(hit.edges.every(Boolean) && hit.w < 44 && hit.h < 44,
+        `(focus) "×" box ${hit.w}x${hit.h} px (unchanged look), hits at +-21 px from its centre ${JSON.stringify(hit.edges)} (44 x 44 target)`);
+    }
+
+    // (corridor) The pointer at the screen's left and right edges.
+    for (const side of [-1, 1]) {
+      const r = await settleShip(side);
+      report(Math.abs(r.ndc.x) <= 1 && Math.abs(r.ndc.y) <= 1,
+        `(corridor) pointer at the ${side < 0 ? 'left' : 'right'} edge: ship x ${r.ship.x.toFixed(3)} (corridor ${JSON.stringify(r.ship.corridor)}), centre at NDC (${r.ndc.x.toFixed(3)}, ${r.ndc.y.toFixed(3)}) (within +-1)`);
+      if (side > 0) await shot('portrait-edge');
+    }
+
+    // (corridor) Meteors aimed at the ship (at the right edge), spread across
+    // the aim's +-0.9, measured as they reach the ship's depth (z >= -1).
+    {
+      const r = await page.evaluate(async () => {
+        const g = window.__pf.game;
+        const w = g.debug.world;
+        const mod = await import('/src/game/world.js');
+        const slots = [0, 1, 2];
+        const offsets = [0, 0.5, 1]; // rng for the aim: -0.9, 0, +0.9
+        const placed = [];
+        for (let i = 0; i < slots.length; i++) {
+          const m = w.meteors[slots[i]];
+          if (mod.spawnMeteor) {
+            const seq = [0, 0.1, offsets[i], 0.5, 0.3, 0.5, 0];
+            let k = 0;
+            mod.spawnMeteor(w, () => seq[k++], slots[i], false);
+          } else {
+            // Before the change: no spawnMeteor; the old aim had no clamp.
+            m.x = w.ship.x + (offsets[i] - 0.5) * 1.8;
+            m.y = w.ship.y;
+            m.R = 0.5 + 0.3 * 0.95;
+          }
+          m.z = m.prevZ = -40;
+          placed.push({ x: m.x, y: m.y });
+        }
+        window.__g.safe = false;
+        window.__near = [];
+        const { camera } = window.__pf;
+        const update = g.update;
+        g.update = function (dt, now) {
+          for (let s = 0; s < w.meteors.length; s++) if (!slots.includes(s) && w.meteors[s].z > -25) w.meteors[s].x = 100;
+          update.call(g, dt, now);
+          for (const s of slots) {
+            const m = w.meteors[s];
+            if (window.__near[s] || m.z < -1 || m.z > 5) continue;
+            const v = camera.position.clone().set(m.x, m.y, m.z).project(camera);
+            window.__near[s] = { x: +m.x.toFixed(3), z: +m.z.toFixed(2), ndcX: +v.x.toFixed(3), ndcY: +v.y.toFixed(3) };
+          }
+        };
+        window.__restoreUpdate = () => (g.update = update);
+        return { placed, spawn: !!mod.spawnMeteor, ship: { x: w.ship.x, y: w.ship.y } };
+      });
+      const got = await page
+        .waitForFunction(() => [0, 1, 2].every((s) => window.__near[s]), null, SHORT)
+        .then(() => true, () => false);
+      const near = await page.evaluate(() => window.__near);
+      await page.evaluate(() => window.__restoreUpdate());
+      const ok = got && near.every((n) => Math.abs(n.ndcX) <= 1 && Math.abs(n.ndcY) <= 1);
+      report(ok, `(corridor) aimed meteors (${r.spawn ? 'spawnMeteor' : 'old aim'}, ship x ${r.ship.x.toFixed(2)}) at the ship's depth: ${JSON.stringify(near)} (NDC within +-1)`);
+    }
+
+    // (keys) The meteors ended the run. Space restarts once the score formed.
+    if (await page.evaluate(() => window.__pf.game.phase === 'play')) await page.evaluate(() => window.__pf.game.debug.kill());
+    await waitPhase('score', WAIT);
+    await page.evaluate(() => (window.__g.safe = true));
+    await page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT);
+    {
+      const fa = await focusInfo();
+      await page.keyboard.press('Space');
+      await waitFrames(page, 2);
+      const fb = await focusInfo();
+      report(fa.focus === 'body' && fb.phase === 'enter' && fb.scrollY === 0,
+        `(keys) score formed, focus ${fa.focus} (released at the crash); Space -> ${fb.phase}, scrollY ${fb.scrollY} (enter, 0)`);
+      if (fb.phase === 'score') await page.mouse.click(W / 2, H / 2).then(away); // restart anyway
+    }
+
+    // (focus) Shift+Tab, then Tab twice, mid-game.
+    {
+      await waitPhase('play', WAIT);
+      const t0 = await page.evaluate(() => window.__pf.game.debug.world.t);
+      await page.keyboard.press('Shift+Tab');
+      await waitFrames(page, 3);
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      const advancing = await page
+        .waitForFunction((t0) => window.__pf.game.debug.world.t > t0 + 1, t0, SHORT)
+        .then(() => true, () => false);
+      const f = await focusInfo();
+      const t1 = await page.evaluate(() => window.__pf.game.debug.world.t);
+      report(advancing && f.scrollY === 0 && f.phase === 'play' && f.mainInert && f.focus === 'exit',
+        `(focus) Shift+Tab mid-game: ${JSON.stringify(f)}, game time ${t0.toFixed(2)} -> ${t1.toFixed(2)} s (scrollY 0, still playing, main inert, focus on the "×")`);
+    }
+
+    // (keys) Enter on the "×" in the score: it exits, it does not restart.
+    {
+      await page.evaluate(() => window.__pf.game.debug.kill());
+      await waitPhase('score', WAIT);
+      await page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT);
+      await page.evaluate(() => document.querySelector('[data-game-exit]').focus());
+      await page.keyboard.press('Enter');
+      await waitFrames(page, 0).catch(() => {});
+      const p = await page.evaluate(() => window.__pf.game.phase);
+      report(p === 'exit', `(keys) Enter with the focus on the "×" in the score -> ${p} (exit, not a restart)`);
+      if (p !== 'exit') await page.keyboard.press('Escape');
+    }
+
+    // (focus) After the exit: the page is the page again.
+    {
+      const idle = await waitPhase('idle', SHORT);
+      await page.waitForFunction(onNameAtRest, true, WAIT).catch(() => {});
+      const f = await focusInfo();
+      report(idle && !f.gameOn && !f.mainInert && !f.overlayInert && f.focus === 'body',
+        `(focus) after the exit: ${JSON.stringify(f)} (idle, no game-on, not inert, focus back on body)`);
+      await page.mouse.move(W / 2, H - 100);
+      for (let i = 0; i < 4; i++) {
+        await page.mouse.wheel(0, 500);
+        await page.waitForTimeout(150);
+      }
+      const y = await page.evaluate(() => window.scrollY);
+      report(y > 0, `(focus) after the exit the page scrolls: scrollY ${y}`);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForFunction(() => window.__pf.state().chainShown === 0 && window.scrollY === 0, null, WAIT);
+    }
+
+    // (focus) A game started with the focus on the language toggle (disabled
+    // for the game) gives it back, enabled, after Esc.
+    {
+      await page.waitForFunction(onNameAtRest, false, WAIT);
+      await page.evaluate(() => document.querySelector('[data-lang-toggle]').focus());
+      await page.evaluate(() => window.__pf.game.start(0));
+      const ok = await waitPhase('play', WAIT);
+      const during = await focusInfo();
+      await page.keyboard.press('Escape');
+      const idle = await waitPhase('idle', SHORT);
+      const f = await focusInfo();
+      const enabled = await page.evaluate(() => !document.querySelector('[data-lang-toggle]').disabled);
+      report(ok && during.focus === 'exit' && idle && f.focus === 'lang' && enabled && f.scrollY === 0,
+        `(focus) language toggle focused before the game: during ${during.focus}, after Esc ${f.focus}, enabled ${enabled}, scrollY ${f.scrollY}`);
+    }
+  } catch (err) {
+    report(false, `(part 4) ${err.message.split('\n')[0]}`);
+  }
+  if (site.errors.length) report(false, `(part 4) console errors:\n  ${site.errors.join('\n  ')}`);
+  else report(true, '(part 4) no console errors');
+  await site.browser.close();
+  return failed;
+}
+
 async function flow() {
   const failed1 = await flowPart1();
   const failed2 = await flowPart2();
   const failed3 = await flowPart3();
-  const failed4 = await probeCheck();
-  return failed1 || failed2 || failed3 || failed4;
+  const failed4 = await flowPart4();
+  const failed5 = await probeCheck();
+  return failed1 || failed2 || failed3 || failed4 || failed5;
 }
 
 async function flowPart1() {
@@ -1373,7 +1670,7 @@ async function heroPrograms() {
   return failed;
 }
 
-const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench, heroPrograms };
+const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, flow4: flowPart4, probe: probeCheck, budget: budgetCheck, bench, heroPrograms };
 
 (async () => {
   const run = checks[mode];
