@@ -432,6 +432,10 @@ async function boot() {
   // Disabled while the game runs: CSS only hides it, and a programmatic or
   // assistive-tech click would still switch the page's language mid-game.
   const langToggle = document.querySelector('[data-lang-toggle]');
+  // Made inert while the game runs: the keyboard cannot reach the page's links
+  // (focusing one would scroll the locked page under the game).
+  const pageParts = [document.querySelector('main'), document.querySelector('.overlay')].filter(Boolean);
+  let focusBefore = null; // what had the keyboard focus when the game entered
 
   /** Can a game start from phrase `from` right now? */
   function canStartFrom(from) {
@@ -472,9 +476,13 @@ async function boot() {
   }
 
   function onGameEnter() {
+    focusBefore = document.activeElement;
     document.documentElement.classList.add('game-on');
     if (langToggle) langToggle.disabled = true;
+    for (const el of pageParts) el.inert = true;
     exitButton?.setAttribute('aria-label', exitLabel(curLang));
+    // The keyboard starts on the "×": the way out, and nothing to scroll to.
+    exitButton?.focus({ preventScroll: true });
     document.body.style.cursor = '';
     cursorHint = false;
     dust.visible = false;
@@ -490,6 +498,15 @@ async function boot() {
   function onGameExited() {
     document.documentElement.classList.remove('game-on');
     if (langToggle) langToggle.disabled = false;
+    for (const el of pageParts) el.inert = false;
+    // The focus goes back where it was (the language toggle too, which the
+    // game disabled), if that is still in the page; else it rests on body.
+    const back = focusBefore;
+    focusBefore = null;
+    if (document.activeElement === exitButton) exitButton.blur();
+    if (back && back !== document.body && back.isConnected && !back.disabled && !back.closest('[inert]')) {
+      back.focus({ preventScroll: true });
+    }
     dust.visible = true;
     // The probe gets back what the game took, unless a stepDown already
     // reached level 1. Samples taken before the game do not count.
@@ -641,6 +658,25 @@ async function boot() {
     if (Math.abs(dS) > 0.5) scrollDir = Math.sign(dS);
     lastScrollY = sy;
 
+    // While the game runs it drives the field and the camera; the hero's own
+    // per-frame logic waits. Ahead of the pause below: the page is locked at
+    // the top while the game runs, but if anything scrolled it (a focused
+    // link, find in page) an opaque section would pause the frame and freeze
+    // the game with Esc unable to finish. Back to the top, and play on.
+    if (game?.active) {
+      paused = false;
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      elapsed += dt;
+      frames++;
+      game.update(dt, now);
+      field.update(dt, elapsed);
+      post.render(dt, elapsed);
+      // As while paused: the pointer's travel during the game is not a stir.
+      lastPx = px;
+      lastPy = py;
+      return;
+    }
+
     // Nothing of the canvas shows while an opaque section fills the screen, so
     // neither simulate nor draw it. The particles hold their shape and pick up
     // where they were when the gap opens again.
@@ -648,20 +684,6 @@ async function boot() {
     if (paused) {
       // Forget the pointer's travel while hidden, or the first frame back would
       // push the whole distance moved meanwhile into the fluid at once.
-      lastPx = px;
-      lastPy = py;
-      return;
-    }
-
-    // While the game runs it drives the field and the camera; the hero's own
-    // per-frame logic waits.
-    if (game?.active) {
-      elapsed += dt;
-      frames++;
-      game.update(dt, now);
-      field.update(dt, elapsed);
-      post.render(dt, elapsed);
-      // As while paused: the pointer's travel during the game is not a stir.
       lastPx = px;
       lastPy = py;
       return;
