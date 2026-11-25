@@ -7,6 +7,9 @@
 //                                           part 3: edge cases, captures in
 //                                           shots/flow-*.png)
 //
+//   node scripts/game-check.cjs bench     (hero frame time vs main; exit 0 pass,
+//                                           1 fail, 3 inconclusive; see bench)
+//
 // Needs the dev server (`npm run dev -- --port 5199`) and the globally
 // installed Playwright. The site's own animation loop is stopped and the check
 // steps the field itself, so every frame has a known dt and known uniforms.
@@ -1095,26 +1098,29 @@ async function probeCheck() {
 // 10 s measured) on this branch and on main, alternating the builds. Software
 // rendering is noisy, so the verdict compares medians and reports the spread.
 //   MAIN_BASE (default http://localhost:5198) serves a `git worktree` of main.
-//   BENCH_RUNS (default 4) runs per build.
+//   BENCH_RUNS (default 4, at least 3) measured runs per build.
 async function benchRun(base) {
   const browser = await chromium.launch({ args: LAUNCH_ARGS });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await page.goto(`${base}/#nivel1`);
-  await page.waitForFunction(() => window.__pf && window.__pf.state().frames > 2, null, { timeout: 300000, polling: 500 });
-  await page.waitForTimeout(3000);
-  const r = await page.evaluate(
-    () =>
-      new Promise((resolve) => {
-        const f0 = window.__pf.state().frames;
-        const t0 = performance.now();
-        setTimeout(() => {
-          const f1 = window.__pf.state().frames;
-          resolve({ frames: f1 - f0, ms: performance.now() - t0 });
-        }, 10000);
-      })
-  );
-  await browser.close();
-  return r.ms / r.frames;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.goto(`${base}/#nivel1`);
+    await page.waitForFunction(() => window.__pf && window.__pf.state().frames > 2, null, { timeout: 300000, polling: 500 });
+    await page.waitForTimeout(3000);
+    const r = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const f0 = window.__pf.state().frames;
+          const t0 = performance.now();
+          setTimeout(() => {
+            const f1 = window.__pf.state().frames;
+            resolve({ frames: f1 - f0, ms: performance.now() - t0 });
+          }, 10000);
+        })
+    );
+    return r.ms / r.frames;
+  } finally {
+    await browser.close();
+  }
 }
 
 const median = (a) => {
@@ -1142,32 +1148,45 @@ async function budgetCheck() {
   return failed;
 }
 
+// Exit codes: 0 pass, 1 fail, 3 inconclusive (the margin to the criterion is
+// inside the run-to-run noise). The order alternates every iteration and one
+// warm-up run per build is discarded, so neither build gets the warm machine.
 async function bench() {
-  const runs = +(process.env.BENCH_RUNS || 4);
+  const runs = Math.max(3, +(process.env.BENCH_RUNS || 4));
   const mainBase = process.env.MAIN_BASE || 'http://localhost:5198';
-  const branch = [];
-  const main = [];
+  const builds = { branch: BASE, main: mainBase };
+  await benchRun(builds.branch);
+  await benchRun(builds.main);
+  console.log('warm-up runs discarded (one per build)');
+  const times = { branch: [], main: [] };
   for (let i = 0; i < runs; i++) {
-    branch.push(await benchRun(BASE));
-    main.push(await benchRun(mainBase));
-    console.log(`run ${i + 1}: branch ${branch[i].toFixed(1)} ms/frame, main ${main[i].toFixed(1)} ms/frame`);
+    const order = i % 2 ? ['main', 'branch'] : ['branch', 'main'];
+    for (const k of order) times[k].push(await benchRun(builds[k]));
+    console.log(
+      `run ${i + 1} (${order.join(' then ')}): branch ${times.branch[i].toFixed(1)} ms/frame, main ${times.main[i].toFixed(1)} ms/frame`
+    );
   }
-  const mb = median(branch);
-  const mm = median(main);
+  const mb = median(times.branch);
+  const mm = median(times.main);
   const ratio = mb / mm;
   const spread = (a) => (Math.max(...a) - Math.min(...a)) / median(a);
-  console.log(`branch median ${mb.toFixed(2)} ms  runs ${branch.map((v) => v.toFixed(1)).join(', ')}  spread ${(spread(branch) * 100).toFixed(1)}%`);
-  console.log(`main   median ${mm.toFixed(2)} ms  runs ${main.map((v) => v.toFixed(1)).join(', ')}  spread ${(spread(main) * 100).toFixed(1)}%`);
+  console.log(`branch median ${mb.toFixed(2)} ms  runs ${times.branch.map((v) => v.toFixed(1)).join(', ')}  spread ${(spread(times.branch) * 100).toFixed(1)}%`);
+  console.log(`main   median ${mm.toFixed(2)} ms  runs ${times.main.map((v) => v.toFixed(1)).join(', ')}  spread ${(spread(times.main) * 100).toFixed(1)}%`);
   console.log(`ratio branch/main ${ratio.toFixed(3)} (criterion <= 1.10)`);
-  const noise = Math.max(spread(branch), spread(main));
-  let failed = false;
-  if (ratio <= 1.1) console.log('PASS hero cost within +10%');
-  else if (Math.abs(ratio - 1) < noise) console.log(`INCONCLUSIVE ratio ${ratio.toFixed(3)} is inside the run-to-run spread ${(noise * 100).toFixed(1)}%`);
+  const noise = Math.max(spread(times.branch), spread(times.main));
+  const margin = Math.abs(1.1 - ratio);
+  const note = `margin ${(margin * 100).toFixed(1)}%, spread ${(noise * 100).toFixed(1)}%`;
+  let code = 0;
+  if (margin <= noise) {
+    console.log(`INCONCLUSIVE (within noise: ${note})`);
+    code = 3;
+  } else if (ratio <= 1.1) console.log(`PASS hero cost within +10% (${note})`);
   else {
-    console.log('FAIL hero cost above +10%');
-    failed = true;
+    console.log(`FAIL hero cost above +10% (${note})`);
+    code = 1;
   }
-  return failed || (await budgetCheck());
+  const budgetFailed = await budgetCheck();
+  return code || (budgetFailed ? 1 : 0);
 }
 
 const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3, probe: probeCheck, budget: budgetCheck, bench };
@@ -1179,5 +1198,5 @@ const checks = { positions, look, flow, flow2: flowPart2, flow3: flowPart3, prob
     process.exit(2);
   }
   const failed = await run();
-  process.exit(failed ? 1 : 0);
+  process.exit(typeof failed === 'number' ? failed : failed ? 1 : 0);
 })();
