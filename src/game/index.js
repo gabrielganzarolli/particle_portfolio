@@ -12,7 +12,7 @@ import { createWorld, stepWorld, gameUniforms } from './world.js';
 import { steerTarget, attachControls } from './controls.js';
 import { gameCamera, blendPose, stepBlend, HERO_FOV, corridorFor } from './camera.js';
 import { createPhases, PHASE, ENTER_S, EXIT_S } from './phases.js';
-import { submitPlay, formatScore } from './ranking.js';
+import { submitPlay, formatScoreboard } from './ranking.js';
 import { createRng } from './rng.js';
 import { buildGamePrograms, gameLift } from './gpu.js';
 import { LEVELS } from '../quality.js';
@@ -185,7 +185,7 @@ export function createGame(ctx) {
   // `Esc` while the ship is alive.
   async function buildScorePhrase(seconds, lang) {
     const rank = await submitPlay(seconds);
-    await field.setPhrase(SCORE, formatScore(seconds, rank, lang));
+    await field.setPhrase(SCORE, formatScoreboard(seconds, rank, lang));
   }
 
   async function formScore() {

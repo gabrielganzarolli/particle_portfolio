@@ -4,7 +4,8 @@
 //
 // Storage is one Redis sorted set: a member per play (a random id), scored by
 // the play's time in seconds. A play's place is 1 plus the number of plays with
-// a strictly longer time, so equal times share a place. Redis is reached over
+// a strictly longer time, so equal times share a place. The answer also carries
+// the TOP_N best times (the times only). Redis is reached over
 // the Upstash REST API with fetch (no dependency).
 
 export const SET_KEY = 'ship:times';
@@ -12,6 +13,7 @@ export const MIN_SECONDS = 0.5; // nobody survives less than this
 export const MAX_SECONDS = 3600; // nor, in practice, more than an hour
 export const RATE_LIMIT = 200; // plays accepted per address per window
 export const RATE_WINDOW_S = 3600;
+export const TOP_N = 10; // the best times sent back with the place
 
 /** The time as one decimal, or null when it is not a believable duration. */
 export function parseSeconds(body) {
@@ -76,8 +78,16 @@ export async function handleRank({ method, body, headers }, { redis, hash, rando
     if (count > RATE_LIMIT) return { status: 429, body: { error: 'rate' } };
 
     const s = String(seconds);
-    const [, longer, total] = await redis([['ZADD', SET_KEY, s, randomId()], ['ZCOUNT', SET_KEY, `(${s}`, '+inf'], ['ZCARD', SET_KEY]]);
-    return { status: 200, body: { rank: longer + 1, total } };
+    const [, longer, total, best] = await redis([
+      ['ZADD', SET_KEY, s, randomId()],
+      ['ZCOUNT', SET_KEY, `(${s}`, '+inf'],
+      ['ZCARD', SET_KEY],
+      ['ZREVRANGE', SET_KEY, '0', String(TOP_N - 1), 'WITHSCORES'],
+    ]);
+    // WITHSCORES answers [id, score, id, score, ...]: only the times go out, never an id.
+    const top = [];
+    for (let i = 1; i < (best ?? []).length; i += 2) top.push(Number(best[i]));
+    return { status: 200, body: { rank: longer + 1, total, top } };
   } catch {
     return { status: 502, body: { error: 'storage' } };
   }

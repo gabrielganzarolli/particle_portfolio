@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SET_KEY, MIN_SECONDS, MAX_SECONDS, RATE_LIMIT, parseSeconds, clientKey, redisConfig, makeRedis, handleRank } from './_rank.js';
+import { SET_KEY, TOP_N, MIN_SECONDS, MAX_SECONDS, RATE_LIMIT, parseSeconds, clientKey, redisConfig, makeRedis, handleRank } from './_rank.js';
 
 const hash = (s) => `h(${s})`;
 const randomId = () => 'id1';
@@ -89,19 +89,19 @@ test('handleRank: 400 for a time that is not believable, and nothing is stored',
 
 test('handleRank: counts the plays, stores one, and answers the rank among all of them', async () => {
   // rate-limit pipeline [INCR, EXPIRE]; then [ZADD, ZCOUNT greater, ZCARD]
-  const redis = fakeRedis([1, 1], [1, 36, 1204]);
+  const redis = fakeRedis([1, 1], [1, 36, 1204, ['a', '90.1', 'b', '88']]);
   const r = await handleRank(post({ seconds: 42.3 }), { redis, hash, randomId });
-  assert.deepEqual(r, { status: 200, body: { rank: 37, total: 1204 } });
+  assert.deepEqual(r, { status: 200, body: { rank: 37, total: 1204, top: [90.1, 88] } });
   assert.deepEqual(redis.calls[0], [['INCR', 'rl:h(203.0.113.9)'], ['EXPIRE', 'rl:h(203.0.113.9)', '3600', 'NX']]);
-  assert.deepEqual(redis.calls[1], [['ZADD', SET_KEY, '42.3', 'id1'], ['ZCOUNT', SET_KEY, '(42.3', '+inf'], ['ZCARD', SET_KEY]]);
+  assert.deepEqual(redis.calls[1], [['ZADD', SET_KEY, '42.3', 'id1'], ['ZCOUNT', SET_KEY, '(42.3', '+inf'], ['ZCARD', SET_KEY], ['ZREVRANGE', SET_KEY, '0', String(TOP_N - 1), 'WITHSCORES']]);
 });
 
 test('handleRank: the best time so far is rank 1; equal times share a rank', async () => {
-  const first = await handleRank(post({ seconds: 20 }), { redis: fakeRedis([1, 1], [1, 0, 1]), hash, randomId });
-  assert.deepEqual(first.body, { rank: 1, total: 1 });
+  const first = await handleRank(post({ seconds: 20 }), { redis: fakeRedis([1, 1], [1, 0, 1, ['x', '20']]), hash, randomId });
+  assert.deepEqual(first.body, { rank: 1, total: 1, top: [20] });
   // two others already had exactly 20.0: nobody is strictly better, so rank 1 of 3
-  const tie = await handleRank(post({ seconds: 20 }), { redis: fakeRedis([1, 1], [1, 0, 3]), hash, randomId });
-  assert.deepEqual(tie.body, { rank: 1, total: 3 });
+  const tie = await handleRank(post({ seconds: 20 }), { redis: fakeRedis([1, 1], [1, 0, 3, ['x', '20', 'y', '20', 'z', '20']]), hash, randomId });
+  assert.deepEqual(tie.body, { rank: 1, total: 3, top: [20, 20, 20] });
 });
 
 test('handleRank: 429 over the hourly limit, and nothing is stored', async () => {
@@ -109,7 +109,7 @@ test('handleRank: 429 over the hourly limit, and nothing is stored', async () =>
   const r = await handleRank(post({ seconds: 42.3 }), { redis, hash, randomId });
   assert.equal(r.status, 429);
   assert.equal(redis.calls.length, 1);
-  const ok = await handleRank(post({ seconds: 42.3 }), { redis: fakeRedis([RATE_LIMIT, 0], [1, 0, 1]), hash, randomId });
+  const ok = await handleRank(post({ seconds: 42.3 }), { redis: fakeRedis([RATE_LIMIT, 0], [1, 0, 1, ['x', '42.3']]), hash, randomId });
   assert.equal(ok.status, 200, 'exactly the limit is still allowed');
 });
 
@@ -119,8 +119,15 @@ test('handleRank: 502 when storage fails, with no detail about it', async () => 
 });
 
 test('handleRank: Redis only ever sees a hash of the address, never the address', async () => {
-  const redis = fakeRedis([1, 1], [1, 0, 1]);
+  const redis = fakeRedis([1, 1], [1, 0, 1, ['x', '10']]);
   await handleRank(post({ seconds: 10 }, { 'x-forwarded-for': '198.51.100.7' }), { redis, hash: () => 'opaque', randomId });
   assert.ok(!JSON.stringify(redis.calls).includes('198.51.100.7'));
   assert.equal(redis.calls[0][0][1], 'rl:opaque');
+});
+
+test('handleRank: the top carries only times, never the ids of the plays', async () => {
+  const redis = fakeRedis([1, 1], [1, 0, 2, ['secret-id-1', '50.5', 'secret-id-2', '49']]);
+  const r = await handleRank(post({ seconds: 49 }), { redis, hash, randomId });
+  assert.ok(!JSON.stringify(r.body).includes('secret-id'));
+  assert.deepEqual(r.body.top, [50.5, 49]);
 });

@@ -1791,9 +1791,15 @@ async function rankCheck() {
 
   // (a) The server answers: time and place, one request, the time as shown.
   {
-    const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204 }) }));
-    const m = /^(\d+\.\d) s  ·  #37 of 1,204$/.exec(r.text ?? '');
-    report(!!m, `(a) score text with the place: "${r.text}"`);
+    const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204, top: [99, 98, 97, 96, 95, 94, 93, 92, 91, 90.5] }) }));
+    const lines = (r.text ?? '').split('\n');
+    report(lines.length === 6 && lines[1] === '1  99.0 s\t6  94.0 s' && lines[5] === '5  95.0 s\t10  90.5 s', `(a) the best times as rows: ${JSON.stringify(lines.slice(1))}`);
+    const m = /^(\d+\.\d) s  ·  #37 of 1,204$/.exec(lines[0]);
+    report(!!m, `(a) first line with the place: "${lines[0]}"`);
+    await r.page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT).catch(() => {});
+    await r.page.waitForTimeout(1500);
+    require('fs').mkdirSync('shots', { recursive: true });
+    await r.page.screenshot({ path: 'shots/rank-top10.png' });
     const body = r.sent[0] ? JSON.parse(r.sent[0].body) : null;
     report(r.sent.length === 1 && r.sent[0].method === 'POST', `(a) one POST to /api/rank (${r.sent.length})`);
     report(!!m && body && body.seconds === Number(m[1]), `(a) the time sent (${body && body.seconds}) is the time shown (${m && m[1]})`);
