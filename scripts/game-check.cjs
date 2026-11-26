@@ -14,6 +14,8 @@
 //
 //   node scripts/game-check.cjs heroPrograms (the hero's programs carry no
 //                                           game code at load or after a game)
+//   node scripts/game-check.cjs headLeak (after a crash the parked particles do
+//                                           not come back as the head's shape)
 //   node scripts/game-check.cjs bench     (hero frame time vs main; exit 0 pass,
 //                                           1 fail, 3 inconclusive; see bench)
 //
@@ -1670,7 +1672,75 @@ async function heroPrograms() {
   return failed;
 }
 
-const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, flow4: flowPart4, probe: probeCheck, budget: budgetCheck, bench, heroPrograms };
+// After the ship blows up, the particles that sit outside the game's budget
+// (parked: they hold still, hidden, while the game runs) must not come back
+// into view in the head's shape on the way to the score. Started from the head,
+// they were frozen exactly there; once the score phase blended the look back to
+// the hero's they showed as a head for about two seconds before the morph moved
+// them. Measured at the first frames where they are drawn at 15% and at 50%.
+async function headLeak() {
+  const { browser, page, errors } = await openSite('#nivel1');
+  let failed = false;
+  const report = (ok, text) => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${text}`);
+    if (!ok) failed = true;
+  };
+  try {
+    if (await formHead(page, report, 'head')) {
+      const pt = await headScreenPoint(page, 'centre');
+      await page.mouse.click(pt.x, pt.y);
+      await page.waitForFunction(() => window.__pf.game?.phase === 'play', null, WAIT);
+      await page.waitForTimeout(1500);
+      const marks = await page.evaluate(
+        (HEAD) =>
+          new Promise((resolve, reject) => {
+            const { field, game } = window.__pf;
+            const N = field.size * field.size;
+            const active = field.gameBudget.active;
+            const head = field.targets[HEAD].image.data;
+            // Share of the parked particles within 0.4 of their place in the head.
+            const nearHead = () => {
+              const pos = field.readPositions();
+              let near = 0;
+              for (let i = active; i < N; i++) {
+                const d = Math.hypot(pos[i * 4] - head[i * 4], pos[i * 4 + 1] - head[i * 4 + 1], pos[i * 4 + 2] - head[i * 4 + 2]);
+                if (d < 0.4) near++;
+              }
+              return near / (N - active);
+            };
+            const pending = [0.85, 0.5]; // gameLook values; the parked are drawn at 1 - look
+            const out = [];
+            const giveUp = setTimeout(() => reject(new Error('the score phase never reached the marks')), 170000);
+            game.debug.kill();
+            const tick = () => {
+              if (game.phase === 'score') {
+                const look = field.gameLook.value;
+                while (pending.length && look < pending[0]) out.push({ drawn: +(1 - pending.shift()).toFixed(2), nearHead: nearHead() });
+                if (!pending.length) {
+                  clearTimeout(giveUp);
+                  return resolve(out);
+                }
+              }
+              requestAnimationFrame(tick);
+            };
+            tick();
+          }),
+        HEAD
+      );
+      for (const m of marks) {
+        report(m.nearHead < 0.1, `parked particles drawn at ${(m.drawn * 100).toFixed(0)}%: ${(m.nearHead * 100).toFixed(1)}% in the head's shape (< 10%)`);
+      }
+      report(marks.length === 2, `both marks measured (${marks.length})`);
+    }
+  } catch (err) {
+    report(false, err.message.split('\n')[0]);
+  }
+  if (errors.length) report(false, `console errors:\n  ${errors.join('\n  ')}`);
+  await browser.close();
+  return failed;
+}
+
+const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, flow4: flowPart4, probe: probeCheck, budget: budgetCheck, bench, heroPrograms, headLeak };
 
 (async () => {
   const run = checks[mode];

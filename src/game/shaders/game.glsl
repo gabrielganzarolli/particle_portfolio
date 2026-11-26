@@ -88,9 +88,31 @@ vec4 gameLocal(float idx) {
   return texelFetch(uGameLocal, ivec2(i % w, i / w), 0);
 }
 
+// A loose cloud, as the page's first frame has it: the field's width (10) times
+// 0.45 to 1.2, flattened in y and thin in z.
+vec3 gameCloud(float idx) {
+  float r = 10.0 * (0.45 + gameHash(idx, 20u) * 0.75);
+  float th = gameHash(idx, 21u) * 6.2832;
+  float ph = acos(2.0 * gameHash(idx, 22u) - 1.0);
+  return vec3(r * sin(ph) * cos(th), r * sin(ph) * sin(th) * 0.4, r * cos(ph) * 0.12);
+}
+
 GameGoal gameGoal(float idx) {
   GameGoal g = GameGoal(vec3(0.0), vec3(0.0), 0.0, 1.0, ROLE_PARKED);
-  if (idx >= uGameActive) return g;
+  if (idx >= uGameActive) {
+    // Parked particles hold still, hidden, while the ship flies: wherever the
+    // game started they are, which from the head is the head's shape. Once the
+    // ship has blown up they gather into a loose cloud, still hidden (the look
+    // stays the game's until the score phase), so that when the hero's look
+    // comes back they show as a haze that condenses into the score, not as the
+    // shape they were frozen in.
+    if (uGameAlive < 0.5) {
+      g.pos = gameCloud(idx);
+      g.k = 8.0;
+      g.free = 0.0;
+    }
+    return g;
+  }
 
   vec3 shipVel = vec3(uShip.zw, 0.0);
 
