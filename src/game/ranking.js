@@ -52,7 +52,7 @@ export async function submitPlay(seconds, { fetchImpl = globalThis.fetch, timeou
 
 /**
  * The whole score screen, as particle text with a hierarchy: the time large,
- * the place under it, then the best times small and dim in two columns (1 to 5
+ * the place under it, then the best times in two columns (1 to 5
  * down the left, 6 to 10 down the right) with the player's own entry, when it
  * is among them, at full density. Rows are split by "\n", the cells of a row
  * by "\t", and "{scale|alpha}" sizes and dims a cell (see rasterizeRows in
@@ -69,9 +69,9 @@ export function formatScoreboard(seconds, rank, lang) {
   if (top.length > 0) {
     // Entry rank.rank - 1 is the player's own when the time is in the list.
     const mine = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
-    // Up to three columns (1 to 4, 5 to 8, 9 and 10) so the rows stay few and
-    // large. Every row has all the columns, empty cells included, so they line up.
-    const cols = Math.min(3, top.length);
+    // Two columns (1 to 5 on the left, 6 to 10 on the right). Every row has all
+    // the columns, empty cells included, so they line up.
+    const cols = Math.min(2, top.length);
     const per = Math.ceil(top.length / cols);
     const cell = (i) => (i < top.length ? `{1|${i === mine ? 1 : 0.85}}${i + 1}  ${formatTime(top[i], lang)}` : '');
     rows.push('{0.35}');
