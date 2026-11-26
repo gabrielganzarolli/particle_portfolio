@@ -453,7 +453,8 @@ main {
    scroll over a fixed canvas — so the control is fixed to the corner rather
    than placed in the flow, where it would scroll away and never come back.
    Above the solid sections, which lift themselves over the canvas. */
-.lang-toggle-fixed {
+.lang-toggle-fixed,
+.game-exit {
   position: fixed;
   /* Same top as the name: the overlay padding, minus this button's padding. */
   top: calc(var(--edge, 1.5rem) - 0.25rem);
@@ -474,8 +475,78 @@ main {
   transition: color var(--dur-micro) var(--ease-out);
 }
 .lang-toggle-fixed:hover,
-.lang-toggle-fixed:focus-visible {
+.lang-toggle-fixed:focus-visible,
+.game-exit:hover,
+.game-exit:focus-visible {
   color: rgba(244, 236, 220, 0.95);
+}
+
+/* The game (src/game) ------------------------------------------------------
+   While it runs the particles are the whole page: the copy fades, the page
+   stops scrolling, the canvas takes every touch, and the only control is the
+   "×" in the language toggle's place. main.js sets html.game-on. */
+.game-exit {
+  /* Clear of a notch (env() is 0 elsewhere). */
+  top: calc(var(--edge, 1.5rem) - 0.25rem + env(safe-area-inset-top, 0px));
+  right: calc(var(--edge, 1.5rem) - 0.25rem + env(safe-area-inset-right, 0px));
+  font-size: 1.125rem;
+  line-height: 1;
+  letter-spacing: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    opacity var(--dur-out) var(--ease-in),
+    visibility 0s linear var(--dur-out);
+}
+
+/* A 44 x 44 px touch target around the small "×", without changing how it
+   looks: the pseudo-element is invisible but takes the button's hits. */
+.game-exit::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+/* scrollbar-gutter keeps the space of the classic scrollbar that overflow:
+   hidden removes, so the fixed overlay and the "×" do not shift sideways by
+   its width. Only while the game runs: the hero's layout is untouched. */
+html.game-on {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* Only html.game-on changes the overlay's opacity, so this runs only for the
+   game's fade out and back in. */
+.overlay {
+  transition: opacity var(--dur-in) var(--ease-out);
+}
+
+html.game-on .overlay {
+  opacity: 0;
+}
+
+html.game-on [data-lang-toggle] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+html.game-on #scene {
+  touch-action: none;
+}
+
+html.game-on .game-exit {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    opacity var(--dur-in) var(--ease-out);
 }
 
 /* Language switch, in place (homeI18n.js): the copy fades out, changes and

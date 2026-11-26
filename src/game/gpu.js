@@ -1,0 +1,106 @@
+// The game's GPU programs: variants of the hero's velocity, position and
+// points programs with the game's code in them (src/game/shaders). They live
+// in the game chunk and are built and compiled at the first game start, so the
+// hero's own programs stay exactly what they are without the game.
+// ParticleField swaps them in while a game runs (useGameShaders).
+import * as THREE from 'three';
+
+import simplex from '../shaders/lib/simplex3d.glsl?raw';
+import curl from '../shaders/lib/curl.glsl?raw';
+import pointsFrag from '../shaders/points.frag?raw';
+import heroPosition from '../shaders/simPosition.frag?raw';
+import heroPointsVert from '../shaders/points.vert?raw';
+import game from './shaders/game.glsl?raw';
+import simVelocity from './shaders/simVelocity.frag?raw';
+import gamePosition from './shaders/simPosition.frag?raw';
+import gamePoints from './shaders/points.vert?raw';
+import { gamePointsVert, gamePositionFrag } from './shaderSource.js';
+
+// The position and points variants are built from the hero's own shader text
+// (src/game/shaderSource.js); the velocity variant is a full copy that
+// npm test holds to the hero's (shaderSource.test.js).
+const VELOCITY_SHADER = `${simplex}\n${curl}\n${game}\n${simVelocity}`;
+const POSITION_SHADER = `${game}\n${gamePositionFrag(heroPosition, gamePosition)}`;
+const POINTS_VERT = `${simplex}\n${game}\n${gamePointsVert(heroPointsVert, gamePoints)}`;
+
+// Without the bloom (level 1) nothing spreads the brightest points' light and
+// there are 25k particles instead of 70k, so the field reads dim and the
+// flame as separate dots. With the bloom off the game's points are drawn this
+// much larger and brighter (display space, before the curve to linear light);
+// in between by a share of it (level 2's bloom is 0.75 -> 1.175). Judged on
+// the look check's captures (lit share / near-white share at t = 8 s): level 1
+// went 0.94% / 0.01% -> 2.47% / 0.20%, level 2 2.50% / 0.08% -> 5.64% / 0.20%;
+// level 3 (no lift) is 6.30% / 0.21%.
+const NO_BLOOM_LIFT = 1.7;
+
+/** The game's size and brightness lift (uGameLift) for a bloom strength 0..1. */
+export function gameLift(bloom) {
+  return 1 + (NO_BLOOM_LIFT - 1) * (1 - Math.min(1, Math.max(0, bloom)));
+}
+
+/**
+ * Build and compile the game's three programs for `field`. Every uniform the
+ * hero's materials have is shared by reference (the existing setters keep
+ * working whichever program is bound), plus the field's game uniforms.
+ *
+ * @param {import('../ParticleField.js').ParticleField} field
+ * @returns {Promise<{ velocity: THREE.ShaderMaterial, position: THREE.ShaderMaterial, points: THREE.ShaderMaterial }>}
+ */
+export async function buildGamePrograms(field) {
+  const { gpu, velVar, posVar, renderer, gameUniforms, gameEnds, gameLook } = field;
+
+  // As GPUComputationRenderer.addVariable() + init() build a variable's
+  // material: the `resolution` define, and one sampler per dependency, whose
+  // uniform entries gpu.compute() fills each step (shared with the hero's).
+  const sim = (variable, source, extra) => {
+    let shader = source;
+    for (const dep of variable.dependencies) shader = `\nuniform sampler2D ${dep.name};\n${shader}`;
+    return gpu.createShaderMaterial(shader, { ...variable.material.uniforms, ...extra });
+  };
+  const velocity = sim(velVar, VELOCITY_SHADER, { ...gameEnds, ...gameUniforms });
+  const position = sim(posVar, POSITION_SHADER, { uMorph: velVar.material.uniforms.uMorph, ...gameEnds, ...gameUniforms });
+
+  const hero = field.material;
+  const points = new THREE.ShaderMaterial({
+    uniforms: {
+      ...hero.uniforms,
+      uGame: gameLook,
+      ...gameUniforms,
+      uPixelRatio: { value: renderer.getPixelRatio() },
+      uGameLift: { value: 1 },
+    },
+    vertexShader: POINTS_VERT,
+    fragmentShader: pointsFrag,
+    transparent: hero.transparent,
+    depthWrite: hero.depthWrite,
+    depthTest: hero.depthTest,
+    blending: hero.blending,
+  });
+  // The pixel ratio follows the renderer (a resize or a quality step changes it).
+  points.onBeforeRender = (r) => {
+    points.uniforms.uPixelRatio.value = r.getPixelRatio();
+  };
+
+  // Compile now, off the frames: the sim programs as they run (into a float
+  // render target, on a full-screen quad), the points as the field draws them
+  // (into the post chain's render target). Any render target gives the same
+  // program here; the screen would not.
+  const camera = new THREE.Camera();
+  // Position and uv only, like the FullScreenQuad gpu.compute() draws with:
+  // a normal attribute alone would give a different program.
+  const quad = new THREE.BufferGeometry();
+  quad.setAttribute('position', new THREE.Float32BufferAttribute([-1, 3, 0, -1, -1, 0, 3, -1, 0], 3));
+  quad.setAttribute('uv', new THREE.Float32BufferAttribute([0, 2, 0, 0, 2, 0], 2));
+  const previous = renderer.getRenderTarget();
+  renderer.setRenderTarget(gpu.getAlternateRenderTarget(posVar));
+  const ready = [
+    renderer.compileAsync(new THREE.Mesh(quad, velocity), camera),
+    renderer.compileAsync(new THREE.Mesh(quad, position), camera),
+    renderer.compileAsync(new THREE.Points(field.points.geometry, points), camera, field.scene),
+  ];
+  renderer.setRenderTarget(previous);
+  await Promise.all(ready);
+  quad.dispose();
+
+  return { velocity, position, points };
+}
