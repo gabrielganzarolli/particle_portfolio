@@ -20,7 +20,48 @@ export async function readyFonts() {
   await document.fonts.ready;
 }
 
+// A phrase with "\n" is rows, and a row with "\t" is cells in equal columns
+// (the score screen's list of best times). Every cell is centred in its
+// column at one size, the largest at which all of them fit.
+function rasterizeRows(phrase) {
+  const canvas = document.createElement('canvas');
+  canvas.width = RASTER_W;
+  canvas.height = RASTER_H;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  const rows = phrase.split('\n').map((r) => r.split('\t'));
+  const padX = RASTER_W * 0.04;
+  const maxW = RASTER_W - padX * 2;
+  const LINE = 1.15; // line height, in font sizes
+  const maxH = RASTER_H * 0.96;
+
+  const ref = 200;
+  ctx.font = `${FONT_WEIGHT} ${ref}px ${FONT_FAMILY}`;
+  let size = (maxH / (rows.length * LINE));
+  for (const cells of rows) {
+    const colW = maxW / cells.length;
+    for (const c of cells) {
+      if (c) size = Math.min(size, (colW * 0.92 / ctx.measureText(c).width) * ref);
+    }
+  }
+
+  ctx.font = `${FONT_WEIGHT} ${size}px ${FONT_FAMILY}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.letterSpacing = `${size * 0.02}px`;
+  ctx.fillStyle = '#fff';
+  const top = (RASTER_H - rows.length * size * LINE) / 2 + (size * LINE) / 2;
+  rows.forEach((cells, r) => {
+    const colW = maxW / cells.length;
+    cells.forEach((c, i) => {
+      if (c) ctx.fillText(c, padX + colW * (i + 0.5), top + r * size * LINE);
+    });
+  });
+  return ctx.getImageData(0, 0, RASTER_W, RASTER_H).data;
+}
+
 function rasterize(phrase) {
+  if (/[\n\t]/.test(phrase)) return rasterizeRows(phrase);
   const canvas = document.createElement('canvas');
   canvas.width = RASTER_W;
   canvas.height = RASTER_H;
