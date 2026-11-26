@@ -1775,7 +1775,7 @@ async function rankCheck() {
       if (crash) {
         await page.evaluate(() => window.__pf.game.debug.kill());
         await page.waitForFunction(() => window.__pf.game.phase === 'score', null, WAIT);
-        await page.waitForFunction(() => /^\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
+        await page.waitForFunction(() => /^(\{2\.3\})?\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
         text = await page.evaluate(SCORE_TEXT);
       } else {
         await page.keyboard.press('Escape');
@@ -1793,9 +1793,10 @@ async function rankCheck() {
   {
     const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204, top: [99, 98, 97, 96, 95, 94, 93, 92, 91, 90.5] }) }));
     const lines = (r.text ?? '').split('\n');
-    report(lines.length === 6 && lines[1] === '1  99.0 s\t6  94.0 s' && lines[5] === '5  95.0 s\t10  90.5 s', `(a) the best times as rows: ${JSON.stringify(lines.slice(1))}`);
-    const m = /^(\d+\.\d) s  ·  #37 of 1,204$/.exec(lines[0]);
-    report(!!m, `(a) first line with the place: "${lines[0]}"`);
+    report(lines.length === 8 && lines[3] === '{0.9|0.6}1  99.0 s\t{0.9|0.6}6  94.0 s' && lines[7] === '{0.9|0.6}5  95.0 s\t{0.9|0.6}10  90.5 s', `(a) the best times as rows: ${JSON.stringify(lines.slice(2))}`);
+    report(lines[1] === '{1|0.85}#37 of 1,204', `(a) the place under the time: "${lines[1]}"`);
+    const m = /^\{2\.3\}(\d+\.\d) s$/.exec(lines[0]);
+    report(!!m, `(a) first line is the time: "${lines[0]}"`);
     await r.page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT).catch(() => {});
     await r.page.waitForTimeout(1500);
     require('fs').mkdirSync('shots', { recursive: true });

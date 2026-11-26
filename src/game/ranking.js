@@ -50,27 +50,27 @@ export async function submitPlay(seconds, { fetchImpl = globalThis.fetch, timeou
   }
 }
 
-/** The line the particles spell on the score screen. */
-export function formatScore(seconds, rank, lang) {
+/**
+ * The whole score screen, as particle text with a hierarchy: the time large,
+ * the place under it, then the best times small and dim in two columns (1 to 5
+ * down the left, 6 to 10 down the right) with the player's own entry, when it
+ * is among them, at full density. Rows are split by "\n", the cells of a row
+ * by "\t", and "{scale|alpha}" sizes and dims a cell (see rasterizeRows in
+ * textTargets.js). With no place it is the time alone.
+ */
+export function formatScoreboard(seconds, rank, lang) {
   const time = formatTime(seconds, lang);
   if (!rank) return time;
   const nf = new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US');
-  return `${time}  ·  #${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`;
-}
-
-/**
- * The whole score screen: the line above, then the best times in two columns
- * (1 to 5 down the left, 6 to 10 down the right). Rows are split by "\n" and
- * the cells of a row by "\t", which the particle text raster lays out. With no
- * top list it is the one line alone.
- */
-export function formatScoreboard(seconds, rank, lang) {
-  const head = formatScore(seconds, rank, lang);
-  const top = rank?.top ?? [];
-  if (top.length === 0) return head;
-  const half = Math.ceil(top.length / 2);
-  const cell = (i) => (i < top.length ? `${i + 1}  ${formatTime(top[i], lang)}` : '');
-  const rows = [];
-  for (let r = 0; r < half; r++) rows.push(`${cell(r)}\t${cell(r + half)}`.replace(/\t$/, ''));
-  return [head, ...rows].join('\n');
+  const rows = [`{2.3}${time}`, `{1|0.85}#${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`];
+  const top = rank.top ?? [];
+  if (top.length > 0) {
+    // Entry rank.rank - 1 is the player's own when the time is in the list.
+    const mine = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
+    const half = Math.ceil(top.length / 2);
+    const cell = (i) => (i < top.length ? `{0.9|${i === mine ? 1 : 0.6}}${i + 1}  ${formatTime(top[i], lang)}` : '');
+    rows.push('{0.5}');
+    for (let r = 0; r < half; r++) rows.push(`${cell(r)}\t${cell(r + half)}`.replace(/\t$/, ''));
+  }
+  return rows.join('\n');
 }

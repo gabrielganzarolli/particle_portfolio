@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RANK_URL, RANK_WAIT_MS, parseRank, submitPlay, formatScore, formatScoreboard } from './ranking.js';
+import { RANK_URL, RANK_WAIT_MS, parseRank, submitPlay, formatScoreboard } from './ranking.js';
 
 const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 
@@ -14,17 +14,6 @@ test('parseRank refuses anything else', () => {
   for (const bad of [null, undefined, 3, 'x', {}, { rank: 0, total: 5 }, { rank: 6, total: 5 }, { rank: 1.5, total: 5 }, { rank: '2', total: 5 }, { rank: NaN, total: 5 }, { rank: 2, total: Infinity }]) {
     assert.equal(parseRank(bad), null, JSON.stringify(bad));
   }
-});
-
-test('formatScore: the time alone when there is no rank', () => {
-  assert.equal(formatScore(42.34, null, 'pt'), '42,3 s');
-  assert.equal(formatScore(42.34, null, 'en'), '42.3 s');
-});
-
-test('formatScore: time, position and total, in the page language', () => {
-  assert.equal(formatScore(42.34, { rank: 37, total: 1204 }, 'pt'), '42,3 s  ·  #37 de 1.204');
-  assert.equal(formatScore(42.34, { rank: 37, total: 1204 }, 'en'), '42.3 s  ·  #37 of 1,204');
-  assert.equal(formatScore(3, { rank: 1, total: 1 }, 'pt'), '3,0 s  ·  #1 de 1');
 });
 
 test('submitPlay posts the time as JSON, rounded to the one decimal the screen shows', async () => {
@@ -89,27 +78,41 @@ test('parseRank keeps a believable top list, best first, and drops a bad one', (
   assert.deepEqual(parseRank({ rank: 2, total: 9 }).top, []);
 });
 
-test('formatScoreboard: no top list is the one line of before', () => {
-  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'pt'), '42,3 s  ·  #37 de 1.204');
+test('formatScoreboard: no place is the time alone, plain', () => {
+  assert.equal(formatScoreboard(42.34, null, 'pt'), '42,3 s');
   assert.equal(formatScoreboard(42.34, null, 'en'), '42.3 s');
 });
 
-test('formatScoreboard: ten times fill two columns, 1 to 5 on the left and 6 to 10 on the right', () => {
+test('formatScoreboard: the time large, then the place, in the page language', () => {
+  assert.deepEqual(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'pt').split('\n'), ['{2.3}42,3 s', '{1|0.85}#37 de 1.204']);
+  assert.deepEqual(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'en').split('\n'), ['{2.3}42.3 s', '{1|0.85}#37 of 1,204']);
+});
+
+test('formatScoreboard: the best times small and dim in two columns, 1 to 5 left and 6 to 10 right', () => {
   const top = [99, 98, 97, 96, 95, 94, 93, 92, 91, 90.5];
-  const text = formatScoreboard(42.3, { rank: 37, total: 1204, top }, 'pt');
-  assert.deepEqual(text.split('\n'), [
-    '42,3 s  ·  #37 de 1.204',
-    '1  99,0 s\t6  94,0 s',
-    '2  98,0 s\t7  93,0 s',
-    '3  97,0 s\t8  92,0 s',
-    '4  96,0 s\t9  91,0 s',
-    '5  95,0 s\t10  90,5 s',
+  const rows = formatScoreboard(42.3, { rank: 37, total: 1204, top }, 'pt').split('\n');
+  const d = (n, t) => `{0.9|0.6}${n}  ${t}`;
+  assert.deepEqual(rows.slice(2), [
+    '{0.5}',
+    `${d(1, '99,0 s')}\t${d(6, '94,0 s')}`,
+    `${d(2, '98,0 s')}\t${d(7, '93,0 s')}`,
+    `${d(3, '97,0 s')}\t${d(8, '92,0 s')}`,
+    `${d(4, '96,0 s')}\t${d(9, '91,0 s')}`,
+    `${d(5, '95,0 s')}\t${d(10, '90,5 s')}`,
   ]);
 });
 
-test('formatScoreboard: a short list leaves the right column short, and one time is one row', () => {
-  const three = formatScoreboard(5, { rank: 3, total: 3, top: [9, 8, 7] }, 'en').split('\n');
-  assert.deepEqual(three, ['5.0 s  ·  #3 of 3', '1  9.0 s\t3  7.0 s', '2  8.0 s']);
-  const one = formatScoreboard(5, { rank: 1, total: 1, top: [5] }, 'en').split('\n');
-  assert.deepEqual(one, ['5.0 s  ·  #1 of 1', '1  5.0 s']);
+test('formatScoreboard: the player\'s own entry, when in the list, is at full density', () => {
+  const top = [99, 98, 97, 96, 95, 94, 93, 92, 91, 90.5];
+  const rows = formatScoreboard(97, { rank: 3, total: 50, top }, 'en').split('\n');
+  assert.equal(rows[5], '{0.9|1}3  97.0 s\t{0.9|0.6}8  92.0 s');
+  // 90.5 is the 10th: rank 10 marks the right-hand cell of the last row
+  const last = formatScoreboard(90.5, { rank: 10, total: 50, top }, 'en').split('\n');
+  assert.equal(last[7], '{0.9|0.6}5  95.0 s\t{0.9|1}10  90.5 s');
+});
+
+test('formatScoreboard: outside the top 10 nobody is marked; a short list leaves the right short', () => {
+  const rows = formatScoreboard(5, { rank: 37, total: 50, top: [9, 8, 7] }, 'en').split('\n');
+  assert.equal(rows.filter((r) => r.includes('{0.9|1}')).length, 0);
+  assert.deepEqual(rows.slice(3), ['{0.9|0.6}1  9.0 s\t{0.9|0.6}3  7.0 s', '{0.9|0.6}2  8.0 s']);
 });
