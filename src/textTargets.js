@@ -54,19 +54,44 @@ function rasterizeRows(phrase) {
     }
   }
 
-  ctx.textAlign = 'center';
+  // Rows with several cells are a grid: each column is as wide as its widest
+  // cell, the columns sit side by side as one centred block, and the text is
+  // aligned to the left edge of its column so the numbers line up.
+  // A one-cell row is simply centred.
+  const colWidth = new Map();
+  rows.forEach((cells) => {
+    if (cells.length < 2) return;
+    cells.forEach((c, i) => {
+      if (!c.text) return;
+      ctx.font = `${FONT_WEIGHT} ${size * c.scale}px ${FONT_FAMILY}`;
+      const key = `${cells.length}:${i}`;
+      colWidth.set(key, Math.max(colWidth.get(key) ?? 0, ctx.measureText(c.text).width));
+    });
+  });
+
   ctx.textBaseline = 'middle';
   let y = (RASTER_H - rowScale.reduce((a, b) => a + b, 0) * size * LINE) / 2;
   rows.forEach((cells, r) => {
     const h = rowScale[r] * size * LINE;
-    const colW = maxW / cells.length;
     cells.forEach((c, i) => {
       if (!c.text) return;
       const fs = size * c.scale;
       ctx.font = `${FONT_WEIGHT} ${fs}px ${FONT_FAMILY}`;
       ctx.letterSpacing = `${fs * 0.02}px`;
       ctx.fillStyle = `rgba(255,255,255,${c.alpha})`;
-      ctx.fillText(c.text, padX + colW * (i + 0.5), y + h / 2);
+      if (cells.length < 2) {
+        ctx.textAlign = 'center';
+        ctx.fillText(c.text, RASTER_W / 2, y + h / 2);
+      } else {
+        // The columns form one block, centred, with a gap between them.
+        const widths = cells.map((_, j) => colWidth.get(`${cells.length}:${j}`) ?? 0);
+        const gap = size * 1.6;
+        const total = widths.reduce((a, b) => a + b, 0) + gap * (cells.length - 1);
+        let x = RASTER_W / 2 - total / 2;
+        for (let j = 0; j < i; j++) x += widths[j] + gap;
+        ctx.textAlign = 'left';
+        ctx.fillText(c.text, x, y + h / 2);
+      }
     });
     y += h;
   });

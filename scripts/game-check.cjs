@@ -1763,7 +1763,7 @@ async function rankCheck() {
   // crashed, and the score text is read once it has been built.
   async function play(label, answer, { crash = true } = {}) {
     const sent = [];
-    const { browser, page, errors } = await openSite('#jogo', {}, (p) =>
+    const { browser, page, errors } = await openSite(`#jogo-nivel${process.env.RANK_LEVEL || 1}`, {}, (p) =>
       p.route('**/api/rank', async (route) => {
         sent.push({ method: route.request().method(), body: route.request().postData() });
         await answer(route);
@@ -1775,7 +1775,7 @@ async function rankCheck() {
       if (crash) {
         await page.evaluate(() => window.__pf.game.debug.kill());
         await page.waitForFunction(() => window.__pf.game.phase === 'score', null, WAIT);
-        await page.waitForFunction(() => /^(\{2\.3\})?\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
+        await page.waitForFunction(() => /^(\{1\.8\})?\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
         text = await page.evaluate(SCORE_TEXT);
       } else {
         await page.keyboard.press('Escape');
@@ -1793,9 +1793,10 @@ async function rankCheck() {
   {
     const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204, top: [99, 98, 97, 96, 95, 94, 93, 92, 91, 90.5] }) }));
     const lines = (r.text ?? '').split('\n');
-    report(lines.length === 8 && lines[3] === '{0.9|0.6}1  99.0 s\t{0.9|0.6}6  94.0 s' && lines[7] === '{0.9|0.6}5  95.0 s\t{0.9|0.6}10  90.5 s', `(a) the best times as rows: ${JSON.stringify(lines.slice(2))}`);
-    report(lines[1] === '{1|0.85}#37 of 1,204', `(a) the place under the time: "${lines[1]}"`);
-    const m = /^\{2\.3\}(\d+\.\d) s$/.exec(lines[0]);
+    const cell = (n, t) => `{1|0.85}${n}  ${t}`;
+    report(lines.length === 7 && lines[3] === `${cell(1, '99.0 s')}\t${cell(5, '95.0 s')}\t${cell(9, '91.0 s')}` && lines[6] === `${cell(4, '96.0 s')}\t${cell(8, '92.0 s')}\t`, `(a) the best times as rows: ${JSON.stringify(lines.slice(2))}`);
+    report(lines[1] === '{1|0.8}#37 of 1,204', `(a) the place under the time: "${lines[1]}"`);
+    const m = /^\{1\.8\}(\d+\.\d) s$/.exec(lines[0]);
     report(!!m, `(a) first line is the time: "${lines[0]}"`);
     await r.page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT).catch(() => {});
     await r.page.waitForTimeout(1500);

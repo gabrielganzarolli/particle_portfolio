@@ -62,15 +62,20 @@ export function formatScoreboard(seconds, rank, lang) {
   const time = formatTime(seconds, lang);
   if (!rank) return time;
   const nf = new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US');
-  const rows = [`{2.3}${time}`, `{1|0.85}#${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`];
+  // Size carries the hierarchy and density only nudges it: with bloom, a dense
+  // large line saturates into a blob and a sparse small one dissolves.
+  const rows = [`{1.8}${time}`, `{1|0.8}#${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`];
   const top = rank.top ?? [];
   if (top.length > 0) {
     // Entry rank.rank - 1 is the player's own when the time is in the list.
     const mine = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
-    const half = Math.ceil(top.length / 2);
-    const cell = (i) => (i < top.length ? `{0.9|${i === mine ? 1 : 0.6}}${i + 1}  ${formatTime(top[i], lang)}` : '');
-    rows.push('{0.5}');
-    for (let r = 0; r < half; r++) rows.push(`${cell(r)}\t${cell(r + half)}`.replace(/\t$/, ''));
+    // Up to three columns (1 to 4, 5 to 8, 9 and 10) so the rows stay few and
+    // large. Every row has all the columns, empty cells included, so they line up.
+    const cols = Math.min(3, top.length);
+    const per = Math.ceil(top.length / cols);
+    const cell = (i) => (i < top.length ? `{1|${i === mine ? 1 : 0.85}}${i + 1}  ${formatTime(top[i], lang)}` : '');
+    rows.push('{0.35}');
+    for (let r = 0; r < per; r++) rows.push(Array.from({ length: cols }, (_, c) => cell(r + c * per)).join('\t'));
   }
   return rows.join('\n');
 }
