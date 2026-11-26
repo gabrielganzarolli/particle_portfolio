@@ -16,6 +16,8 @@
 //                                           game code at load or after a game)
 //   node scripts/game-check.cjs headLeak (after a crash the parked particles do
 //                                           not come back as the head's shape)
+//   node scripts/game-check.cjs rank      (the ranking on the score screen, with
+//                                           /api/rank answered by the page's routes)
 //   node scripts/game-check.cjs bench     (hero frame time vs main; exit 0 pass,
 //                                           1 fail, 3 inconclusive; see bench)
 //
@@ -35,10 +37,12 @@ async function openSite(hash = '', options = {}, setup = null) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, ...options });
   const errors = [];
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
+    // The ranking's request fails by design here (the dev server has no /api,
+    // and the rank check answers 503 on purpose); the browser logs each one.
+    if (msg.type() === 'error' && !msg.location().url.endsWith('/api/rank')) errors.push(msg.text());
   });
   page.on('pageerror', (err) => errors.push(String(err)));
-  if (setup) setup(page);
+  if (setup) await setup(page);
   await page.goto(`${BASE}/${hash}`);
   await page.waitForFunction(() => window.__pf && window.__pf.state().frames > 2, null, { timeout: 300000, polling: 500 });
   return { browser, page, errors };
@@ -1740,7 +1744,94 @@ async function headLeak() {
   return failed;
 }
 
-const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, flow4: flowPart4, probe: probeCheck, budget: budgetCheck, bench, heroPrograms, headLeak };
+// The ranking on the score screen. There is no Redis here, so /api/rank is
+// answered by the page's own routes: the place comes in the score text, the
+// time alone shows when the server fails or is too slow, and only a crash is a
+// play (leaving with Esc while the ship is alive sends nothing).
+async function rankCheck() {
+  let failed = false;
+  const report = (ok, text) => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${text}`);
+    if (!ok) failed = true;
+  };
+  const SCORE_TEXT = () => {
+    const f = window.__pf.field;
+    return f.phrases[f.scoreIndex];
+  };
+
+  // One play: the answer `answer(route)` is given to the request, the ship is
+  // crashed, and the score text is read once it has been built.
+  async function play(label, answer, { crash = true } = {}) {
+    const sent = [];
+    const { browser, page, errors } = await openSite('#jogo', {}, (p) =>
+      p.route('**/api/rank', async (route) => {
+        sent.push({ method: route.request().method(), body: route.request().postData() });
+        await answer(route);
+      })
+    );
+    let text = null;
+    try {
+      await page.waitForFunction(() => window.__pf.game?.phase === 'play', null, WAIT);
+      if (crash) {
+        await page.evaluate(() => window.__pf.game.debug.kill());
+        await page.waitForFunction(() => window.__pf.game.phase === 'score', null, WAIT);
+        await page.waitForFunction(() => /^\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
+        text = await page.evaluate(SCORE_TEXT);
+      } else {
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => window.__pf.game.phase === 'idle', null, WAIT);
+        await page.waitForTimeout(1500); // a request, if one were going to be sent
+      }
+    } catch (err) {
+      report(false, `${label}: ${err.message.split('\n')[0]}`);
+    }
+    if (errors.length) report(false, `${label}: console errors:\n  ${errors.join('\n  ')}`);
+    return { browser, page, sent, text };
+  }
+
+  // (a) The server answers: time and place, one request, the time as shown.
+  {
+    const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204 }) }));
+    const m = /^(\d+\.\d) s  ·  #37 of 1,204$/.exec(r.text ?? '');
+    report(!!m, `(a) score text with the place: "${r.text}"`);
+    const body = r.sent[0] ? JSON.parse(r.sent[0].body) : null;
+    report(r.sent.length === 1 && r.sent[0].method === 'POST', `(a) one POST to /api/rank (${r.sent.length})`);
+    report(!!m && body && body.seconds === Number(m[1]), `(a) the time sent (${body && body.seconds}) is the time shown (${m && m[1]})`);
+    await r.page.keyboard.press('Escape');
+    await r.page.waitForFunction(() => window.__pf.game.phase === 'idle', null, WAIT).catch(() => {});
+    report(r.sent.length === 1, `(a) leaving the score screen sends nothing more (${r.sent.length})`);
+    await r.browser.close();
+  }
+
+  // (b) The server is not configured: the time alone.
+  {
+    const r = await play('(b)', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"not-configured"}' }));
+    report(/^\d+\.\d s$/.test(r.text ?? ''), `(b) 503 -> the time alone: "${r.text}"`);
+    await r.browser.close();
+  }
+
+  // (c) The server is too slow: the time alone, and the game is not held up.
+  {
+    const t0 = Date.now();
+    const r = await play('(c)', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 1, total: 1 }) }).catch(() => {});
+    });
+    report(/^\d+\.\d s$/.test(r.text ?? ''), `(c) slow server -> the time alone: "${r.text}"`);
+    await r.browser.close();
+    void t0;
+  }
+
+  // (d) Esc with the ship alive is not a play.
+  {
+    const r = await play('(d)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"rank":1,"total":1}' }), { crash: false });
+    report(r.sent.length === 0, `(d) Esc with the ship alive sends nothing (${r.sent.length})`);
+    await r.browser.close();
+  }
+  return failed;
+}
+
+const checks = { positions, look, flow, flow1: flowPart1, flow2: flowPart2, flow3: flowPart3, flow4: flowPart4, probe: probeCheck, budget: budgetCheck, bench, heroPrograms, headLeak, rank: rankCheck };
 
 (async () => {
   const run = checks[mode];

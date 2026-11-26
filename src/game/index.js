@@ -12,7 +12,7 @@ import { createWorld, stepWorld, gameUniforms } from './world.js';
 import { steerTarget, attachControls } from './controls.js';
 import { gameCamera, blendPose, stepBlend, HERO_FOV, corridorFor } from './camera.js';
 import { createPhases, PHASE, ENTER_S, EXIT_S } from './phases.js';
-import { formatTime } from './text.js';
+import { submitPlay, formatScore } from './ranking.js';
 import { createRng } from './rng.js';
 import { buildGamePrograms, gameLift } from './gpu.js';
 import { LEVELS } from '../quality.js';
@@ -173,9 +173,19 @@ export function createGame(ctx) {
     // again and Esc still exits.
     if (document.activeElement?.closest?.('[data-game-exit]')) document.activeElement.blur();
     scoreFormed = false;
-    scorePhrase = field.setPhrase(SCORE, formatTime(world.t, ctx.lang()));
+    scorePhrase = buildScorePhrase(world.t, ctx.lang());
     scorePhrase.catch((err) => console.warn(err));
     endRun();
+  }
+
+  // The play's time goes to the ranking and the score text is its time and its
+  // place among all the plays. If the place does not come in time, or at all
+  // (no server, not configured), the text is the time alone: the game never
+  // depends on the ranking. Only a crash counts as a play, not leaving with
+  // `Esc` while the ship is alive.
+  async function buildScorePhrase(seconds, lang) {
+    const rank = await submitPlay(seconds);
+    await field.setPhrase(SCORE, formatScore(seconds, rank, lang));
   }
 
   async function formScore() {

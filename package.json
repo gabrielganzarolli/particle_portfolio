@@ -7,7 +7,7 @@
     "build": "npm run cases && vite build",
     "preview": "vite preview",
     "cases": "node scripts/build-cases.mjs",
-    "test": "node --test \"src/game/**/*.test.js\""
+    "test": "node --test \"src/game/**/*.test.js\" \"api/**/*.test.js\""
   },
   "type": "module",
   "dependencies": {
