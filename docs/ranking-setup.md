@@ -1,7 +1,7 @@
 # Ranking: como ativar
 
 Ao bater, o jogo envia o tempo para `/api/rank` e mostra a sua posição entre
-todas as partidas (ex.: `42,3 s  ·  #37 de 1.204`) e, abaixo, o **top 10 do
+todas as partidas (ex.: `42,3 s  ·  #37 de 1.204`) e, abaixo, o **top 5 do
 mundo** (só os tempos, em duas colunas, sem nomes). Sem o armazenamento abaixo
 configurado, a função responde 503 e a tela de pontuação mostra só o tempo,
 como antes. Nada quebra.
@@ -31,7 +31,7 @@ testar o ranking de verdade, use `vercel dev` com as variáveis do projeto
   segundos. Nenhum dado pessoal.
 - Para limitar abuso (200 partidas por hora por endereço), um contador
   `rl:<hash>` que expira em 1 hora. Só o hash do IP vai ao Redis, nunca o IP.
-- O top 10 sai do mesmo conjunto (`ZREVRANGE`) e a API devolve só os tempos,
+- O top 5 sai do mesmo conjunto (`ZREVRANGE`) e a API devolve só os tempos,
   nunca os ids das partidas.
 - A posição é 1 + o número de partidas estritamente mais longas; tempos iguais
   dividem a posição.

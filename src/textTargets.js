@@ -20,48 +20,74 @@ export async function readyFonts() {
   await document.fonts.ready;
 }
 
-// A phrase with "\n" is rows, and a row with "\t" is cells in equal columns
-// (the score screen's list of best times). Every cell is centred in its
-// column at one size, the largest at which all of them fit.
+// A phrase with "\n" is rows, and one with "\f" is panes side by side (the
+// score screen: the player's time on one side, the best times on the other).
+// A row may start with "{scale}" or "{scale|alpha}": its size relative to the
+// rest and how dense its ink is (a lower alpha draws fewer particles, so it
+// reads dimmer). A pane that starts with "{<}" has its rows aligned to the
+// left edge of the pane's block, so numbers line up; any other pane is centred.
+// Each pane is centred vertically in its half of the width, and everything is
+// drawn at the largest size at which every pane fits.
+function parseRow(raw) {
+  const m = /^\{([\d.]+)(?:\|([\d.]+))?\}/.exec(raw);
+  if (!m) return { text: raw, scale: 1, alpha: 1 };
+  return { text: raw.slice(m[0].length), scale: Number(m[1]), alpha: m[2] === undefined ? 1 : Number(m[2]) };
+}
+
 function rasterizeRows(phrase) {
   const canvas = document.createElement('canvas');
   canvas.width = RASTER_W;
   canvas.height = RASTER_H;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  const rows = phrase.split('\n').map((r) => r.split('\t'));
+  const panes = phrase.split('\f').map((raw) => {
+    const left = raw.startsWith('{<}');
+    return { left, rows: (left ? raw.slice(3) : raw).split('\n').map(parseRow) };
+  });
   const padX = RASTER_W * 0.04;
   const maxW = RASTER_W - padX * 2;
+  const paneW = maxW / panes.length;
   const LINE = 1.15; // line height, in font sizes
   const maxH = RASTER_H * 0.96;
 
   const ref = 200;
   ctx.font = `${FONT_WEIGHT} ${ref}px ${FONT_FAMILY}`;
-  let size = (maxH / (rows.length * LINE));
-  for (const cells of rows) {
-    const colW = maxW / cells.length;
-    for (const c of cells) {
-      if (c) size = Math.min(size, (colW * 0.92 / ctx.measureText(c).width) * ref);
+  const heightOf = (pane) => pane.rows.reduce((a, r) => a + r.scale, 0) * LINE; // in font sizes
+  let size = Math.min(...panes.map((pane) => maxH / heightOf(pane)));
+  for (const pane of panes) {
+    for (const r of pane.rows) {
+      if (r.text) size = Math.min(size, ((paneW * 0.92) / (ctx.measureText(r.text).width * r.scale)) * ref);
     }
   }
 
-  ctx.font = `${FONT_WEIGHT} ${size}px ${FONT_FAMILY}`;
-  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.letterSpacing = `${size * 0.02}px`;
-  ctx.fillStyle = '#fff';
-  const top = (RASTER_H - rows.length * size * LINE) / 2 + (size * LINE) / 2;
-  rows.forEach((cells, r) => {
-    const colW = maxW / cells.length;
-    cells.forEach((c, i) => {
-      if (c) ctx.fillText(c, padX + colW * (i + 0.5), top + r * size * LINE);
-    });
+  panes.forEach((pane, p) => {
+    const cx = padX + paneW * (p + 0.5);
+    // The block's width at the final size, for a left-aligned pane.
+    let block = 0;
+    for (const r of pane.rows) {
+      ctx.font = `${FONT_WEIGHT} ${size * r.scale}px ${FONT_FAMILY}`;
+      block = Math.max(block, ctx.measureText(r.text).width);
+    }
+    let y = (RASTER_H - heightOf(pane) * size) / 2;
+    for (const r of pane.rows) {
+      const fs = size * r.scale;
+      const h = fs * LINE;
+      if (r.text) {
+        ctx.font = `${FONT_WEIGHT} ${fs}px ${FONT_FAMILY}`;
+        ctx.letterSpacing = `${fs * 0.02}px`;
+        ctx.fillStyle = `rgba(255,255,255,${r.alpha})`;
+        ctx.textAlign = pane.left ? 'left' : 'center';
+        ctx.fillText(r.text, pane.left ? cx - block / 2 : cx, y + h / 2);
+      }
+      y += h;
+    }
   });
   return ctx.getImageData(0, 0, RASTER_W, RASTER_H).data;
 }
 
 function rasterize(phrase) {
-  if (/[\n\t]/.test(phrase)) return rasterizeRows(phrase);
+  if (/[\n\f]/.test(phrase)) return rasterizeRows(phrase);
   const canvas = document.createElement('canvas');
   canvas.width = RASTER_W;
   canvas.height = RASTER_H;

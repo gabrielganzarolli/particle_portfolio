@@ -1763,7 +1763,7 @@ async function rankCheck() {
   // crashed, and the score text is read once it has been built.
   async function play(label, answer, { crash = true } = {}) {
     const sent = [];
-    const { browser, page, errors } = await openSite('#jogo', {}, (p) =>
+    const { browser, page, errors } = await openSite(`#jogo-nivel${process.env.RANK_LEVEL || 1}`, {}, (p) =>
       p.route('**/api/rank', async (route) => {
         sent.push({ method: route.request().method(), body: route.request().postData() });
         await answer(route);
@@ -1775,7 +1775,7 @@ async function rankCheck() {
       if (crash) {
         await page.evaluate(() => window.__pf.game.debug.kill());
         await page.waitForFunction(() => window.__pf.game.phase === 'score', null, WAIT);
-        await page.waitForFunction(() => /^\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
+        await page.waitForFunction(() => /^(\{2\.4\})?\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
         text = await page.evaluate(SCORE_TEXT);
       } else {
         await page.keyboard.press('Escape');
@@ -1791,15 +1791,18 @@ async function rankCheck() {
 
   // (a) The server answers: time and place, one request, the time as shown.
   {
-    const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204, top: [99, 98, 97, 96, 95, 94, 93, 92, 91, 90.5] }) }));
-    const lines = (r.text ?? '').split('\n');
-    report(lines.length === 6 && lines[1] === '1  99.0 s\t6  94.0 s' && lines[5] === '5  95.0 s\t10  90.5 s', `(a) the best times as rows: ${JSON.stringify(lines.slice(1))}`);
-    const m = /^(\d+\.\d) s  ·  #37 of 1,204$/.exec(lines[0]);
-    report(!!m, `(a) first line with the place: "${lines[0]}"`);
+    const r = await play('(a)', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rank: 37, total: 1204, top: [99, 98, 97, 96, 95] }) }));
+    const [mine = '', list = ''] = (r.text ?? '').split('\f');
+    const lines = mine.split('\n');
+    const cell = (n, t) => `{1|0.85}${n}  ${t}`;
+    report(list === `{<}${[cell(1, '99.0 s'), cell(2, '98.0 s'), cell(3, '97.0 s'), cell(4, '96.0 s'), cell(5, '95.0 s')].join('\n')}`, `(a) the best times on the other side: ${JSON.stringify(list)}`);
+    report(lines[1] === '{2}#37' && lines[2] === '{0.95|0.9}of 1,204', `(a) the place and the total under the time: ${JSON.stringify(lines.slice(1))}`);
+    const m = /^\{2\.4\}(\d+\.\d) s$/.exec(lines[0]);
+    report(!!m, `(a) first line is the time: "${lines[0]}"`);
     await r.page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT).catch(() => {});
     await r.page.waitForTimeout(1500);
     require('fs').mkdirSync('shots', { recursive: true });
-    await r.page.screenshot({ path: 'shots/rank-top10.png' });
+    await r.page.screenshot({ path: 'shots/rank-top5.png' });
     const body = r.sent[0] ? JSON.parse(r.sent[0].body) : null;
     report(r.sent.length === 1 && r.sent[0].method === 'POST', `(a) one POST to /api/rank (${r.sent.length})`);
     report(!!m && body && body.seconds === Number(m[1]), `(a) the time sent (${body && body.seconds}) is the time shown (${m && m[1]})`);

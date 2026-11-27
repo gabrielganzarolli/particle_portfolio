@@ -9,7 +9,7 @@ export const RANK_URL = '/api/rank';
 // the score phase starts 1.5 s after the crash.
 export const RANK_WAIT_MS = 1200;
 
-export const TOP_N = 10;
+export const TOP_N = 5;
 
 /**
  * `{ rank, total, top }` as whole numbers with rank within total, else null.
@@ -50,27 +50,25 @@ export async function submitPlay(seconds, { fetchImpl = globalThis.fetch, timeou
   }
 }
 
-/** The line the particles spell on the score screen. */
-export function formatScore(seconds, rank, lang) {
+/**
+ * The whole score screen, as particle text: the player's time large with the
+ * place (its number large too, the total small) under it on one side, and the best times on the other, with the
+ * player's own entry, when it is among them, at full density. "\n" splits rows,
+ * "\f" splits the two sides, and "{scale|alpha}" sizes and dims a row ("{<}"
+ * left-aligns a side), see rasterizeRows in textTargets.js. With no list it is
+ * the time and the place centred, and with no place the time alone.
+ */
+export function formatScoreboard(seconds, rank, lang) {
   const time = formatTime(seconds, lang);
   if (!rank) return time;
   const nf = new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US');
-  return `${time}  ·  #${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`;
-}
-
-/**
- * The whole score screen: the line above, then the best times in two columns
- * (1 to 5 down the left, 6 to 10 down the right). Rows are split by "\n" and
- * the cells of a row by "\t", which the particle text raster lays out. With no
- * top list it is the one line alone.
- */
-export function formatScoreboard(seconds, rank, lang) {
-  const head = formatScore(seconds, rank, lang);
-  const top = rank?.top ?? [];
-  if (top.length === 0) return head;
-  const half = Math.ceil(top.length / 2);
-  const cell = (i) => (i < top.length ? `${i + 1}  ${formatTime(top[i], lang)}` : '');
-  const rows = [];
-  for (let r = 0; r < half; r++) rows.push(`${cell(r)}\t${cell(r + half)}`.replace(/\t$/, ''));
-  return [head, ...rows].join('\n');
+  // Three sizes: the time, the place (the number that matters, so it is nearly
+  // as large and fully dense), and the total as a smaller complement.
+  const mine = [`{2.4}${time}`, `{2}#${nf.format(rank.rank)}`, `{0.95|0.9}${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`].join('\n');
+  const top = rank.top ?? [];
+  if (top.length === 0) return mine;
+  // Entry rank.rank - 1 is the player's own when the time is in the list.
+  const own = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
+  const list = top.map((t, i) => `{1|${i === own ? 1 : 0.85}}${i + 1}  ${formatTime(t, lang)}`);
+  return `${mine}\f{<}${list.join('\n')}`;
 }
