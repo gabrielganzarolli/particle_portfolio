@@ -52,7 +52,7 @@ export async function submitPlay(seconds, { fetchImpl = globalThis.fetch, timeou
 
 /**
  * The whole score screen, as particle text: the player's time large with the
- * place under it on one side, and the best times on the other, with the
+ * place (its number large too, the total small) under it on one side, and the best times on the other, with the
  * player's own entry, when it is among them, at full density. "\n" splits rows,
  * "\f" splits the two sides, and "{scale|alpha}" sizes and dims a row ("{<}"
  * left-aligns a side), see rasterizeRows in textTargets.js. With no list it is
@@ -62,7 +62,9 @@ export function formatScoreboard(seconds, rank, lang) {
   const time = formatTime(seconds, lang);
   if (!rank) return time;
   const nf = new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US');
-  const mine = [`{2.6}${time}`, `{1.1|0.8}#${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`].join('\n');
+  // Three sizes: the time, the place (the number that matters, so it is nearly
+  // as large and fully dense), and the total as a smaller complement.
+  const mine = [`{2.4}${time}`, `{2}#${nf.format(rank.rank)}`, `{0.95|0.9}${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`].join('\n');
   const top = rank.top ?? [];
   if (top.length === 0) return mine;
   // Entry rank.rank - 1 is the player's own when the time is in the list.

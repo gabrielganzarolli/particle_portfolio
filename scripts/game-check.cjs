@@ -1775,7 +1775,7 @@ async function rankCheck() {
       if (crash) {
         await page.evaluate(() => window.__pf.game.debug.kill());
         await page.waitForFunction(() => window.__pf.game.phase === 'score', null, WAIT);
-        await page.waitForFunction(() => /^(\{2\.6\})?\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
+        await page.waitForFunction(() => /^(\{2\.4\})?\d+\.\d s/.test(String(window.__pf.field.phrases[window.__pf.field.scoreIndex])), null, WAIT);
         text = await page.evaluate(SCORE_TEXT);
       } else {
         await page.keyboard.press('Escape');
@@ -1796,8 +1796,8 @@ async function rankCheck() {
     const lines = mine.split('\n');
     const cell = (n, t) => `{1|0.85}${n}  ${t}`;
     report(list === `{<}${[cell(1, '99.0 s'), cell(2, '98.0 s'), cell(3, '97.0 s'), cell(4, '96.0 s'), cell(5, '95.0 s')].join('\n')}`, `(a) the best times on the other side: ${JSON.stringify(list)}`);
-    report(lines[1] === '{1.1|0.8}#37 of 1,204', `(a) the place under the time: "${lines[1]}"`);
-    const m = /^\{2\.6\}(\d+\.\d) s$/.exec(lines[0]);
+    report(lines[1] === '{2}#37' && lines[2] === '{0.95|0.9}of 1,204', `(a) the place and the total under the time: ${JSON.stringify(lines.slice(1))}`);
+    const m = /^\{2\.4\}(\d+\.\d) s$/.exec(lines[0]);
     report(!!m, `(a) first line is the time: "${lines[0]}"`);
     await r.page.waitForFunction(() => window.__pf.game.debug.scoreFormed, null, WAIT).catch(() => {});
     await r.page.waitForTimeout(1500);

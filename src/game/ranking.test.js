@@ -83,9 +83,9 @@ test('formatScoreboard: no place is the time alone, plain', () => {
   assert.equal(formatScoreboard(42.34, null, 'en'), '42.3 s');
 });
 
-test('formatScoreboard: with no list, the time large and the place under it, in the page language', () => {
-  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'pt'), '{2.6}42,3 s\n{1.1|0.8}#37 de 1.204');
-  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'en'), '{2.6}42.3 s\n{1.1|0.8}#37 of 1,204');
+test('formatScoreboard: with no list, the time, the place and the total, large to small, in the page language', () => {
+  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'pt'), '{2.4}42,3 s\n{2}#37\n{0.95|0.9}de 1.204');
+  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'en'), '{2.4}42.3 s\n{2}#37\n{0.95|0.9}of 1,204');
 });
 
 const d = (n, t, a = 0.85) => `{1|${a}}${n}  ${t}`;
@@ -93,7 +93,7 @@ const d = (n, t, a = 0.85) => `{1|${a}}${n}  ${t}`;
 test('formatScoreboard: the player on one side, the best 5 times on the other', () => {
   const top = [99, 98, 97, 96, 95];
   const [mine, list] = formatScoreboard(42.3, { rank: 37, total: 1204, top }, 'pt').split('\f');
-  assert.equal(mine, '{2.6}42,3 s\n{1.1|0.8}#37 de 1.204');
+  assert.equal(mine, '{2.4}42,3 s\n{2}#37\n{0.95|0.9}de 1.204');
   assert.equal(list, `{<}${[d(1, '99,0 s'), d(2, '98,0 s'), d(3, '97,0 s'), d(4, '96,0 s'), d(5, '95,0 s')].join('\n')}`);
 });
 
