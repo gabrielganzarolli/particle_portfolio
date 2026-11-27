@@ -13,7 +13,7 @@ export const MIN_SECONDS = 0.5; // nobody survives less than this
 export const MAX_SECONDS = 3600; // nor, in practice, more than an hour
 export const RATE_LIMIT = 200; // plays accepted per address per window
 export const RATE_WINDOW_S = 3600;
-export const TOP_N = 10; // the best times sent back with the place
+export const TOP_N = 5; // the best times sent back with the place
 
 /** The time as one decimal, or null when it is not a believable duration. */
 export function parseSeconds(body) {

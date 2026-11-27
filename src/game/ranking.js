@@ -9,7 +9,7 @@ export const RANK_URL = '/api/rank';
 // the score phase starts 1.5 s after the crash.
 export const RANK_WAIT_MS = 1200;
 
-export const TOP_N = 10;
+export const TOP_N = 5;
 
 /**
  * `{ rank, total, top }` as whole numbers with rank within total, else null.
@@ -52,8 +52,8 @@ export async function submitPlay(seconds, { fetchImpl = globalThis.fetch, timeou
 
 /**
  * The whole score screen, as particle text with a hierarchy: the time large,
- * the place under it, then the best times in two columns (1 to 5
- * down the left, 6 to 10 down the right) with the player's own entry, when it
+ * the place under it, then the best 5 times in two columns (1 to 3
+ * down the left, 4 and 5 down the right) with the player's own entry, when it
  * is among them, at full density. Rows are split by "\n", the cells of a row
  * by "\t", and "{scale|alpha}" sizes and dims a cell (see rasterizeRows in
  * textTargets.js). With no place it is the time alone.
@@ -69,7 +69,7 @@ export function formatScoreboard(seconds, rank, lang) {
   if (top.length > 0) {
     // Entry rank.rank - 1 is the player's own when the time is in the list.
     const mine = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
-    // Two columns (1 to 5 on the left, 6 to 10 on the right). Every row has all
+    // Two columns (1 to 3 on the left, 4 and 5 on the right). Every row has all
     // the columns, empty cells included, so they line up.
     const cols = Math.min(2, top.length);
     const per = Math.ceil(top.length / cols);
