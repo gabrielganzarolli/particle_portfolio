@@ -83,38 +83,31 @@ test('formatScoreboard: no place is the time alone, plain', () => {
   assert.equal(formatScoreboard(42.34, null, 'en'), '42.3 s');
 });
 
-test('formatScoreboard: the time large, then the place, in the page language', () => {
-  assert.deepEqual(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'pt').split('\n'), ['{1.8}42,3 s', '{1|0.8}#37 de 1.204']);
-  assert.deepEqual(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'en').split('\n'), ['{1.8}42.3 s', '{1|0.8}#37 of 1,204']);
+test('formatScoreboard: with no list, the time large and the place under it, in the page language', () => {
+  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'pt'), '{2.6}42,3 s\n{1.1|0.8}#37 de 1.204');
+  assert.equal(formatScoreboard(42.34, { rank: 37, total: 1204, top: [] }, 'en'), '{2.6}42.3 s\n{1.1|0.8}#37 of 1,204');
 });
 
 const d = (n, t, a = 0.85) => `{1|${a}}${n}  ${t}`;
 
-test('formatScoreboard: the best 5 times in two columns, 1 to 3 on the left and 4 and 5 on the right', () => {
+test('formatScoreboard: the player on one side, the best 5 times on the other', () => {
   const top = [99, 98, 97, 96, 95];
-  const rows = formatScoreboard(42.3, { rank: 37, total: 1204, top }, 'pt').split('\n');
-  assert.deepEqual(rows.slice(2), [
-    '{0.35}',
-    `${d(1, '99,0 s')}\t${d(4, '96,0 s')}`,
-    `${d(2, '98,0 s')}\t${d(5, '95,0 s')}`,
-    `${d(3, '97,0 s')}\t`,
-  ]);
+  const [mine, list] = formatScoreboard(42.3, { rank: 37, total: 1204, top }, 'pt').split('\f');
+  assert.equal(mine, '{2.6}42,3 s\n{1.1|0.8}#37 de 1.204');
+  assert.equal(list, `{<}${[d(1, '99,0 s'), d(2, '98,0 s'), d(3, '97,0 s'), d(4, '96,0 s'), d(5, '95,0 s')].join('\n')}`);
 });
 
 test('formatScoreboard: the player\'s own entry, when in the list, is at full density', () => {
   const top = [99, 98, 97, 96, 95];
-  const rows = formatScoreboard(97, { rank: 3, total: 50, top }, 'en').split('\n');
-  assert.equal(rows[5], `${d(3, '97.0 s', 1)}\t`);
-  const last = formatScoreboard(95, { rank: 5, total: 50, top }, 'en').split('\n');
-  assert.equal(last[4], `${d(2, '98.0 s')}\t${d(5, '95.0 s', 1)}`);
+  const list = formatScoreboard(97, { rank: 3, total: 50, top }, 'en').split('\f')[1].split('\n');
+  assert.equal(list[2], d(3, '97.0 s', 1));
+  assert.equal(list.filter((r) => r.includes('{1|1}')).length, 1);
 });
 
-test('formatScoreboard: outside the top 5 nobody is marked; short lists stay aligned', () => {
-  const three = formatScoreboard(5, { rank: 37, total: 50, top: [9, 8, 7] }, 'en').split('\n');
+test('formatScoreboard: outside the top 5 nobody is marked; a short list is just shorter', () => {
+  const three = formatScoreboard(5, { rank: 37, total: 50, top: [9, 8, 7] }, 'en').split('\f')[1].split('\n');
   assert.equal(three.filter((r) => r.includes('{1|1}')).length, 0);
-  assert.deepEqual(three.slice(3), [`${d(1, '9.0 s')}\t${d(3, '7.0 s')}`, `${d(2, '8.0 s')}\t`]);
-  const two = formatScoreboard(5, { rank: 2, total: 2, top: [9, 5] }, 'en').split('\n');
-  assert.deepEqual(two.slice(3), [`${d(1, '9.0 s')}\t${d(2, '5.0 s', 1)}`]);
-  const one = formatScoreboard(5, { rank: 1, total: 1, top: [5] }, 'en').split('\n');
-  assert.deepEqual(one.slice(3), [d(1, '5.0 s', 1)]);
+  assert.equal(three.length, 3);
+  const one = formatScoreboard(5, { rank: 1, total: 1, top: [5] }, 'en').split('\f')[1];
+  assert.equal(one, `{<}${d(1, '5.0 s', 1)}`);
 });

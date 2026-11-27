@@ -20,12 +20,15 @@ export async function readyFonts() {
   await document.fonts.ready;
 }
 
-// A phrase with "\n" is rows, and a row with "\t" is cells in equal columns
-// (the score screen). A cell may start with "{scale}" or "{scale|alpha}": the
-// size relative to the rest and how dense its ink is (a lower alpha draws
-// fewer particles, so it reads dimmer). A row is as tall as its largest cell.
-// Everything is centred in its column at the largest size at which it all fits.
-function parseCell(raw) {
+// A phrase with "\n" is rows, and one with "\f" is panes side by side (the
+// score screen: the player's time on one side, the best times on the other).
+// A row may start with "{scale}" or "{scale|alpha}": its size relative to the
+// rest and how dense its ink is (a lower alpha draws fewer particles, so it
+// reads dimmer). A pane that starts with "{<}" has its rows aligned to the
+// left edge of the pane's block, so numbers line up; any other pane is centred.
+// Each pane is centred vertically in its half of the width, and everything is
+// drawn at the largest size at which every pane fits.
+function parseRow(raw) {
   const m = /^\{([\d.]+)(?:\|([\d.]+))?\}/.exec(raw);
   if (!m) return { text: raw, scale: 1, alpha: 1 };
   return { text: raw.slice(m[0].length), scale: Number(m[1]), alpha: m[2] === undefined ? 1 : Number(m[2]) };
@@ -37,69 +40,54 @@ function rasterizeRows(phrase) {
   canvas.height = RASTER_H;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  const rows = phrase.split('\n').map((r) => r.split('\t').map(parseCell));
-  const rowScale = rows.map((cells) => Math.max(...cells.map((c) => c.scale)));
+  const panes = phrase.split('\f').map((raw) => {
+    const left = raw.startsWith('{<}');
+    return { left, rows: (left ? raw.slice(3) : raw).split('\n').map(parseRow) };
+  });
   const padX = RASTER_W * 0.04;
   const maxW = RASTER_W - padX * 2;
+  const paneW = maxW / panes.length;
   const LINE = 1.15; // line height, in font sizes
   const maxH = RASTER_H * 0.96;
 
   const ref = 200;
   ctx.font = `${FONT_WEIGHT} ${ref}px ${FONT_FAMILY}`;
-  let size = maxH / (rowScale.reduce((a, b) => a + b, 0) * LINE);
-  for (const cells of rows) {
-    const colW = maxW / cells.length;
-    for (const c of cells) {
-      if (c.text) size = Math.min(size, ((colW * 0.92) / (ctx.measureText(c.text).width * c.scale)) * ref);
+  const heightOf = (pane) => pane.rows.reduce((a, r) => a + r.scale, 0) * LINE; // in font sizes
+  let size = Math.min(...panes.map((pane) => maxH / heightOf(pane)));
+  for (const pane of panes) {
+    for (const r of pane.rows) {
+      if (r.text) size = Math.min(size, ((paneW * 0.92) / (ctx.measureText(r.text).width * r.scale)) * ref);
     }
   }
 
-  // Rows with several cells are a grid: each column is as wide as its widest
-  // cell, the columns sit side by side as one centred block, and the text is
-  // aligned to the left edge of its column so the numbers line up.
-  // A one-cell row is simply centred.
-  const colWidth = new Map();
-  rows.forEach((cells) => {
-    if (cells.length < 2) return;
-    cells.forEach((c, i) => {
-      if (!c.text) return;
-      ctx.font = `${FONT_WEIGHT} ${size * c.scale}px ${FONT_FAMILY}`;
-      const key = `${cells.length}:${i}`;
-      colWidth.set(key, Math.max(colWidth.get(key) ?? 0, ctx.measureText(c.text).width));
-    });
-  });
-
   ctx.textBaseline = 'middle';
-  let y = (RASTER_H - rowScale.reduce((a, b) => a + b, 0) * size * LINE) / 2;
-  rows.forEach((cells, r) => {
-    const h = rowScale[r] * size * LINE;
-    cells.forEach((c, i) => {
-      if (!c.text) return;
-      const fs = size * c.scale;
-      ctx.font = `${FONT_WEIGHT} ${fs}px ${FONT_FAMILY}`;
-      ctx.letterSpacing = `${fs * 0.02}px`;
-      ctx.fillStyle = `rgba(255,255,255,${c.alpha})`;
-      if (cells.length < 2) {
-        ctx.textAlign = 'center';
-        ctx.fillText(c.text, RASTER_W / 2, y + h / 2);
-      } else {
-        // The columns form one block, centred, with a gap between them.
-        const widths = cells.map((_, j) => colWidth.get(`${cells.length}:${j}`) ?? 0);
-        const gap = size * 1.6;
-        const total = widths.reduce((a, b) => a + b, 0) + gap * (cells.length - 1);
-        let x = RASTER_W / 2 - total / 2;
-        for (let j = 0; j < i; j++) x += widths[j] + gap;
-        ctx.textAlign = 'left';
-        ctx.fillText(c.text, x, y + h / 2);
+  panes.forEach((pane, p) => {
+    const cx = padX + paneW * (p + 0.5);
+    // The block's width at the final size, for a left-aligned pane.
+    let block = 0;
+    for (const r of pane.rows) {
+      ctx.font = `${FONT_WEIGHT} ${size * r.scale}px ${FONT_FAMILY}`;
+      block = Math.max(block, ctx.measureText(r.text).width);
+    }
+    let y = (RASTER_H - heightOf(pane) * size) / 2;
+    for (const r of pane.rows) {
+      const fs = size * r.scale;
+      const h = fs * LINE;
+      if (r.text) {
+        ctx.font = `${FONT_WEIGHT} ${fs}px ${FONT_FAMILY}`;
+        ctx.letterSpacing = `${fs * 0.02}px`;
+        ctx.fillStyle = `rgba(255,255,255,${r.alpha})`;
+        ctx.textAlign = pane.left ? 'left' : 'center';
+        ctx.fillText(r.text, pane.left ? cx - block / 2 : cx, y + h / 2);
       }
-    });
-    y += h;
+      y += h;
+    }
   });
   return ctx.getImageData(0, 0, RASTER_W, RASTER_H).data;
 }
 
 function rasterize(phrase) {
-  if (/[\n\t]/.test(phrase)) return rasterizeRows(phrase);
+  if (/[\n\f]/.test(phrase)) return rasterizeRows(phrase);
   const canvas = document.createElement('canvas');
   canvas.width = RASTER_W;
   canvas.height = RASTER_H;

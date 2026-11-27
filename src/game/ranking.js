@@ -51,31 +51,22 @@ export async function submitPlay(seconds, { fetchImpl = globalThis.fetch, timeou
 }
 
 /**
- * The whole score screen, as particle text with a hierarchy: the time large,
- * the place under it, then the best 5 times in two columns (1 to 3
- * down the left, 4 and 5 down the right) with the player's own entry, when it
- * is among them, at full density. Rows are split by "\n", the cells of a row
- * by "\t", and "{scale|alpha}" sizes and dims a cell (see rasterizeRows in
- * textTargets.js). With no place it is the time alone.
+ * The whole score screen, as particle text: the player's time large with the
+ * place under it on one side, and the best times on the other, with the
+ * player's own entry, when it is among them, at full density. "\n" splits rows,
+ * "\f" splits the two sides, and "{scale|alpha}" sizes and dims a row ("{<}"
+ * left-aligns a side), see rasterizeRows in textTargets.js. With no list it is
+ * the time and the place centred, and with no place the time alone.
  */
 export function formatScoreboard(seconds, rank, lang) {
   const time = formatTime(seconds, lang);
   if (!rank) return time;
   const nf = new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US');
-  // Size carries the hierarchy and density only nudges it: with bloom, a dense
-  // large line saturates into a blob and a sparse small one dissolves.
-  const rows = [`{1.8}${time}`, `{1|0.8}#${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`];
+  const mine = [`{2.6}${time}`, `{1.1|0.8}#${nf.format(rank.rank)} ${lang === 'pt' ? 'de' : 'of'} ${nf.format(rank.total)}`].join('\n');
   const top = rank.top ?? [];
-  if (top.length > 0) {
-    // Entry rank.rank - 1 is the player's own when the time is in the list.
-    const mine = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
-    // Two columns (1 to 3 on the left, 4 and 5 on the right). Every row has all
-    // the columns, empty cells included, so they line up.
-    const cols = Math.min(2, top.length);
-    const per = Math.ceil(top.length / cols);
-    const cell = (i) => (i < top.length ? `{1|${i === mine ? 1 : 0.85}}${i + 1}  ${formatTime(top[i], lang)}` : '');
-    rows.push('{0.35}');
-    for (let r = 0; r < per; r++) rows.push(Array.from({ length: cols }, (_, c) => cell(r + c * per)).join('\t'));
-  }
-  return rows.join('\n');
+  if (top.length === 0) return mine;
+  // Entry rank.rank - 1 is the player's own when the time is in the list.
+  const own = top[rank.rank - 1] === Number(seconds.toFixed(1)) ? rank.rank - 1 : -1;
+  const list = top.map((t, i) => `{1|${i === own ? 1 : 0.85}}${i + 1}  ${formatTime(t, lang)}`);
+  return `${mine}\f{<}${list.join('\n')}`;
 }
